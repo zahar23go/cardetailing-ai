@@ -1,0 +1,46 @@
+/* ============================================
+   THEME — Цвета и переменные (Глава 13.2)
+   ============================================ */
+
+:root {
+  /* Основные цвета */
+  --color-graphite: #0B0D10;
+  --color-carbon: #13161A;
+  --color-elevated: #1A1E23;
+  --color-divider: #232A33;
+  
+  /* Текст */
+  --color-white: #FFFFFF;
+  --color-titanium: #AAB2BF;
+  
+  /* Акцент */
+  --color-gold: #C8A977;
+  --color-gold-hover: #D5B98D;
+  --color-gold-shadow: rgba(200, 169, 119, 0.15);
+  
+  /* Статусы */
+  --color-success: #0F5D46;
+  --color-warning: #B76A29;
+  
+  /* Скругления (уменьшены) */
+  --radius-card: 24px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  
+  /* Тени */
+  --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(200, 169, 119, 0.03);
+  --shadow-gold: 0 20px 40px rgba(200, 169, 119, 0.15);
+  --shadow-gold-hover: 0 20px 50px rgba(200, 169, 119, 0.25);
+  
+  /* Шрифты */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  
+  /* Отступы (уменьшены) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+}

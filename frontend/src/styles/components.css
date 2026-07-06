@@ -1,0 +1,423 @@
+/* ============================================
+   COMPONENTS — Стили для компонентов (Глава 13.3)
+   ============================================ */
+
+/* --- КАРТОЧКИ (Cards) --- */
+.card-luxury {
+  background-color: var(--color-carbon);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s ease;
+}
+
+.card-luxury:hover {
+  border-color: rgba(200, 169, 119, 0.15);
+}
+
+/* --- КНОПКИ (Buttons) --- */
+.btn-gold {
+  background-color: var(--color-gold);
+  border: none;
+  border-radius: var(--radius-lg);
+  color: var(--color-graphite);
+  font-weight: 600;
+  font-size: 16px;
+  height: 48px;
+  padding: 0 24px;
+  box-shadow: var(--shadow-gold);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  width: 100%;
+  font-family: var(--font-family);
+}
+
+.btn-gold:hover {
+  background-color: var(--color-gold-hover);
+  box-shadow: var(--shadow-gold-hover);
+  transform: translateY(-1px);
+}
+
+.btn-gold:active {
+  transform: scale(0.97);
+}
+
+.btn-gold-secondary {
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  color: var(--color-titanium);
+  font-weight: 500;
+  font-size: 16px;
+  height: 48px;
+  padding: 0 24px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  width: 100%;
+  font-family: var(--font-family);
+}
+
+.btn-gold-secondary:hover {
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+}
+
+/* --- ПОЛЯ ВВОДА (Inputs) --- */
+.input-luxury {
+  background-color: var(--color-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  color: var(--color-white);
+  height: 46px;
+  padding: 0 14px;
+  width: 100%;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  font-family: var(--font-family);
+}
+
+.input-luxury::placeholder {
+  color: var(--color-titanium);
+  opacity: 0.7;
+}
+
+.input-luxury:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(200, 169, 119, 0.1);
+  outline: none;
+}
+
+/* --- ВЫБОР РОЛИ (Role Selector) --- */
+.role-selector {
+  display: flex;
+  gap: 6px;
+  background-color: var(--color-elevated);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.role-btn {
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background-color: transparent;
+  color: var(--color-titanium);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: var(--font-family);
+}
+
+/* HOVER для НЕАКТИВНОЙ кнопки — фон становится чуть светлее (Глава 13.3.3) */
+.role-btn:not(.role-btn-active):hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+/* Активная кнопка (выбранная) */
+.role-btn-active {
+  background-color: var(--color-divider);
+  color: var(--color-gold);
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(200, 169, 119, 0.1);
+}
+
+/* Hover на активной кнопке — лёгкое свечение */
+.role-btn-active:hover {
+  box-shadow: 0 4px 20px rgba(200, 169, 119, 0.2);
+}
+
+/* --- ЗАГОЛОВКИ --- */
+.title-gold {
+  color: var(--color-gold);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  font-family: var(--font-family);
+}
+
+.title-gold-large {
+  font-size: 26px;
+  margin-bottom: 2px;
+}
+
+.text-titanium {
+  color: var(--color-titanium);
+}
+
+.text-white {
+  color: var(--color-white);
+}
+
+/* --- ТЕКСТОВЫЕ ХЕЛПЕРЫ --- */
+.text-gold {
+  color: var(--color-gold);
+}
+
+.text-small {
+  font-size: 12px;
+  color: var(--color-titanium);
+}
+
+.text-gold-bold {
+  color: var(--color-gold);
+  font-weight: 700;
+}
+
+.text-white-bold {
+  color: var(--color-white);
+  font-weight: 600;
+}
+
+.text-center {
+  text-align: center;
+}
+
+/* --- ЛЕЙБЛЫ --- */
+.label-field {
+  display: block;
+  color: var(--color-titanium);
+  margin-bottom: 4px;
+}
+
+/* --- СТАТИСТИКА --- */
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-value-gold {
+  color: var(--color-gold);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-value-green {
+  color: #4ECB71;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.stat-value-white {
+  color: var(--color-white);
+  font-size: 28px;
+}
+
+/* --- ТУЛБАР --- */
+.toolbar-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-lg);
+}
+
+.toolbar-right {
+  text-align: right;
+  margin-bottom: var(--spacing-lg);
+}
+
+/* --- КАРТОЧКИ ДЛЯ COMMAND CENTER --- */
+.card-kpi {
+  background-color: var(--color-carbon);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+}
+
+.card-kpi:hover {
+  border-color: rgba(200, 169, 119, 0.15);
+}
+
+.card-appointment {
+  background-color: var(--color-carbon);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-sm);
+  transition: all 0.3s ease;
+}
+
+.card-appointment:hover {
+  border-color: rgba(200, 169, 119, 0.15);
+}
+
+.card-detail {
+  background-color: var(--color-elevated);
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
+/* --- КНОПКИ ДЕЙСТВИЙ --- */
+.btn-action-gold {
+  color: var(--color-gold);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-action-danger {
+  color: #ff4d4f;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-logout {
+  color: var(--color-titanium);
+}
+
+.btn-role-pill {
+  background-color: var(--color-elevated);
+  border-color: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  color: var(--color-titanium);
+}
+
+/* --- ТАБЛИЦЫ --- */
+.table-header-cell {
+  background-color: var(--color-elevated);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.table-body-cell {
+  background-color: var(--color-carbon);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.table-body-row {
+  background-color: var(--color-carbon);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.btn-role-pill[data-role="super_admin"] {
+  color: var(--color-gold);
+}
+
+/* --- ХЕДЕР И КОНТЕНТ COMMAND CENTER --- */
+.header-command {
+  background-color: var(--color-carbon);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0 var(--spacing-xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+
+.header-command .icon-command {
+  font-size: 22px;
+}
+
+.header-command .title-command {
+  font-size: 18px;
+}
+
+.header-command .tag-category {
+  margin-left: 8px;
+}
+
+.content-command {
+  padding: var(--spacing-xl);
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* --- МОДАЛКИ --- */
+.modal-command .ant-modal-content {
+  background-color: var(--color-carbon);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modal-command .ant-modal-mask {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.modal-command .ant-select,
+.modal-command .ant-space-vertical {
+  width: 100% !important;
+}
+
+.modal-command .card-detail .text-titanium,
+.modal-command .card-detail .text-small {
+  display: block;
+}
+
+.modal-command .card-detail .text-titanium {
+  font-size: 12px;
+}
+
+.modal-command .card-detail {
+  text-align: center;
+}
+
+/* --- ТЭГ СТАТУСА --- */
+.tag-status {
+  border-radius: var(--radius-xs);
+  border: none;
+  font-size: 11px;
+}
+
+/* --- ТЕКСТОВЫЕ МОДИФИКАТОРЫ --- */
+.text-medium {
+  font-weight: 500;
+}
+
+.icon-revenue-green {
+  color: #0F5D46;
+}
+
+.tag-category-table {
+  margin-left: 8px;
+}
+
+/* --- УТИЛИТЫ --- */
+.d-block {
+  display: block;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-16 {
+  font-size: 16px;
+}
+
+.text-12 {
+  font-size: 12px;
+}
+
+.text-24 {
+  font-size: 24px;
+}
+
+.text-18-bold {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.mt-4 {
+  margin-top: var(--spacing-lg);
+}
+
+/* --- ТЭГ КАТЕГОРИИ --- */
+.tag-category {
+  background-color: var(--color-divider);
+  border: none;
+  color: var(--color-gold);
+  border-radius: var(--radius-xs);
+  font-size: 11px;
+}
+
+/* --- ПОДПИСЬ ВНИЗУ --- */
+.footer-note {
+  color: var(--color-titanium);
+  font-size: 11px;
+  opacity: 0.5;
+  letter-spacing: 0.5px;
+  text-align: center;
+  margin-top: var(--spacing-md);
+}
