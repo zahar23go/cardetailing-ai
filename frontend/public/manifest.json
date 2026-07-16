@@ -1,0 +1,15 @@
+{
+  "name": "CarDetailing AI",
+  "short_name": "CarDetailing",
+  "description": "AI-управляющий автомойкой — запись, оплата, портфолио",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0D10",
+  "theme_color": "#C8A977",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

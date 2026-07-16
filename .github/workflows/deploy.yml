@@ -1,0 +1,60 @@
+name: Deploy CarDetailing AI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: cardetailing
+          POSTGRES_PASSWORD: cardetailing
+          POSTGRES_DB: cardetailing
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          cd backend
+          pytest tests/ -v --tb=short
+        env:
+          DATABASE_URL: postgresql+asyncpg://cardetailing:cardetailing@localhost:5432/cardetailing
+          JWT_SECRET: test-secret
+          SMS_PROVIDER: stub
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t cardetailing-backend:latest -f backend/Dockerfile.prod backend/
+
+      - name: Build frontend image
+        run: docker build -t cardetailing-frontend:latest -f frontend/Dockerfile.prod frontend/

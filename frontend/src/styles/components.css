@@ -378,21 +378,53 @@
   text-align: right;
 }
 
+.text-center {
+  text-align: center;
+}
+
+.flex-space-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-start {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
 .text-16 {
   font-size: 16px;
+}
+
+.text-14 {
+  font-size: 14px;
 }
 
 .text-12 {
   font-size: 12px;
 }
 
+.text-13 {
+  font-size: 13px;
+}
+
 .text-24 {
   font-size: 24px;
+}
+
+.text-18 {
+  font-size: 18px;
 }
 
 .text-18-bold {
   font-size: 18px;
   font-weight: 600;
+}
+
+.text-11 {
+  font-size: 11px;
 }
 
 .w-full {
@@ -401,6 +433,22 @@
 
 .mt-4 {
   margin-top: var(--spacing-lg);
+}
+
+.gap-8 {
+  gap: 8px;
+}
+
+.mb-8 {
+  margin-bottom: 8px;
+}
+
+.mb-12 {
+  margin-bottom: 12px;
+}
+
+.opacity-70 {
+  opacity: 0.7;
 }
 
 /* --- ТЭГ КАТЕГОРИИ --- */

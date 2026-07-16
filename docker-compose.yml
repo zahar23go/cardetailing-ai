@@ -1,0 +1,76 @@
+version: "3.9"
+
+services:
+  # ================================================================
+  # Database — PostgreSQL 15
+  # ================================================================
+  db:
+    image: postgres:15
+    container_name: cardetailing_db
+    environment:
+      POSTGRES_USER: cardetailing
+      POSTGRES_PASSWORD: cardetailing
+      POSTGRES_DB: cardetailing
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cardetailing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ================================================================
+  # Backend — FastAPI
+  # ================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cardetailing_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://cardetailing:cardetailing@db:5432/cardetailing
+      JWT_SECRET: ${JWT_SECRET}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+
+  # ================================================================
+  # Frontend — React + Vite
+  # ================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cardetailing_frontend
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+  # ================================================================
+  # Adminer — Управление БД (опционально)
+  # ================================================================
+  adminer:
+    image: adminer
+    container_name: cardetailing_adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

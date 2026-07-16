@@ -21,7 +21,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           token: {
             colorPrimary: '#C8A977',
             colorBgContainer: '#13161A',
+            colorBgElevated: '#13161A',
             colorText: '#FFFFFF',
+            colorTextSecondary: '#AAB2BF',
             borderRadius: 14,
             fontFamily: "'Inter', -apple-system, sans-serif",
           },

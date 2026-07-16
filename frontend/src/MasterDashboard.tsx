@@ -12,6 +12,7 @@ import {
   UserOutlined, PhoneOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import PortfolioSection from './components/PortfolioSection';
 
 const { Text } = Typography;
 const { TabPane } = Tabs;
@@ -112,8 +113,8 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
   const fetchAppointments = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch<Appointment[]>('/api/masters/me/appointments');
-      setAppointments(data);
+      const data = await apiFetch<{items: Appointment[]; total: number}>('/api/masters/me/appointments?skip=0&limit=200');
+      setAppointments(data.items);
     } catch (e: any) {
       message.error(e.message || 'Ошибка загрузки записей');
     }
@@ -519,6 +520,11 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
                   </Text>
                 </div>
               </Card>
+
+              {/* Портфолио мастера */}
+              <div className="mt-4">
+                <PortfolioSection masterId={user.id} />
+              </div>
             </motion.div>
           </TabPane>
         </Tabs>
