@@ -14,6 +14,7 @@ import jwt
 from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -94,6 +95,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ========== STATIC FILES ==========
+import os
+uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
+if os.path.isdir(uploads_dir):
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # ========== JWT ==========
 SECRET_KEY = settings.JWT_SECRET
@@ -768,6 +775,7 @@ async def get_my_master_appointments(
         .where(
             Appointment.master_id == current_user["id"],
             Appointment.tenant_id == UUID(current_user["tenant_id"]),
+            Appointment.status.in_(["pending", "confirmed", "in_progress"]),
         )
         .order_by(Appointment.start_time.desc())
     )
@@ -2103,17 +2111,20 @@ async def _save_uploaded_photo(
     subdir = f"{entity_type}s/{entity_id or 'unknown'}"
     url, thumb_url = save_file_local(contents, subdir, filename)
 
-    photo = Photo(
-        tenant_id=tenant_id,
-        entity_type=entity_type,
-        url=url,
-        thumbnail_url=thumb_url,
-        title=title or file.filename,
-        file_size=len(contents),
-        mime_type=mime,
-        uploaded_by_id=uploaded_by_id,
-        **{entity_field: entity_id},
-    )
+    photo_data = {
+        "tenant_id": tenant_id,
+        "entity_type": entity_type,
+        "url": url,
+        "thumbnail_url": thumb_url,
+        "title": title or file.filename,
+        "file_size": len(contents),
+        "mime_type": mime,
+        "uploaded_by_id": uploaded_by_id,
+    }
+    # entity_field может совпадать с uploaded_by_id (портфолио) — избегаем дубликата
+    if entity_field != "uploaded_by_id":
+        photo_data[entity_field] = entity_id
+    photo = Photo(**photo_data)
     db.add(photo)
     await db.commit()
     await db.refresh(photo)

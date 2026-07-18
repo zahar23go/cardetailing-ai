@@ -161,7 +161,7 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
 
   /* ---------- Grouping ---------- */
   const activeAppointments = appointments.filter(
-    a => a.status === 'confirmed' || a.status === 'in_progress'
+    a => a.status === 'pending' || a.status === 'confirmed' || a.status === 'in_progress'
   );
   const completedAppointments = appointments.filter(
     a => a.status === 'completed'

@@ -273,6 +273,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [users, setUsers] = useState<RfmClient[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [userRoleTab, setUserRoleTab] = useState<string>('clients');
 
   // Modals
   const [serviceModal, setServiceModal] = useState(false);
@@ -666,6 +667,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
       message.success(`✅ Пользователь «${userName}» удалён`);
       fetchUsers();
+      fetchAllUsers();
     } catch (e: any) {
       message.error(e.message || 'Ошибка удаления пользователя');
     }
@@ -1064,109 +1066,227 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
           {/* ===== TAB 4: USERS ===== */}
           <TabPane tab={<span><TeamOutlined /> Пользователи</span>} key="users">
-            <Spin spinning={usersLoading || rfmLoading}>
-              {rfmData && rfmData.segments.length > 0 && (
-                <Row gutter={[8, 8]} className="mb-12">
-                  {rfmData.segments.map(sc => {
-                    const segColors: Record<string, string> = { vip: '#C8A977', loyal: '#4ECB71', regular: '#AAB2BF', new: '#69B1FF', sleeping: '#B76A29', lost: '#ff4d4f' };
-                    const segLabels: Record<string, string> = { vip: 'VIP', loyal: 'Лояльные', regular: 'Постоянные', new: 'Новые', sleeping: 'Спящие', lost: 'Ушедшие' };
-                    return (
-                      <Col xs={12} sm={8} md={4} key={sc.segment}>
-                        <Card size="small" className="card-kpi"
-                          style={{ cursor: 'pointer', borderColor: segmentFilter === sc.segment ? segColors[sc.segment] : undefined }}
-                          onClick={() => handleSegmentFilter(segmentFilter === sc.segment ? '' : sc.segment)}>
-                          <Statistic
-                            title={<Text className="text-titanium text-11">{segLabels[sc.segment] || sc.segment}</Text>}
-                            value={sc.count}
-                            suffix={<Text className="text-titanium text-11">({sc.percent}%)</Text>}
-                            valueStyle={{ color: segColors[sc.segment] || '#AAB2BF', fontSize: '20px', fontWeight: 700 }}
-                          />
-                        </Card>
-                      </Col>
-                    );
-                  })}
-                </Row>
-              )}
+            {/* Role tabs */}
+            <Tabs activeKey={userRoleTab} onChange={setUserRoleTab}
+              tabBarStyle={{ borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}
+              size="small"
+            >
+              {/* ===== CLIENTS ===== */}
+              <TabPane tab="👤 Клиенты" key="clients">
+                <Spin spinning={usersLoading || rfmLoading}>
+                  {rfmData && rfmData.segments.length > 0 && (
+                    <Row gutter={[8, 8]} className="mb-12">
+                      {rfmData.segments.map(sc => {
+                        const segColors: Record<string, string> = { vip: '#C8A977', loyal: '#4ECB71', regular: '#AAB2BF', new: '#69B1FF', sleeping: '#B76A29', lost: '#ff4d4f' };
+                        const segLabels: Record<string, string> = { vip: 'VIP', loyal: 'Лояльные', regular: 'Постоянные', new: 'Новые', sleeping: 'Спящие', lost: 'Ушедшие' };
+                        return (
+                          <Col xs={12} sm={8} md={4} key={sc.segment}>
+                            <Card size="small" className="card-kpi"
+                              style={{ cursor: 'pointer', borderColor: segmentFilter === sc.segment ? segColors[sc.segment] : undefined }}
+                              onClick={() => handleSegmentFilter(segmentFilter === sc.segment ? '' : sc.segment)}>
+                              <Statistic
+                                title={<Text className="text-titanium text-11">{segLabels[sc.segment] || sc.segment}</Text>}
+                                value={sc.count}
+                                suffix={<Text className="text-titanium text-11">({sc.percent}%)</Text>}
+                                valueStyle={{ color: segColors[sc.segment] || '#AAB2BF', fontSize: '20px', fontWeight: 700 }}
+                              />
+                            </Card>
+                          </Col>
+                        );
+                      })}
+                    </Row>
+                  )}
 
-              {users.length === 0 && !usersLoading ? (
-                <Empty description={<Text className="text-titanium">Нет клиентов</Text>} />
-              ) : (
-                <Table
-                  dataSource={users}
-                  rowKey="id"
-                  pagination={{ pageSize: 20, size: 'small' }}
-                  columns={[
-                    {
-                      title: <Text className="text-titanium">Имя</Text>,
-                      dataIndex: 'full_name',
-                      key: 'full_name',
-                      render: (val) => <Text className="text-white text-medium">{val}</Text>,
-                    },
-                    {
-                      title: <Text className="text-titanium">Телефон</Text>,
-                      dataIndex: 'phone',
-                      key: 'phone',
-                      render: (val) => <Text className="text-titanium"><PhoneOutlined /> {val}</Text>,
-                    },
-                    {
-                      title: <Text className="text-titanium">Сегмент</Text>,
-                      dataIndex: 'segment',
-                      key: 'segment',
-                      width: 120,
-                      render: (val: string) => {
-                        const segColors: Record<string, string> = { vip: 'gold', loyal: 'green', regular: 'default', new: 'blue', sleeping: 'orange', lost: 'red' };
-                        const segLabels: Record<string, string> = { vip: 'VIP', loyal: 'Лояльный', regular: 'Постоянный', new: 'Новый', sleeping: 'Спящий', lost: 'Ушедший' };
-                        return <Tag color={segColors[val] || 'default'} className="tag-status">{segLabels[val] || val}</Tag>;
-                      },
-                    },
-                    {
-                      title: <Text className="text-titanium">Визиты</Text>,
-                      dataIndex: 'frequency',
-                      key: 'frequency',
-                      width: 70,
-                      render: (val) => <Text className="text-white text-13">{val}</Text>,
-                    },
-                    {
-                      title: <Text className="text-titanium">Сумма</Text>,
-                      dataIndex: 'monetary',
-                      key: 'monetary',
-                      width: 100,
-                      render: (val) => <Text className="text-gold-bold text-13">{val.toLocaleString()} ₽</Text>,
-                    },
-                    {
-                      title: <Text className="text-titanium">Дата рег.</Text>,
-                      dataIndex: 'created_at',
-                      key: 'created_at',
-                      render: (val) => <Text className="text-titanium">{val ? dayjs(val).format('DD.MM.YYYY') : '—'}</Text>,
-                    },
-                    {
-                      title: '',
-                      key: 'actions',
-                      width: 80,
-                      render: (_, record) => (
-                        <Space size="small">
-                          <Tooltip title="История клиента">
-                            <Button size="small" onClick={() => openClientDetail(record.id)} className="btn-action-gold">📋</Button>
-                          </Tooltip>
-                          <Popconfirm title={`Удалить клиента «${record.full_name}»?`}
-                            description="Будут удалены все автомобили и записи."
-                            onConfirm={() => handleDeleteUser(record.id, record.full_name)}
-                            okText="Да, удалить" cancelText="Отмена" okButtonProps={{ danger: true }}>
-                            <Tooltip title="Удалить клиента">
-                              <Button size="small" icon={<DeleteOutlined />} className="btn-action-danger" />
-                            </Tooltip>
-                          </Popconfirm>
-                        </Space>
-                      ),
-                    },
-                  ]}
-                  components={{
-                    header: { cell: (p: any) => <th {...p} className="table-header-cell" /> },
-                    body: { row: (p: any) => <tr {...p} className="table-body-row" />, cell: (p: any) => <td {...p} className="table-body-cell" /> },
-                  }}
-                />
-              )}
-            </Spin>
+                  {users.length === 0 && !usersLoading ? (
+                    <Empty description={<Text className="text-titanium">Нет клиентов</Text>} />
+                  ) : (
+                    <Table
+                      dataSource={users}
+                      rowKey="id"
+                      pagination={{ pageSize: 20, size: 'small' }}
+                      columns={[
+                        {
+                          title: <Text className="text-titanium">Имя</Text>,
+                          dataIndex: 'full_name',
+                          key: 'full_name',
+                          render: (val) => <Text className="text-white text-medium">{val}</Text>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Телефон</Text>,
+                          dataIndex: 'phone',
+                          key: 'phone',
+                          render: (val) => <Text className="text-titanium"><PhoneOutlined /> {val}</Text>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Сегмент</Text>,
+                          dataIndex: 'segment',
+                          key: 'segment',
+                          width: 120,
+                          render: (val: string) => {
+                            const segColors: Record<string, string> = { vip: 'gold', loyal: 'green', regular: 'default', new: 'blue', sleeping: 'orange', lost: 'red' };
+                            const segLabels: Record<string, string> = { vip: 'VIP', loyal: 'Лояльный', regular: 'Постоянный', new: 'Новый', sleeping: 'Спящий', lost: 'Ушедший' };
+                            return <Tag color={segColors[val] || 'default'} className="tag-status">{segLabels[val] || val}</Tag>;
+                          },
+                        },
+                        {
+                          title: <Text className="text-titanium">Визиты</Text>,
+                          dataIndex: 'frequency',
+                          key: 'frequency',
+                          width: 70,
+                          render: (val) => <Text className="text-white text-13">{val}</Text>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Сумма</Text>,
+                          dataIndex: 'monetary',
+                          key: 'monetary',
+                          width: 100,
+                          render: (val) => <Text className="text-gold-bold text-13">{val.toLocaleString()} ₽</Text>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Дата рег.</Text>,
+                          dataIndex: 'created_at',
+                          key: 'created_at',
+                          render: (val) => <Text className="text-titanium">{val ? dayjs(val).format('DD.MM.YYYY') : '—'}</Text>,
+                        },
+                        {
+                          title: '',
+                          key: 'actions',
+                          width: 80,
+                          render: (_, record) => (
+                            <Space size="small">
+                              <Tooltip title="История клиента">
+                                <Button size="small" onClick={() => openClientDetail(record.id)} className="btn-action-gold">📋</Button>
+                              </Tooltip>
+                              <Popconfirm title={`Удалить клиента «${record.full_name}»?`}
+                                description="Будут удалены все автомобили и записи."
+                                onConfirm={() => handleDeleteUser(record.id, record.full_name)}
+                                okText="Да, удалить" cancelText="Отмена" okButtonProps={{ danger: true }}>
+                                <Tooltip title="Удалить клиента">
+                                  <Button size="small" icon={<DeleteOutlined />} className="btn-action-danger" />
+                                </Tooltip>
+                              </Popconfirm>
+                            </Space>
+                          ),
+                        },
+                      ]}
+                      components={{
+                        header: { cell: (p: any) => <th {...p} className="table-header-cell" /> },
+                        body: { row: (p: any) => <tr {...p} className="table-body-row" />, cell: (p: any) => <td {...p} className="table-body-cell" /> },
+                      }}
+                    />
+                  )}
+                </Spin>
+              </TabPane>
+
+              {/* ===== MASTERS ===== */}
+              <TabPane tab="🔧 Мастера" key="masters">
+                <Spin spinning={usersLoading}>
+                  {allUsers.filter(u => u.role === 'master').length === 0 ? (
+                    <Empty description={<Text className="text-titanium">Нет мастеров</Text>} />
+                  ) : (
+                    <Table
+                      dataSource={allUsers.filter(u => u.role === 'master')}
+                      rowKey="id"
+                      pagination={{ pageSize: 20, size: 'small' }}
+                      columns={[
+                        {
+                          title: <Text className="text-titanium">Имя</Text>,
+                          dataIndex: 'full_name',
+                          key: 'full_name',
+                          render: (val) => <Text className="text-white text-medium">{val}</Text>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Телефон</Text>,
+                          dataIndex: 'phone',
+                          key: 'phone',
+                          render: (val) => <Text className="text-titanium"><PhoneOutlined /> {val}</Text>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Роль</Text>,
+                          dataIndex: 'role',
+                          key: 'role',
+                          width: 140,
+                          render: (val: string) => <Tag color="cyan" className="tag-status">{ROLE_LABELS[val] || val}</Tag>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Дата рег.</Text>,
+                          dataIndex: 'created_at',
+                          key: 'created_at',
+                          render: (val) => <Text className="text-titanium">{val ? dayjs(val).format('DD.MM.YYYY') : '—'}</Text>,
+                        },
+                      ]}
+                      components={{
+                        header: { cell: (p: any) => <th {...p} className="table-header-cell" /> },
+                        body: { row: (p: any) => <tr {...p} className="table-body-row" />, cell: (p: any) => <td {...p} className="table-body-cell" /> },
+                      }}
+                    />
+                  )}
+                </Spin>
+              </TabPane>
+
+              {/* ===== ADMINS ===== */}
+              <TabPane tab="👑 Админы" key="admins">
+                <Spin spinning={usersLoading}>
+                  {allUsers.filter(u => u.role === 'admin' || u.role === 'super_admin').length === 0 ? (
+                    <Empty description={<Text className="text-titanium">Нет администраторов</Text>} />
+                  ) : (
+                    <Table
+                      dataSource={allUsers.filter(u => u.role === 'admin' || u.role === 'super_admin')}
+                      rowKey="id"
+                      pagination={{ pageSize: 20, size: 'small' }}
+                      columns={[
+                        {
+                          title: <Text className="text-titanium">Имя</Text>,
+                          dataIndex: 'full_name',
+                          key: 'full_name',
+                          render: (val) => <Text className="text-white text-medium">{val}</Text>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Телефон</Text>,
+                          dataIndex: 'phone',
+                          key: 'phone',
+                          render: (val) => <Text className="text-titanium"><PhoneOutlined /> {val}</Text>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Роль</Text>,
+                          dataIndex: 'role',
+                          key: 'role',
+                          width: 160,
+                          render: (val: string) => <Tag color="gold" className="tag-status">{ROLE_LABELS[val] || val}</Tag>,
+                        },
+                        {
+                          title: <Text className="text-titanium">Дата рег.</Text>,
+                          dataIndex: 'created_at',
+                          key: 'created_at',
+                          render: (val) => <Text className="text-titanium">{val ? dayjs(val).format('DD.MM.YYYY') : '—'}</Text>,
+                        },
+                        {
+                          title: '',
+                          key: 'actions',
+                          width: 80,
+                          render: (_, record) => (
+                            <Space size="small">
+                              <Popconfirm title={`Удалить пользователя «${record.full_name}»?`}
+                                description="Будут удалены все связанные данные."
+                                onConfirm={() => handleDeleteUser(record.id, record.full_name)}
+                                okText="Да, удалить" cancelText="Отмена" okButtonProps={{ danger: true }}>
+                                <Tooltip title="Удалить">
+                                  <Button size="small" icon={<DeleteOutlined />} className="btn-action-danger" />
+                                </Tooltip>
+                              </Popconfirm>
+                            </Space>
+                          ),
+                        },
+                      ]}
+                      components={{
+                        header: { cell: (p: any) => <th {...p} className="table-header-cell" /> },
+                        body: { row: (p: any) => <tr {...p} className="table-body-row" />, cell: (p: any) => <td {...p} className="table-body-cell" /> },
+                      }}
+                    />
+                  )}
+                </Spin>
+              </TabPane>
+            </Tabs>
           </TabPane>
 
           {/* ===== TAB 5: AI FINANCIER ===== */}
