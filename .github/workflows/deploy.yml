@@ -45,6 +45,7 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://cardetailing:cardetailing@localhost:5432/cardetailing
           JWT_SECRET: test-secret
           SMS_PROVIDER: stub
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 
   build:
     needs: test
