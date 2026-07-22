@@ -89,6 +89,35 @@ export default function Gallery({
                 </div>
               )}
 
+              {/* Название услуги (для портфолио) */}
+              {photo.service_name && (
+                <div style={{ position: 'absolute', top: '14px', right: '14px' }}>
+                  <span className="tag-category" style={{
+                    fontSize: '10px', padding: '2px 8px', borderRadius: '8px',
+                    backgroundColor: 'rgba(200,169,119,0.2)', color: '#C8A977',
+                  }}>
+                    {photo.service_name}
+                  </span>
+                </div>
+              )}
+
+              {/* Описание работы */}
+              {photo.description && (
+                <div style={{ marginTop: '8px', padding: '4px 4px 0' }}>
+                  <Text className="text-titanium text-12"
+                    style={{ lineHeight: '1.3', display: 'block' }}>
+                    {photo.description}
+                  </Text>
+                </div>
+              )}
+
+              {/* Имя мастера (для портфолио) */}
+              {photo.uploader_name && (
+                <div style={{ marginTop: '2px', padding: '0 4px' }}>
+                  <Text className="text-titanium text-11">🔧 {photo.uploader_name}</Text>
+                </div>
+              )}
+
               {/* Действия */}
               {!readonly && (
                 <div style={{ marginTop: '8px' }}>

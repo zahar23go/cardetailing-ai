@@ -27,7 +27,25 @@ async def create_notification(
     related_entity_type: str | None = None,
     related_entity_id: int | None = None,
 ) -> Notification:
-    """Создать уведомление."""
+    """Создать уведомление (или обновить существующее, если дубликат за последние 5 минут)."""
+    now = datetime.now(timezone.utc)
+    # Проверить, есть ли такое уведомление за последние 5 минут
+    existing = await db.execute(
+        select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.tenant_id == tenant_id,
+            Notification.title == title,
+            Notification.created_at > now - timedelta(minutes=5)
+        )
+    )
+    existing_notif = existing.scalar_one_or_none()
+    if existing_notif:
+        existing_notif.message = message
+        existing_notif.created_at = now
+        await db.commit()
+        await db.refresh(existing_notif)
+        return existing_notif
+
     notif = Notification(
         user_id=user_id,
         tenant_id=tenant_id,
@@ -58,6 +76,9 @@ async def get_notifications(
         .where(
             Notification.user_id == user_id,
             Notification.tenant_id == tenant_id,
+            Notification.title.isnot(None),
+            Notification.message.isnot(None),
+            Notification.created_at.isnot(None),
         )
         .order_by(Notification.created_at.desc())
     )

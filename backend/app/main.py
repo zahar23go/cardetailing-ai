@@ -6,7 +6,7 @@ FastAPI entry point with database-backed authentication.
 
 import contextlib
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time
 from uuid import UUID
 
 import bcrypt
@@ -15,7 +15,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File, st
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -23,7 +23,7 @@ from app.core.config import settings
 from app.core.database import get_db, init_db
 from app.core.deepseek_client import get_ai_response, get_financier_response
 from app.core.image_service import validate_image, save_file_local, generate_filename, delete_file_local
-from app.models import Tenant, User, UserRole, AppointmentStatus, Service, Car, Appointment, Expense, DiscountRule, ClientDiscount, LoyaltyPoints, LoyaltyTierConfig, Photo, EntityType, Notification, UserNotificationSettings, WorkingHours, AppointmentHistory, Payment
+from app.models import Box, Tenant, User, UserRole, AppointmentStatus, Service, Car, Appointment, Expense, DiscountRule, ClientDiscount, LoyaltyPoints, LoyaltyTierConfig, Photo, EntityType, Notification, UserNotificationSettings, WorkingHours, AppointmentHistory, Payment
 from app.schemas import (
     RegisterRequest, LoginRequest, AuthResponse, UserOut,
     ServiceCreate, ServiceUpdate, ServiceOut,
@@ -40,13 +40,15 @@ from app.schemas import (
     FunnelResponse, FunnelStage,
     RfmResponse, RfmClient, SegmentCount,
     DiscountRuleCreate, DiscountRuleUpdate, DiscountRuleOut,
-    ClientDiscountOut, LoyaltyPointsSummary, LoyaltyTierConfigOut, LoyaltyTierConfigUpdate, ClientTierOut,
+    ClientDiscountOut, DiscountAnalyticsResponse, DiscountAnalyticsTopRule,
+    LoyaltyPointsSummary, LoyaltyTierConfigOut, LoyaltyTierConfigUpdate, ClientTierOut,
     PaginatedResponse,
     PhotoOut, PhotoOrderUpdate, PhotoCreateResponse,
     NotificationOut, UnreadCountOut,
     NotificationSettingsOut, NotificationSettingsUpdate,
     TelegramConnectRequest,
     WorkingHoursOut, WorkingHoursUpdate,
+    BoxCreate, BoxUpdate, BoxOut,
     CalendarResponse, CalendarDay, CalendarAppointment, HistoryEntryOut, HistoryResponse, ServiceTrendPoint, ServiceTrend, ServiceComparison, TopService, ForecastPoint, ServiceAnalyticsResponse, PaymentCreateRequest, PaymentOut, PaymentWebhookRequest, RevenueDetail, PeriodComparison, MasterRevenueSummary, ServiceRevenueSummary, RevenueReportResponse,
 )
 
@@ -158,6 +160,40 @@ def _require_master(current_user: dict = Depends(_get_current_user)):
     if current_user["role"] not in ["master", "admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Доступ запрещён. Только для мастеров.")
     return current_user
+
+
+# ========== DISCOUNT HELPERS ==========
+
+def _parse_time_str(value: str | None) -> time | None:
+    """Convert 'HH:MM' string to datetime.time or None."""
+    if not value:
+        return None
+    try:
+        parts = value.strip().split(':')
+        return time(int(parts[0]), int(parts[1]))
+    except (ValueError, IndexError):
+        return None
+
+
+def _discount_rule_to_out(rule) -> dict:
+    """Convert DiscountRule ORM to dict with slot times and related names."""
+    return {
+        "id": rule.id,
+        "name": rule.name,
+        "type": rule.type,
+        "conditions": rule.conditions,
+        "discount_percent": rule.discount_percent,
+        "slot_start": rule.slot_start.strftime('%H:%M') if rule.slot_start else None,
+        "slot_end": rule.slot_end.strftime('%H:%M') if rule.slot_end else None,
+        "service_id": rule.service_id,
+        "service_name": rule.service.name if rule.service else None,
+        "client_id": rule.client_id,
+        "client_name": rule.client.full_name if rule.client else None,
+        "valid_until": rule.valid_until.isoformat() if rule.valid_until else None,
+        "is_active": rule.is_active,
+        "created_at": rule.created_at,
+        "updated_at": rule.updated_at,
+    }
 
 
 # ========== PAGINATION HELPER ==========
@@ -441,6 +477,7 @@ def _serialize_appointment(appointment):
         "master_id": appointment.master_id,
         "car_id": appointment.car_id,
         "service_id": appointment.service_id,
+        "box_id": appointment.box_id,
         "start_time": appointment.start_time,
         "end_time": appointment.end_time,
         "status": appointment.status if appointment.status else None,
@@ -582,6 +619,7 @@ async def create_appointment(
         total_price=service.price,
         status="pending",
         client_notes=request.notes or request.client_notes,
+        box_id=request.box_id,
         tenant_id=UUID(current_user["tenant_id"]),
     )
     db.add(appointment)
@@ -1492,54 +1530,81 @@ async def get_pl_report(
 
 @app.get("/api/analytics/revenue", response_model=RevenueResponse)
 async def get_revenue_chart(
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
     current_user: dict = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Дневная выручка за текущий месяц (Area Chart)."""
+    """Дневная выручка за период (Area Chart) + сравнение с предыдущим периодом."""
     tenant_id = UUID(current_user["tenant_id"])
     now = datetime.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    # Берём следующий месяц для верхней границы
-    if month_start.month == 12:
-        next_month = month_start.replace(year=month_start.year + 1, month=1)
+    # Определяем границы периода
+    if start_date and end_date:
+        s_date = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+        e_date = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
     else:
-        next_month = month_start.replace(month=month_start.month + 1)
+        # По умолчанию — текущий месяц
+        s_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if s_date.month == 12:
+            e_date = s_date.replace(year=s_date.year + 1, month=1)
+        else:
+            e_date = s_date.replace(month=s_date.month + 1)
 
-    result = await db.execute(
-        select(Appointment).where(
-            Appointment.start_time >= month_start,
-            Appointment.start_time < next_month,
-            Appointment.tenant_id == tenant_id,
-            Appointment.status == "completed",
-        ).order_by(Appointment.start_time)
-    )
-    appts = result.scalars().all()
+    period_days = (e_date - s_date).days
 
-    # Группировка по дням
-    daily: dict[str, dict] = {}
-    days_in_month = (next_month - month_start).days
-    for i in range(days_in_month):
-        day = month_start + timedelta(days=i)
-        key = day.strftime("%Y-%m-%d")
-        daily[key] = {"revenue": 0.0, "appointments": 0}
+    # Предыдущий период (такой же длины)
+    prev_end = s_date
+    prev_start = prev_end - timedelta(days=period_days)
 
-    for a in appts:
-        key = a.start_time.strftime("%Y-%m-%d")
-        if key in daily:
+    async def _fetch_period(start: datetime, end: datetime) -> tuple[list[RevenuePoint], float, float]:
+        """Вспомогательная функция: получить данные за период."""
+        result = await db.execute(
+            select(Appointment).where(
+                Appointment.start_time >= start,
+                Appointment.start_time < end,
+                Appointment.tenant_id == tenant_id,
+                Appointment.status == "completed",
+            ).order_by(Appointment.start_time)
+        )
+        appts = result.scalars().all()
+
+        # Если период <= 31 день — группировка по дням, иначе по неделям/месяцам
+        daily: dict[str, dict] = {}
+        for a in appts:
+            if period_days <= 35:
+                key = a.start_time.strftime("%Y-%m-%d")
+            else:
+                key = a.start_time.strftime("%Y-%m-%d")  # пока дни, фронт сам сгруппирует
+            if key not in daily:
+                daily[key] = {"revenue": 0.0, "appointments": 0}
             daily[key]["revenue"] += float(a.total_price or 0)
             daily[key]["appointments"] += 1
 
-    points = [
-        RevenuePoint(date=key, revenue=round(v["revenue"], 2), appointments=v["appointments"])
-        for key, v in sorted(daily.items())
-    ]
+        points = [
+            RevenuePoint(date=key, revenue=round(v["revenue"], 2), appointments=v["appointments"])
+            for key, v in sorted(daily.items())
+        ]
+        total = round(sum(p.revenue for p in points), 2)
+        days_count = max(len(daily), 1)
+        avg = round(total / days_count, 2) if days_count else 0
+        return points, total, avg
 
-    total = round(sum(p.revenue for p in points), 2)
+    # Основной период
+    points, total, avg = await _fetch_period(s_date, e_date)
+
+    # Предыдущий период
+    prev_points, prev_total, prev_avg = await _fetch_period(prev_start, prev_end)
+
+    # Лучший/худший день
     days_with_data = [p for p in points if p.appointments > 0]
-    avg = round(total / days_in_month, 2) if days_in_month else 0
     best = max(days_with_data, key=lambda p: p.revenue) if days_with_data else None
     worst = min(days_with_data, key=lambda p: p.revenue) if days_with_data else None
+
+    # Изменение в %
+    change_percent = round(
+        ((total - prev_total) / prev_total * 100) if prev_total else 0, 1
+    )
 
     return RevenueResponse(
         daily=points,
@@ -1547,15 +1612,19 @@ async def get_revenue_chart(
         avg_per_day=avg,
         best_day=best.date if best else None,
         worst_day=worst.date if worst else None,
+        previous_total=round(prev_total, 2),
+        change_percent=change_percent,
+        previous_avg_per_day=prev_avg,
     )
 
 
 @app.get("/api/analytics/heatmap", response_model=HeatmapResponse)
 async def get_heatmap(
+    box_id: int | None = Query(None, description="Фильтр по боксу"),
     current_user: dict = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Тепловая карта загрузки: день недели × час."""
+    """Тепловая карта загрузки: день недели × час, с фильтром по боксу."""
     tenant_id = UUID(current_user["tenant_id"])
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -1565,13 +1634,18 @@ async def get_heatmap(
     else:
         next_month = month_start.replace(month=month_start.month + 1)
 
+    # Фильтр по боксу
+    filters = [
+        Appointment.start_time >= month_start,
+        Appointment.start_time < next_month,
+        Appointment.tenant_id == tenant_id,
+        Appointment.status.in_(["completed", "confirmed", "in_progress"]),
+    ]
+    if box_id is not None:
+        filters.append(Appointment.box_id == box_id)
+
     result = await db.execute(
-        select(Appointment).where(
-            Appointment.start_time >= month_start,
-            Appointment.start_time < next_month,
-            Appointment.tenant_id == tenant_id,
-            Appointment.status.in_(["completed", "confirmed", "in_progress"]),
-        )
+        select(Appointment).where(*filters)
     )
     appts = result.scalars().all()
 
@@ -1590,11 +1664,21 @@ async def get_heatmap(
             cells_map[key]["revenue"] += float(a.total_price or 0)
 
     cells = [
-        HeatmapCell(day=d, hour=h, count=v["count"], revenue=round(v["revenue"], 2))
+        HeatmapCell(
+            day=d, hour=h, count=v["count"],
+            revenue=round(v["revenue"], 2),
+            box_id=box_id,
+        )
         for (d, h), v in sorted(cells_map.items())
     ]
 
-    return HeatmapResponse(cells=cells)
+    # Загружаем список боксов тенанта
+    boxes_result = await db.execute(
+        select(Box).where(Box.tenant_id == tenant_id).order_by(Box.sort_order, Box.name)
+    )
+    boxes = boxes_result.scalars().all()
+
+    return HeatmapResponse(cells=cells, boxes=[BoxOut.model_validate(b) for b in boxes])
 
 
 @app.get("/api/analytics/funnel", response_model=FunnelResponse)
@@ -1663,6 +1747,69 @@ async def get_funnel(
     )
 
 
+@app.get("/api/analytics/discounts", response_model=DiscountAnalyticsResponse)
+async def get_discount_analytics(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Аналитика эффективности скидок."""
+    tenant_id = UUID(current_user["tenant_id"])
+
+    # Все правила
+    rules_result = await db.execute(
+        select(DiscountRule).where(DiscountRule.tenant_id == tenant_id)
+    )
+    all_rules = rules_result.scalars().all()
+    total_rules = len(all_rules)
+    active_rules = sum(1 for r in all_rules if r.is_active)
+
+    # Все применения скидок
+    cd_result = await db.execute(
+        select(ClientDiscount)
+        .options(selectinload(ClientDiscount.discount_rule))
+        .where(
+            ClientDiscount.tenant_id == tenant_id,
+            ClientDiscount.is_used == True,
+        )
+    )
+    all_cd = cd_result.scalars().all()
+
+    total_times_used = len(all_cd)
+    total_discount_amount = sum(float(cd.applied_amount or 0) for cd in all_cd)
+    unique_clients = len(set(cd.client_id for cd in all_cd))
+
+    # Топ правил по использованию
+    rule_usage: dict[int, dict] = {}
+    for cd in all_cd:
+        rid = cd.discount_rule_id
+        if rid not in rule_usage:
+            rule_usage[rid] = {"times_used": 0, "total_discount": 0.0, "clients": set()}
+        rule_usage[rid]["times_used"] += 1
+        rule_usage[rid]["total_discount"] += float(cd.applied_amount or 0)
+        rule_usage[rid]["clients"].add(cd.client_id)
+
+    top_rules = []
+    for rid, stats in sorted(rule_usage.items(), key=lambda x: x[1]["times_used"], reverse=True)[:10]:
+        rule = next((r for r in all_rules if r.id == rid), None)
+        top_rules.append(DiscountAnalyticsTopRule(
+            rule_id=rid,
+            rule_name=rule.name if rule else f"Правило #{rid}",
+            rule_type=rule.type if rule else "unknown",
+            times_used=stats["times_used"],
+            total_discount=round(stats["total_discount"], 2),
+            client_count=len(stats["clients"]),
+        ))
+
+    return DiscountAnalyticsResponse(
+        total_rules=total_rules,
+        active_rules=active_rules,
+        total_times_used=total_times_used,
+        total_discount_amount=round(total_discount_amount, 2),
+        unique_clients_affected=unique_clients,
+        top_rules=top_rules,
+    )
+
+
 # =============================================================================
 # DISCOUNTS & LOYALTY
 # =============================================================================
@@ -1677,14 +1824,17 @@ async def get_discount_rules(
     """Получить все правила скидок тенанта."""
     stmt = (
         select(DiscountRule)
+        .options(selectinload(DiscountRule.service), selectinload(DiscountRule.client))
         .where(DiscountRule.tenant_id == UUID(current_user["tenant_id"]))
         .order_by(DiscountRule.created_at.desc())
     )
     items, total = await _paginate(db, stmt, skip=skip, limit=limit)
-    return PaginatedResponse[DiscountRuleOut](
-        items=[DiscountRuleOut.model_validate(r) for r in items],
-        total=total, skip=skip, limit=limit,
-    )
+    return {
+        "items": [_discount_rule_to_out(r) for r in items],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
 
 
 @app.post("/api/discounts", response_model=DiscountRuleOut)
@@ -1694,33 +1844,56 @@ async def create_discount_rule(
     db: AsyncSession = Depends(get_db),
 ):
     """Создать новое правило скидки."""
-    start_date = None
-    if request.start_date:
-        try:
-            start_date = datetime.fromisoformat(request.start_date)
-        except ValueError:
-            pass
-    end_date = None
-    if request.end_date:
-        try:
-            end_date = datetime.fromisoformat(request.end_date)
-        except ValueError:
-            pass
+    tenant_id = UUID(current_user["tenant_id"])
+
+    # Проверка на дубликат по имени
+    existing = await db.execute(
+        select(DiscountRule).where(
+            DiscountRule.tenant_id == tenant_id,
+            DiscountRule.name == request.name,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail=f"Скидка с названием «{request.name}» уже существует")
+
+    slot_start = _parse_time_str(request.slot_start)
+    slot_end = _parse_time_str(request.slot_end)
+    valid_until = _parse_date_str(request.valid_until)
 
     rule = DiscountRule(
         name=request.name,
         type=request.type,
         conditions=request.conditions or {},
         discount_percent=request.discount_percent,
-        start_date=start_date,
-        end_date=end_date,
+        slot_start=slot_start,
+        slot_end=slot_end,
+        service_id=request.service_id,
+        client_id=request.client_id,
+        valid_until=valid_until,
         is_active=request.is_active if request.is_active is not None else True,
-        tenant_id=UUID(current_user["tenant_id"]),
+        tenant_id=tenant_id,
     )
-    db.add(rule)
-    await db.commit()
-    await db.refresh(rule)
-    return DiscountRuleOut.model_validate(rule)
+    try:
+        db.add(rule)
+        await db.commit()
+        result = await db.execute(
+            select(DiscountRule)
+            .options(selectinload(DiscountRule.service), selectinload(DiscountRule.client))
+            .where(DiscountRule.id == rule.id)
+        )
+        rule = result.scalar_one()
+        # Уведомление — не должно ломать создание скидки
+        try:
+            await _notify_discount_created(db, rule, current_user)
+        except Exception as notify_err:
+            print(f"[WARN] Notification failed: {notify_err}")
+        return _discount_rule_to_out(rule)
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        print(f"[ERROR] Create discount failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.put("/api/discounts/{rule_id}", response_model=DiscountRuleOut)
@@ -1742,25 +1915,25 @@ async def update_discount_rule(
         raise HTTPException(status_code=404, detail="Правило скидки не найдено")
 
     update_data = request.model_dump(exclude_unset=True)
-    if "start_date" in update_data:
-        if update_data["start_date"]:
-            try:
-                update_data["start_date"] = datetime.fromisoformat(update_data["start_date"])
-            except ValueError:
-                del update_data["start_date"]
-    if "end_date" in update_data:
-        if update_data["end_date"]:
-            try:
-                update_data["end_date"] = datetime.fromisoformat(update_data["end_date"])
-            except ValueError:
-                del update_data["end_date"]
+    if "slot_start" in update_data:
+        update_data["slot_start"] = _parse_time_str(update_data["slot_start"])
+    if "slot_end" in update_data:
+        update_data["slot_end"] = _parse_time_str(update_data["slot_end"])
+    if "valid_until" in update_data:
+        update_data["valid_until"] = _parse_date_str(update_data["valid_until"])
 
     for key, value in update_data.items():
         setattr(rule, key, value)
 
     await db.commit()
-    await db.refresh(rule)
-    return DiscountRuleOut.model_validate(rule)
+    # Reload with relations
+    result = await db.execute(
+        select(DiscountRule)
+        .options(selectinload(DiscountRule.service), selectinload(DiscountRule.client))
+        .where(DiscountRule.id == rule.id)
+    )
+    rule = result.scalar_one()
+    return _discount_rule_to_out(rule)
 
 
 @app.delete("/api/discounts/{rule_id}")
@@ -1781,8 +1954,15 @@ async def delete_discount_rule(
         raise HTTPException(status_code=404, detail="Правило скидки не найдено")
 
     name = rule.name
-    await db.delete(rule)
-    await db.commit()
+    try:
+        await db.delete(rule)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не удалось удалить правило «{name}»: {str(e)}",
+        )
     return {"message": f"Правило скидки «{name}» удалено"}
 
 
@@ -1875,34 +2055,29 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
     for rule in rules:
         conditions = rule.conditions or {}
 
-        # Проверка дат — сравниваем с временем ЗАПИСИ, а не с now
-        # (иначе запись на будущую дату не получит скидку, если правило начнётся позже today)
-        appt_time = appointment.start_time or now
-        if rule.start_date and rule.start_date > appt_time:
-            continue
-        if rule.end_date and rule.end_date < appt_time:
-            continue
-
         if rule.type == "happy_hours":
-            # Скидка в часы низкой загрузки
-            utc_offset = conditions.get("utc_offset", 0)
-            raw_hour = appointment.start_time.hour if appointment.start_time else now.hour
-            hour = (raw_hour + utc_offset) % 24
-            happy_start = conditions.get("hour_start", 10)
-            happy_end = conditions.get("hour_end", 14)
-            min_discount = conditions.get("min_discount", 0)
-
-            # Отладка
-            weekday = appointment.start_time.weekday() if appointment.start_time else -1
-            print(f"[DEBUG] happy_hours: start_time={appointment.start_time}, hour={hour}, weekday={weekday}")
-            print(f"[DEBUG] rule: {happy_start} <= {hour} <= {happy_end} = {happy_start <= hour <= happy_end}")
-            print(f"[DEBUG] rule.start_date={rule.start_date}, appt_time={appt_time}, date_ok={not (rule.start_date and rule.start_date > appt_time)}")
-            print(f"[DEBUG] min_discount={min_discount}, discount_percent={rule.discount_percent}")
-
-            if min_discount and rule.discount_percent < min_discount:
+            # Скидка на часовой слот (например, 14:00–16:00)
+            if not rule.slot_start or not rule.slot_end:
                 continue
-            # Проверка: happy hours
-            if happy_start <= hour <= happy_end and appointment.start_time and appointment.start_time.weekday() < 5:
+
+            appt_time = appointment.start_time
+            if not appt_time:
+                continue
+
+            # Извлекаем время записи (часы:минуты)
+            appt_slot = appt_time.time()
+
+            # Проверяем, попадает ли время записи в слот
+            # Обработка случая, когда слот переходит через полночь (не типично, но на всякий)
+            slot_active = False
+            if rule.slot_start <= rule.slot_end:
+                slot_active = rule.slot_start <= appt_slot <= rule.slot_end
+            else:
+                # Слот переходит через полночь (например, 22:00–02:00)
+                slot_active = appt_slot >= rule.slot_start or appt_slot <= rule.slot_end
+
+            # Проверка: только будни
+            if slot_active and appt_time.weekday() < 5:
                 if rule.discount_percent > best_discount:
                     best_discount = rule.discount_percent
                     best_rule = rule
@@ -1946,15 +2121,39 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
                         best_discount = rule.discount_percent
                         best_rule = rule
 
+        elif rule.type == "service":
+            # Скидка на конкретную услугу
+            if rule.service_id and rule.service_id == appointment.service_id:
+                if rule.discount_percent > best_discount:
+                    best_discount = rule.discount_percent
+                    best_rule = rule
+
+        elif rule.type == "client":
+            # Персональная скидка для клиента
+            if rule.client_id and rule.client_id == appointment.client_id:
+                if rule.discount_percent > best_discount:
+                    best_discount = rule.discount_percent
+                    best_rule = rule
+
         elif rule.type == "cashback":
             # Кэшбек начисляется при завершении, не при создании — пропускаем
             continue
 
     if best_rule and best_discount > 0:
         original_price = float(appointment.total_price)
-        discount_amount = round(original_price * best_discount / 100, 2)
-        appointment.discount_applied = discount_amount
-        appointment.total_price = original_price - discount_amount
+        # Защита минимальной цены (из conditions: {"min_price": 500})
+        raw_conditions = best_rule.conditions or {}
+        if isinstance(raw_conditions, str):
+            import json
+            raw_conditions = json.loads(raw_conditions)
+        min_price = float(raw_conditions.get("min_price", 0))
+        max_discount = max(0, original_price - min_price)
+        effective_discount = min(
+            round(original_price * best_discount / 100, 2),
+            max_discount,
+        )
+        appointment.discount_applied = effective_discount
+        appointment.total_price = original_price - effective_discount
 
         cd = ClientDiscount(
             tenant_id=tenant_id,
@@ -1962,7 +2161,7 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
             discount_rule_id=best_rule.id,
             appointment_id=appointment.id,
             applied_percent=best_discount,
-            applied_amount=discount_amount,
+            applied_amount=effective_discount,
             is_used=True,
         )
         db.add(cd)
@@ -2006,6 +2205,88 @@ async def _award_loyalty_points(appointment_id: int, db: AsyncSession):
         db.add(lp)
 
     await db.commit()
+
+
+# ========== BOXES ==========
+
+@app.get("/api/boxes", response_model=list[BoxOut])
+async def get_boxes(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Список всех боксов/зон тенанта."""
+    result = await db.execute(
+        select(Box).where(Box.tenant_id == UUID(current_user["tenant_id"]))
+        .order_by(Box.sort_order, Box.name)
+    )
+    return [BoxOut.model_validate(b) for b in result.scalars().all()]
+
+
+@app.post("/api/boxes", response_model=BoxOut)
+async def create_box(
+    request: BoxCreate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Создать новый бокс/зону."""
+    box = Box(
+        name=request.name,
+        color=request.color,
+        sort_order=request.sort_order,
+        is_active=request.is_active,
+        tenant_id=UUID(current_user["tenant_id"]),
+    )
+    db.add(box)
+    await db.commit()
+    await db.refresh(box)
+    return BoxOut.model_validate(box)
+
+
+@app.put("/api/boxes/{box_id}", response_model=BoxOut)
+async def update_box(
+    box_id: int,
+    request: BoxUpdate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Обновить бокс/зону."""
+    result = await db.execute(
+        select(Box).where(Box.id == box_id, Box.tenant_id == UUID(current_user["tenant_id"]))
+    )
+    box = result.scalar_one_or_none()
+    if not box:
+        raise HTTPException(status_code=404, detail="Бокс не найден")
+
+    update_data = request.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(box, key, value)
+
+    await db.commit()
+    await db.refresh(box)
+    return BoxOut.model_validate(box)
+
+
+@app.delete("/api/boxes/{box_id}")
+async def delete_box(
+    box_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Удалить бокс/зону."""
+    result = await db.execute(
+        select(Box).where(Box.id == box_id, Box.tenant_id == UUID(current_user["tenant_id"]))
+    )
+    box = result.scalar_one_or_none()
+    if not box:
+        raise HTTPException(status_code=404, detail="Бокс не найден")
+
+    # Сбросить box_id у связанных записей
+    await db.execute(
+        update(Appointment).where(Appointment.box_id == box_id).values(box_id=None)
+    )
+    await db.delete(box)
+    await db.commit()
+    return {"message": f"Бокс «{box.name}» удалён"}
 
 
 # ========== CARS ==========
@@ -2103,6 +2384,8 @@ async def _save_uploaded_photo(
     entity_id: int | None,
     uploaded_by_id: int,
     title: str | None = None,
+    service_id: int | None = None,
+    description: str | None = None,
 ) -> PhotoCreateResponse:
     """Validate, save and create Photo record."""
     contents = await file.read()
@@ -2117,6 +2400,8 @@ async def _save_uploaded_photo(
         "url": url,
         "thumbnail_url": thumb_url,
         "title": title or file.filename,
+        "description": description,
+        "service_id": service_id,
         "file_size": len(contents),
         "mime_type": mime,
         "uploaded_by_id": uploaded_by_id,
@@ -2190,13 +2475,26 @@ async def upload_appointment_photo(
 async def upload_portfolio_photo(
     file: UploadFile = File(...),
     title: str | None = Query(None),
+    service_id: int | None = Query(None, description="ID услуги, к которой относится фото"),
+    description: str | None = Query(None, description="Описание работы (было → стало)"),
     current_user: dict = Depends(_require_master),
     db: AsyncSession = Depends(get_db),
 ):
-    """Загрузить фото в портфолио мастера."""
+    """Загрузить фото в портфолио мастера с привязкой к услуге."""
+    # Если указан service_id — проверяем, что услуга существует
+    if service_id is not None:
+        srv_result = await db.execute(
+            select(Service).where(
+                Service.id == service_id,
+                Service.tenant_id == UUID(current_user["tenant_id"]),
+            )
+        )
+        if not srv_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Услуга не найдена")
+
     return await _save_uploaded_photo(
         db, file, UUID(current_user["tenant_id"]), "portfolio", "uploaded_by_id", current_user["id"],
-        current_user["id"], title=title,
+        current_user["id"], title=title, service_id=service_id, description=description,
     )
 
 
@@ -2218,16 +2516,96 @@ async def get_photos(
     if filter_col is None:
         raise HTTPException(status_code=400, detail="Некорректный тип сущности")
 
-    result = await db.execute(
-        select(Photo)
-        .where(
-            filter_col == entity_id,
-            Photo.tenant_id == UUID(current_user["tenant_id"]),
-            Photo.entity_type == entity_type,
-        )
-        .order_by(Photo.sort_order, Photo.created_at.desc())
+    # Для портфолио подгружаем связи с услугой и загрузчиком
+    query = select(Photo).where(
+        filter_col == entity_id,
+        Photo.tenant_id == UUID(current_user["tenant_id"]),
+        Photo.entity_type == entity_type,
     )
-    return [PhotoOut.model_validate(p) for p in result.scalars().all()]
+    if entity_type == "portfolio":
+        query = query.options(
+            selectinload(Photo.service),
+            selectinload(Photo.uploader),
+        )
+    result = await db.execute(query.order_by(Photo.sort_order, Photo.created_at.desc()))
+    photos = result.scalars().all()
+
+    # Обогащаем ответ именами для портфолио
+    result_list = []
+    for p in photos:
+        po = PhotoOut.model_validate(p)
+        if entity_type == "portfolio":
+            po.service_name = p.service.name if p.service else None
+            po.uploader_name = p.uploader.full_name if p.uploader else None
+        result_list.append(po)
+    return result_list
+
+
+@app.get("/api/portfolio", response_model=list[PhotoOut])
+async def get_all_portfolio(
+    service_id: int | None = Query(None, description="Фильтр по услуге"),
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Получить все портфолио-фото салона (с фильтром по услуге)."""
+    tenant_id = UUID(current_user["tenant_id"])
+    query = (
+        select(Photo)
+        .options(selectinload(Photo.service), selectinload(Photo.uploader))
+        .where(
+            Photo.tenant_id == tenant_id,
+            Photo.entity_type == "portfolio",
+        )
+    )
+    if service_id is not None:
+        query = query.where(Photo.service_id == service_id)
+
+    result = await db.execute(query.order_by(Photo.created_at.desc()))
+    photos = result.scalars().all()
+
+    result_list = []
+    for p in photos:
+        po = PhotoOut.model_validate(p)
+        po.service_name = p.service.name if p.service else None
+        po.uploader_name = p.uploader.full_name if p.uploader else None
+        result_list.append(po)
+    return result_list
+
+
+@app.get("/api/portfolio/services", response_model=list[dict])
+async def get_portfolio_services(
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Получить список услуг, по которым есть фото в портфолио."""
+    tenant_id = UUID(current_user["tenant_id"])
+    result = await db.execute(
+        select(Photo.service_id, func.count(Photo.id).label("photo_count"))
+        .where(
+            Photo.tenant_id == tenant_id,
+            Photo.entity_type == "portfolio",
+            Photo.service_id.isnot(None),
+        )
+        .group_by(Photo.service_id)
+        .order_by(func.count(Photo.id).desc())
+    )
+    rows = result.all()
+    service_ids = [r.service_id for r in rows if r.service_id]
+
+    services_out = []
+    if service_ids:
+        srv_result = await db.execute(
+            select(Service).where(Service.id.in_(service_ids))
+        )
+        srv_map = {s.id: s for s in srv_result.scalars().all()}
+        for r in rows:
+            srv = srv_map.get(r.service_id)
+            services_out.append({
+                "service_id": r.service_id,
+                "service_name": srv.name if srv else f"Услуга #{r.service_id}",
+                "photo_count": r.photo_count,
+            })
+    return services_out
 
 
 @app.delete("/api/photos/{photo_id}")
@@ -2649,13 +3027,12 @@ async def get_history_detail(
     db: AsyncSession = Depends(get_db),
 ):
     """Получить детали конкретного изменения."""
-    from sqlalchemy.orm import selectinload
     result = await db.execute(
-        select(AppointmentHistory, Payment)
-        .options(selectinload(AppointmentHistory, Payment.changed_by))
+        select(AppointmentHistory)
+        .options(selectinload(AppointmentHistory.changed_by))
         .where(
-            AppointmentHistory, Payment.id == history_id,
-            AppointmentHistory, Payment.appointment_id == appointment_id,
+            AppointmentHistory.id == history_id,
+            AppointmentHistory.appointment_id == appointment_id,
         )
     )
     entry = result.scalar_one_or_none()
@@ -2889,35 +3266,49 @@ async def get_service_analytics(
         for s in sorted_services[:5]
     ]
 
-    # --- 4. Прогноз (простое скользящее среднее) ---
+    # --- 4. Прогноз на 3 месяца (скользящее среднее + тренд) ---
     forecast = []
-    if appts:
-        # Собираем последние 3 месяца
-        last_months = sorted(set(
-            a.start_time.strftime("%Y-%m") for a in appts
-        ))[-3:]
-        if last_months:
-            total_rev = sum(
-                monthly_data[a.service_id].get(m, {"revenue": 0})["revenue"]
-                for sid in monthly_data for m in [last_months[-1]]
-                if m in monthly_data[sid]
-                for a in appts if a.service_id == sid
-            )
+    # Собираем общую выручку по месяцам (сумма по всем услугам)
+    monthly_total: dict[str, float] = {}
+    for a in appts:
+        m = a.start_time.strftime("%Y-%m")
+        monthly_total[m] = monthly_total.get(m, 0) + float(a.total_price or 0)
 
-            avg_revenue = total_rev / len(last_months) if last_months else 0
+    if len(monthly_total) >= 3:
+        sorted_months = sorted(monthly_total.keys())
+        last_3 = sorted_months[-3:]
 
-            pass
+        # Средняя выручка за последние 3 месяца
+        recent_revenues = [monthly_total[m] for m in last_3]
+        avg_revenue = sum(recent_revenues) / len(recent_revenues)
 
-            # Простой прогноз на 3 месяца вперёд
-            last_month = datetime.strptime(last_months[-1] + "-01", "%Y-%m-%d")
-            for i in range(1, 4):
-                next_m = (last_month + timedelta(days=32 * i)).strftime("%Y-%m")
-                forecast.append(ForecastPoint(
-                    month=next_m,
-                    forecast=round(avg_revenue, 2),
-                    lower_bound=round(avg_revenue * 0.8, 2),
-                    upper_bound=round(avg_revenue * 1.2, 2),
-                ))
+        # Тренд: изменение между самым старым и самым новым месяцем из last_3
+        if recent_revenues[0] > 0:
+            trend = (recent_revenues[-1] - recent_revenues[0]) / recent_revenues[0]
+        else:
+            trend = 0.0
+
+        # Уровень уверенности: чем больше данных, тем выше
+        data_points = len(monthly_total)
+        if data_points >= 6:
+            confidence_width = 0.2  # ±20%
+        elif data_points >= 4:
+            confidence_width = 0.3  # ±30%
+        else:
+            confidence_width = 0.4  # ±40%
+
+        # Прогноз на 3 месяца вперёд
+        last_month_dt = datetime.strptime(sorted_months[-1] + "-01", "%Y-%m-%d")
+        for i in range(1, 4):
+            next_m = (last_month_dt + timedelta(days=32 * i)).strftime("%Y-%m")
+            # Прогноз: среднее * (1 + тренд)^i (экспоненциальное сглаживание)
+            projected = avg_revenue * ((1 + trend) ** i)
+            forecast.append(ForecastPoint(
+                month=next_m,
+                forecast=round(projected, 2),
+                lower_bound=round(projected * (1 - confidence_width), 2),
+                upper_bound=round(projected * (1 + confidence_width), 2),
+            ))
 
     return ServiceAnalyticsResponse(
         trends=trends,
@@ -3228,3 +3619,202 @@ async def refund_payment(
     payment.status = "refunded"
     await db.commit()
     return {"message": "Платёж возвращён", "payment_id": payment_id}
+
+
+# =============================================================================
+# DISCOUNT HELPERS & EXTENDED ENDPOINTS
+# =============================================================================
+
+def _parse_date_str(value: str | None):
+    """Convert 'YYYY-MM-DD' string to datetime or None."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        return None
+
+
+async def _notify_discount_created(db: AsyncSession, rule, admin_user: dict):
+    """Send notification about a new discount to relevant clients."""
+    from app.core.notification_service import create_notification
+
+    tenant_id = rule.tenant_id
+    now = datetime.now(timezone.utc)
+
+    # Собираем получателей
+    recipient_ids = []
+
+    if rule.client_id:
+        # Персональная скидка — только этому клиенту
+        recipient_ids = [rule.client_id]
+    elif rule.service_id:
+        # Скидка на услугу — всем, кто её заказывал
+        appt_result = await db.execute(
+            select(Appointment.client_id)
+            .where(
+                Appointment.service_id == rule.service_id,
+                Appointment.tenant_id == tenant_id,
+                Appointment.status == "completed",
+            )
+            .distinct()
+        )
+        recipient_ids = [r[0] for r in appt_result.all()]
+    else:
+        # Общая скидка — всем клиентам
+        user_result = await db.execute(
+            select(User.id).where(
+                User.role == "client",
+                User.tenant_id == tenant_id,
+            )
+        )
+        recipient_ids = [r[0] for r in user_result.all()]
+
+    # Лимит на число уведомлений (не спамим)
+    for uid in recipient_ids[:50]:
+        await create_notification(
+            db=db,
+            user_id=uid,
+            tenant_id=tenant_id,
+            type="promo",
+            channel="in_app",
+            title=f"🎉 Новая скидка: {rule.name}",
+            message=f"Скидка {rule.discount_percent}% на услуги салона. "
+                    f"Действует до {rule.valid_until.strftime('%d.%m.%Y') if rule.valid_until else 'отдельного уведомления'}.",
+            related_entity_type="discount",
+            related_entity_id=rule.id,
+        )
+
+
+# ===== DISCOUNT BY SERVICE =====
+
+@app.get("/api/discounts/by-service/{service_id}", response_model=list[dict])
+async def get_discounts_by_service(
+    service_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Получить скидки для конкретной услуги."""
+    result = await db.execute(
+        select(DiscountRule)
+        .options(selectinload(DiscountRule.service), selectinload(DiscountRule.client))
+        .where(
+            DiscountRule.tenant_id == UUID(current_user["tenant_id"]),
+            DiscountRule.service_id == service_id,
+            DiscountRule.is_active == True,
+        )
+        .order_by(DiscountRule.created_at.desc())
+    )
+    return [_discount_rule_to_out(r) for r in result.scalars().all()]
+
+
+# ===== DISCOUNT BY CLIENT =====
+
+@app.get("/api/discounts/by-client/{client_id}", response_model=list[dict])
+async def get_discounts_by_client(
+    client_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Получить персональные скидки для клиента."""
+    result = await db.execute(
+        select(DiscountRule)
+        .options(selectinload(DiscountRule.service), selectinload(DiscountRule.client))
+        .where(
+            DiscountRule.tenant_id == UUID(current_user["tenant_id"]),
+            DiscountRule.client_id == client_id,
+            DiscountRule.is_active == True,
+        )
+        .order_by(DiscountRule.created_at.desc())
+    )
+    return [_discount_rule_to_out(r) for r in result.scalars().all()]
+
+
+# ===== DISCOUNT ANALYTICS =====
+
+@app.get("/api/discounts/analytics")
+async def get_discount_analytics(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Аналитика эффективности скидок."""
+    tenant_id = UUID(current_user["tenant_id"])
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # Все правила скидок
+    rules_result = await db.execute(
+        select(DiscountRule).where(DiscountRule.tenant_id == tenant_id)
+    )
+    rules = rules_result.scalars().all()
+
+    # Все применения скидок (ClientDiscount)
+    cd_result = await db.execute(
+        select(ClientDiscount)
+        .options(selectinload(ClientDiscount.discount_rule))
+        .where(
+            ClientDiscount.tenant_id == tenant_id,
+            ClientDiscount.is_used == True,
+        )
+    )
+    client_discounts = cd_result.scalars().all()
+
+    # Статистика по каждому правилу
+    rule_stats = {}
+    for cd in client_discounts:
+        rule_id = cd.discount_rule_id
+        if rule_id not in rule_stats:
+            rule_stats[rule_id] = {
+                "count": 0,
+                "total_discount_amount": 0.0,
+                "total_original_price": 0.0,
+            }
+        rule_stats[rule_id]["count"] += 1
+        rule_stats[rule_id]["total_discount_amount"] += float(cd.applied_amount or 0)
+
+        # Ищем оригинальную цену в appointment
+        if cd.appointment_id:
+            appt_result = await db.execute(
+                select(Appointment).where(Appointment.id == cd.appointment_id)
+            )
+            appt = appt_result.scalar_one_or_none()
+            if appt:
+                original = float(appt.total_price or 0) + float(appt.discount_applied or 0)
+                rule_stats[rule_id]["total_original_price"] += original
+
+    # Собираем результат
+    analytics = []
+    for rule in rules:
+        stats = rule_stats.get(rule.id, {"count": 0, "total_discount_amount": 0.0, "total_original_price": 0.0})
+        roi = 0
+        if stats["total_discount_amount"] > 0:
+            roi = round(
+                (stats["total_original_price"] - stats["total_discount_amount"]) / stats["total_discount_amount"] * 100,
+                1,
+            ) if stats["total_discount_amount"] else 0
+
+        analytics.append({
+            "rule_id": rule.id,
+            "rule_name": rule.name,
+            "rule_type": rule.type,
+            "discount_percent": rule.discount_percent,
+            "is_active": rule.is_active,
+            "usage_count": stats["count"],
+            "total_discount_amount": round(stats["total_discount_amount"], 2),
+            "total_original_price": round(stats["total_original_price"], 2),
+            "roi_percent": roi,
+        })
+
+    # Общая статистика
+    total_used = sum(a["usage_count"] for a in analytics)
+    total_discounted = sum(a["total_discount_amount"] for a in analytics)
+
+    return {
+        "rules": analytics,
+        "summary": {
+            "total_rules": len(rules),
+            "active_rules": sum(1 for r in rules if r.is_active),
+            "total_discount_uses": total_used,
+            "total_discount_amount": round(total_discounted, 2),
+        },
+    }

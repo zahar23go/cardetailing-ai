@@ -127,7 +127,7 @@ export default function NotificationList({
                       <Tag color={TYPE_COLORS[item.type]} className="tag-status">
                         {TYPE_LABELS[item.type] || item.type}
                       </Tag>
-                      <Text className={item.is_read ? 'text-titanium' : 'text-white-bold'}>
+                      <Text className="text-gold-bold">
                         {item.title}
                       </Text>
                       {!item.is_read && (
@@ -142,8 +142,8 @@ export default function NotificationList({
                   }
                   description={
                     <Space direction="vertical" size={2}>
-                      <Text className="text-titanium text-13">{item.message}</Text>
-                      <Text className="text-titanium text-11 opacity-70">
+                      <Text className="text-titanium">{item.message}</Text>
+                      <Text className="text-small opacity-70">
                         {item.created_at ? dayjs(item.created_at).format('DD.MM.YYYY HH:mm') : ''}
                       </Text>
                     </Space>

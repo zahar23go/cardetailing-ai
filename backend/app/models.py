@@ -17,6 +17,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Time,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, backref
@@ -75,6 +76,7 @@ class Tenant(Base):
     services = relationship("Service", back_populates="tenant", cascade="all, delete-orphan")
     appointments = relationship("Appointment", back_populates="tenant", cascade="all, delete-orphan")
     expenses = relationship("Expense", back_populates="tenant", cascade="all, delete-orphan")
+    boxes = relationship("Box", back_populates="tenant", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Tenant(id={self.id}, name='{self.name}', subdomain='{self.subdomain}')>"
@@ -204,6 +206,35 @@ class Service(Base):
         return f"<Service(id={self.id}, name='{self.name}', price={self.price})>"
 
 
+class Box(Base):
+    """Бокс/зона в сервисе (напр. «Бокс 1 — мойка», «Бокс 2 — полировка»)."""
+    __tablename__ = "boxes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String(100), nullable=False, comment="Название бокса")
+    color = Column(String(20), nullable=True, comment="Цвет для UI (hex)")
+    sort_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # relationships
+    tenant = relationship("Tenant", back_populates="boxes")
+    appointments = relationship("Appointment", back_populates="box")
+
+    def __repr__(self) -> str:
+        return f"<Box(id={self.id}, name='{self.name}')>"
+
+
 class Appointment(Base):
     __tablename__ = "appointments"
 
@@ -237,6 +268,13 @@ class Appointment(Base):
         ForeignKey("services.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
+    )
+    box_id = Column(
+        Integer,
+        ForeignKey("boxes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Бокс/зона выполнения",
     )
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False)
@@ -275,6 +313,7 @@ class Appointment(Base):
     )
     car = relationship("Car", back_populates="appointments")
     service = relationship("Service", back_populates="appointments")
+    box = relationship("Box", back_populates="appointments")
     tenant = relationship("Tenant", back_populates="appointments")
     photos = relationship("Photo", back_populates="appointment", cascade="all, delete-orphan")
 
@@ -332,6 +371,7 @@ class DiscountType(str, enum.Enum):
     cashback = "cashback"
 
 
+
 class DiscountRule(Base):
     __tablename__ = "discount_rules"
 
@@ -343,11 +383,20 @@ class DiscountRule(Base):
         index=True,
     )
     name = Column(String(255), nullable=False)
-    type = Column(String(50), nullable=False, comment="happy_hours, frequency, win_back, cashback")
+    type = Column(String(50), nullable=False, comment="happy_hours, frequency, win_back, cashback, service, client")
     conditions = Column(JSONB, nullable=False, server_default="'{}'")
     discount_percent = Column(Integer, nullable=False, default=0)
-    start_date = Column(DateTime(timezone=True), nullable=True)
-    end_date = Column(DateTime(timezone=True), nullable=True)
+    slot_start = Column(Time(timezone=False), nullable=True, comment="Время начала слота (HH:MM)")
+    slot_end = Column(Time(timezone=False), nullable=True, comment="Время конца слота (HH:MM)")
+    service_id = Column(
+        Integer, ForeignKey("services.id", ondelete="CASCADE"), nullable=True, index=True,
+        comment="Привязка скидки к услуге",
+    )
+    client_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True,
+        comment="Персональная скидка для клиента",
+    )
+    valid_until = Column(DateTime(timezone=True), nullable=True, comment="Срок действия скидки")
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(
         DateTime(timezone=True),
@@ -363,6 +412,8 @@ class DiscountRule(Base):
 
     # relationships
     tenant = relationship("Tenant", backref="discount_rules")
+    service = relationship("Service", backref="discount_rules")
+    client = relationship("User", backref="personal_discounts", foreign_keys=[client_id])
 
     def __repr__(self) -> str:
         return f"<DiscountRule(id={self.id}, name='{self.name}', type='{self.type}')>"
@@ -474,12 +525,17 @@ class Photo(Base):
     appointment_id = Column(
         Integer, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True, index=True,
     )
+    service_id = Column(
+        Integer, ForeignKey("services.id", ondelete="SET NULL"), nullable=True, index=True,
+        comment="Привязка к услуге (для портфолио)",
+    )
     uploaded_by_id = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True,
     )
     url = Column(String(500), nullable=False)
     thumbnail_url = Column(String(500), nullable=True)
     title = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True, comment="Описание работы (было → стало)")
     is_primary = Column(Boolean, nullable=False, default=False)
     sort_order = Column(Integer, nullable=False, default=0)
     file_size = Column(Integer, nullable=True)
@@ -494,6 +550,7 @@ class Photo(Base):
     tenant = relationship("Tenant", backref="photos")
     car = relationship("Car", back_populates="photos")
     appointment = relationship("Appointment", back_populates="photos")
+    service = relationship("Service", backref="portfolio_photos")
     uploader = relationship("User", back_populates="portfolio_photos", foreign_keys=[uploaded_by_id])
 
     def __repr__(self) -> str:

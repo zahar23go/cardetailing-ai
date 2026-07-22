@@ -163,6 +163,7 @@ class AppointmentCreate(BaseModel):
     start_time: str = Field(..., description="ISO 8601 datetime string")
     notes: Optional[str] = Field(None, description="Client notes")
     client_notes: Optional[str] = None  # alias for notes
+    box_id: Optional[int] = Field(None, description="ID бокса/зоны")
 
     @field_validator("start_time")
     @classmethod
@@ -244,6 +245,7 @@ class AppointmentOut(BaseModel):
     master_id: Optional[int] = None
     car_id: int
     service_id: int
+    box_id: Optional[int] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     status: Optional[str] = None
@@ -412,6 +414,9 @@ class RevenueResponse(BaseModel):
     avg_per_day: float = 0
     best_day: Optional[str] = None
     worst_day: Optional[str] = None
+    previous_total: float = 0
+    change_percent: float = 0
+    previous_avg_per_day: float = 0
 
 
 class HeatmapCell(BaseModel):
@@ -419,10 +424,37 @@ class HeatmapCell(BaseModel):
     hour: int
     count: int = 0
     revenue: float = 0
+    box_id: Optional[int] = None
 
 
 class HeatmapResponse(BaseModel):
     cells: list[HeatmapCell] = []
+    boxes: list["BoxOut"] = []
+
+
+class BoxCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    color: Optional[str] = None
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class BoxUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    color: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class BoxOut(BaseModel):
+    id: int
+    name: str
+    color: Optional[str] = None
+    sort_order: int = 0
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
 
 
 class FunnelStage(BaseModel):
@@ -473,11 +505,14 @@ class RfmResponse(BaseModel):
 
 class DiscountRuleCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    type: str = Field(..., description="happy_hours, frequency, win_back, cashback")
+    type: str = Field(..., description="happy_hours, frequency, win_back, cashback, service, client")
     conditions: Optional[dict] = None
     discount_percent: int = Field(default=0, ge=0, le=100)
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    slot_start: Optional[str] = Field(None, description="Время начала слота HH:MM (для happy_hours)")
+    slot_end: Optional[str] = Field(None, description="Время конца слота HH:MM (для happy_hours)")
+    service_id: Optional[int] = Field(None, description="ID услуги (для скидки на услугу)")
+    client_id: Optional[int] = Field(None, description="ID клиента (для персональной скидки)")
+    valid_until: Optional[str] = Field(None, description="Срок действия YYYY-MM-DD")
     is_active: Optional[bool] = True
 
 
@@ -486,8 +521,11 @@ class DiscountRuleUpdate(BaseModel):
     type: Optional[str] = None
     conditions: Optional[dict] = None
     discount_percent: Optional[int] = Field(None, ge=0, le=100)
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    slot_start: Optional[str] = Field(None, description="Время начала слота HH:MM (для happy_hours)")
+    slot_end: Optional[str] = Field(None, description="Время конца слота HH:MM (для happy_hours)")
+    service_id: Optional[int] = None
+    client_id: Optional[int] = None
+    valid_until: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -497,8 +535,13 @@ class DiscountRuleOut(BaseModel):
     type: str
     conditions: Optional[dict] = None
     discount_percent: int
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    slot_start: Optional[str] = None
+    slot_end: Optional[str] = None
+    service_id: Optional[int] = None
+    service_name: Optional[str] = None
+    client_id: Optional[int] = None
+    client_name: Optional[str] = None
+    valid_until: Optional[str] = None
     is_active: bool
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -517,6 +560,24 @@ class ClientDiscountOut(BaseModel):
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class DiscountAnalyticsTopRule(BaseModel):
+    rule_id: int
+    rule_name: str
+    rule_type: str
+    times_used: int = 0
+    total_discount: float = 0
+    client_count: int = 0
+
+
+class DiscountAnalyticsResponse(BaseModel):
+    total_rules: int = 0
+    active_rules: int = 0
+    total_times_used: int = 0
+    total_discount_amount: float = 0
+    unique_clients_affected: int = 0
+    top_rules: list[DiscountAnalyticsTopRule] = []
 
 
 class LoyaltyPointsOut(BaseModel):
@@ -550,6 +611,11 @@ class PhotoOut(BaseModel):
     url: str
     thumbnail_url: Optional[str] = None
     title: Optional[str] = None
+    description: Optional[str] = None
+    service_id: Optional[int] = None
+    service_name: Optional[str] = None
+    uploaded_by_id: Optional[int] = None
+    uploader_name: Optional[str] = None
     is_primary: bool = False
     sort_order: int = 0
     file_size: Optional[int] = None

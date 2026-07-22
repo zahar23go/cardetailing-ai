@@ -10,9 +10,13 @@ import {
   CheckCircleOutlined, PlayCircleOutlined, EditOutlined,
   LogoutOutlined, ReloadOutlined, CarOutlined,
   UserOutlined, PhoneOutlined, FileTextOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import PortfolioSection from './components/PortfolioSection';
+import NotificationBell from './components/NotificationBell';
+import NotificationList from './components/NotificationList';
+import NotificationSettings from './components/NotificationSettings';
 
 const { Text } = Typography;
 const { TabPane } = Tabs;
@@ -197,6 +201,7 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
           <Text style={{ color: '#AAB2BF' }}>
             🔧 {user.full_name}
           </Text>
+          <NotificationBell />
           <Button type="text" icon={<LogoutOutlined />} onClick={onLogout} style={{ color: '#AAB2BF' }}>
             Выйти
           </Button>
@@ -526,6 +531,18 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
                 <PortfolioSection masterId={user.id} />
               </div>
             </motion.div>
+          </TabPane>
+
+          {/* ===== TAB: NOTIFICATIONS ===== */}
+          <TabPane tab={<span><BellOutlined /> Уведомления</span>} key="notifications">
+            <Tabs size="small" tabBarStyle={{ borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
+              <TabPane tab="📋 Список" key="list">
+                <NotificationList title="Мои уведомления" />
+              </TabPane>
+              <TabPane tab="⚙️ Настройки" key="settings">
+                <NotificationSettings />
+              </TabPane>
+            </Tabs>
           </TabPane>
         </Tabs>
       </Content>

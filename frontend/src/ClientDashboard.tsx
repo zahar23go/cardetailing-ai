@@ -8,10 +8,16 @@ import {
 import {
   CarOutlined, CalendarOutlined, ClockCircleOutlined,
   FileTextOutlined, PlusOutlined, HistoryOutlined,
-  ShopOutlined, LogoutOutlined,
+  ShopOutlined, LogoutOutlined, CameraOutlined,
+  BellOutlined, CrownOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import CarCard from './components/CarCard';
+import PortfolioSection from './components/PortfolioSection';
+import NotificationBell from './components/NotificationBell';
+import NotificationList from './components/NotificationList';
+import NotificationSettings from './components/NotificationSettings';
+import LoyaltyCard from './components/LoyaltyCard';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -250,6 +256,25 @@ export default function ClientDashboard({ user, onLogout }: { user: User; onLogo
 
   const [cancellingId, setCancellingId] = useState<number | null>(null);
 
+  // Portfolio state
+  const [portfolioServices, setPortfolioServices] = useState<Service[]>([]);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+
+  const fetchPortfolioServices = async () => {
+    setPortfolioLoading(true);
+    try {
+      const data = await apiFetch<{items: Service[]; total: number}>('/api/services?skip=0&limit=100');
+      setPortfolioServices(data.items);
+    } catch { /* ignore */ }
+    setPortfolioLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'portfolio') {
+      fetchPortfolioServices();
+    }
+  }, [activeTab]);
+
   const handleCancelAppointment = async (appointmentId: number) => {
     setCancellingId(appointmentId);
     try {
@@ -353,6 +378,7 @@ export default function ClientDashboard({ user, onLogout }: { user: User; onLogo
           <Tag color="gold" className="tag-category">
             {roleLabel[user.role]}
           </Tag>
+          <NotificationBell />
           <Button type="text" icon={<LogoutOutlined />} onClick={onLogout} className="btn-logout">
             Выйти
           </Button>
@@ -695,6 +721,36 @@ export default function ClientDashboard({ user, onLogout }: { user: User; onLogo
                 </>
               )}
             </Spin>
+          </TabPane>
+
+          {/* ===== TAB: PORTFOLIO ===== */}
+          <TabPane tab={<span><CameraOutlined /> Портфолио</span>} key="portfolio">
+            <PortfolioSection
+              masterId={user.id}
+              readonly={user.role === 'client'}
+              allServices={portfolioServices}
+            />
+          </TabPane>
+
+          {/* ===== TAB: LOYALTY ===== */}
+          <TabPane tab={<span><CrownOutlined /> Мои бонусы</span>} key="loyalty">
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={12} lg={8}>
+                <LoyaltyCard />
+              </Col>
+            </Row>
+          </TabPane>
+
+          {/* ===== TAB: NOTIFICATIONS ===== */}
+          <TabPane tab={<span><BellOutlined /> Уведомления</span>} key="notifications">
+            <Tabs size="small" tabBarStyle={{ borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
+              <TabPane tab="📋 Список" key="list">
+                <NotificationList title="Мои уведомления" />
+              </TabPane>
+              <TabPane tab="⚙️ Настройки" key="settings">
+                <NotificationSettings />
+              </TabPane>
+            </Tabs>
           </TabPane>
         </Tabs>
       </Content>

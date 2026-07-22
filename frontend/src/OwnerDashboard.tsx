@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Typography, Card, Row, Col, Statistic, Table, Button, Tag, Space, Tabs,
   message, Modal, Select, Input, Popconfirm, Badge, Layout, List,
-  Empty, Spin, Tooltip,
+  Empty, Spin, Tooltip, DatePicker, TimePicker, Switch,
 } from 'antd';
 import {
   CrownOutlined, ToolOutlined,
@@ -11,8 +11,15 @@ import {
   TeamOutlined, DeleteOutlined, EditOutlined,
   PlusOutlined, LogoutOutlined, ReloadOutlined, PhoneOutlined,
   BulbOutlined, SendOutlined, AreaChartOutlined,
-  GiftOutlined, StarOutlined,
+  GiftOutlined, StarOutlined, BellOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
+import NotificationBell from './components/NotificationBell';
+import NotificationList from './components/NotificationList';
+import NotificationSettings from './components/NotificationSettings';
+import MasterCalendar from './components/MasterCalendar';
+import ReportManager from './components/ReportManager';
+import ServiceAnalytics from './components/ServiceAnalytics';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, FunnelChart, Funnel, LabelList,
@@ -125,6 +132,9 @@ interface RevenueData {
   avg_per_day: number;
   best_day: string | null;
   worst_day: string | null;
+  previous_total: number;
+  change_percent: number;
+  previous_avg_per_day: number;
 }
 
 interface HeatmapCell {
@@ -132,6 +142,15 @@ interface HeatmapCell {
   hour: number;
   count: number;
   revenue: number;
+  box_id?: number | null;
+}
+
+interface BoxItem {
+  id: number;
+  name: string;
+  color?: string | null;
+  sort_order: number;
+  is_active: boolean;
 }
 
 interface FunnelStage {
@@ -180,11 +199,34 @@ interface DiscountRule {
   type: string;
   conditions: Record<string, any>;
   discount_percent: number;
-  start_date: string | null;
-  end_date: string | null;
+  slot_start: string | null;
+  slot_end: string | null;
+  service_id?: number;
+  service_name?: string;
+  client_id?: number;
+  client_name?: string;
+  valid_until?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+interface DiscountAnalyticsTopRule {
+  rule_id: number;
+  rule_name: string;
+  rule_type: string;
+  times_used: number;
+  total_discount: number;
+  client_count: number;
+}
+
+interface DiscountAnalytics {
+  total_rules: number;
+  active_rules: number;
+  total_times_used: number;
+  total_discount_amount: number;
+  unique_clients_affected: number;
+  top_rules: DiscountAnalyticsTopRule[];
 }
 
 interface LoyaltyClient {
@@ -322,11 +364,16 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   // Discounts & Loyalty state
   const [discountRules, setDiscountRules] = useState<DiscountRule[]>([]);
   const [discountsLoading, setDiscountsLoading] = useState(false);
+  const [discountAnalytics, setDiscountAnalytics] = useState<DiscountAnalytics | null>(null);
   const [discountModal, setDiscountModal] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<DiscountRule | null>(null);
   const [discountForm, setDiscountForm] = useState({
     name: '', type: 'happy_hours', conditions: '{}',
-    discount_percent: 0, start_date: '', end_date: '',
+    discount_percent: 0, slot_start: '', slot_end: '',
+    service_id: undefined as number | undefined,
+    client_id: undefined as number | undefined,
+    valid_until: '',
+    is_active: true,
   });
   const [discountSaving, setDiscountSaving] = useState(false);
 
@@ -338,8 +385,14 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [revenueLoading, setRevenueLoading] = useState(false);
   const [heatmapData, setHeatmapData] = useState<HeatmapCell[]>([]);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
+  const [boxes, setBoxes] = useState<BoxItem[]>([]);
+  const [selectedBoxId, setSelectedBoxId] = useState<number | undefined>(undefined);
   const [funnelData, setFunnelData] = useState<FunnelData | null>(null);
   const [funnelLoading, setFunnelLoading] = useState(false);
+
+  // Period selector state
+  const [periodStart, setPeriodStart] = useState<string | null>(null);
+  const [periodEnd, setPeriodEnd] = useState<string | null>(null);
 
   // Fetch all data
   useEffect(() => {
@@ -432,20 +485,29 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   };
 
   /* ---------- Analytics Charts ---------- */
-  const fetchRevenueChart = async () => {
+  const fetchRevenueChart = async (start?: string, end?: string) => {
     setRevenueLoading(true);
     try {
-      const data = await apiFetch<RevenueData>('/api/analytics/revenue');
+      let path = '/api/analytics/revenue';
+      if (start && end) {
+        path += `?start_date=${start}&end_date=${end}`;
+      }
+      const data = await apiFetch<RevenueData>(path);
       setRevenueData(data);
     } catch { /* ignore */ }
     setRevenueLoading(false);
   };
 
-  const fetchHeatmap = async () => {
+  const fetchHeatmap = async (boxId?: number) => {
     setHeatmapLoading(true);
     try {
-      const data = await apiFetch<{cells: HeatmapCell[]}>('/api/analytics/heatmap');
+      let path = '/api/analytics/heatmap';
+      if (boxId !== undefined) {
+        path += `?box_id=${boxId}`;
+      }
+      const data = await apiFetch<{cells: HeatmapCell[]; boxes: BoxItem[]}>(path);
       setHeatmapData(data.cells);
+      if (data.boxes) setBoxes(data.boxes);
     } catch { /* ignore */ }
     setHeatmapLoading(false);
   };
@@ -482,6 +544,10 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       const data = await apiFetch<{items: DiscountRule[]; total: number}>('/api/discounts?skip=0&limit=100');
       setDiscountRules(data.items);
     } catch { /* ignore */ }
+    try {
+      const analytics = await apiFetch<DiscountAnalytics>('/api/analytics/discounts');
+      setDiscountAnalytics(analytics);
+    } catch { /* ignore */ }
     setDiscountsLoading(false);
   };
 
@@ -494,6 +560,13 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     setLoyaltyLoading(false);
   };
 
+  const fetchDiscountAnalytics = async () => {
+    try {
+      const data = await apiFetch<DiscountAnalytics>('/api/analytics/discounts');
+      setDiscountAnalytics(data);
+    } catch { /* ignore */ }
+  };
+
   const openDiscountModal = (rule?: DiscountRule) => {
     if (rule) {
       setEditingDiscount(rule);
@@ -502,14 +575,22 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         type: rule.type,
         conditions: JSON.stringify(rule.conditions || {}, null, 2),
         discount_percent: rule.discount_percent,
-        start_date: rule.start_date ? rule.start_date.slice(0, 16) : '',
-        end_date: rule.end_date ? rule.end_date.slice(0, 16) : '',
+        slot_start: rule.slot_start || '',
+        slot_end: rule.slot_end || '',
+        service_id: rule.service_id || undefined,
+        client_id: rule.client_id || undefined,
+        valid_until: rule.valid_until || '',
+        is_active: rule.is_active,
       });
     } else {
       setEditingDiscount(null);
       setDiscountForm({
         name: '', type: 'happy_hours', conditions: '{}',
-        discount_percent: 0, start_date: '', end_date: '',
+        discount_percent: 0, slot_start: '', slot_end: '',
+        service_id: undefined,
+        client_id: undefined,
+        valid_until: '',
+        is_active: true,
       });
     }
     setDiscountModal(true);
@@ -527,9 +608,12 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         type: discountForm.type,
         conditions,
         discount_percent: discountForm.discount_percent,
-        start_date: discountForm.start_date || null,
-        end_date: discountForm.end_date || null,
-        is_active: true,
+        slot_start: discountForm.slot_start || null,
+        slot_end: discountForm.slot_end || null,
+        service_id: discountForm.service_id || null,
+        client_id: discountForm.client_id || null,
+        valid_until: discountForm.valid_until || null,
+        is_active: discountForm.is_active,
       };
       if (editingDiscount) {
         await apiFetch(`/api/discounts/${editingDiscount.id}`, {
@@ -564,6 +648,8 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
   const DISCOUNT_TYPE_LABELS: Record<string, string> = {
     happy_hours: 'Happy Hours',
+    service: 'На услугу',
+    client: 'Персональная',
     frequency: 'За частоту',
     win_back: 'Возврат',
     cashback: 'Кэшбек',
@@ -571,6 +657,8 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
   const DISCOUNT_TYPE_COLORS: Record<string, string> = {
     happy_hours: 'blue',
+    service: 'gold',
+    client: 'purple',
     frequency: 'green',
     win_back: 'orange',
     cashback: 'purple',
@@ -781,6 +869,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         </Space>
         <Space size="middle">
           <Text className="text-titanium">👑 {user.full_name}</Text>
+          <NotificationBell />
           <Button type="text" icon={<LogoutOutlined />} onClick={onLogout} className="btn-logout">
             Выйти
           </Button>
@@ -1575,21 +1664,108 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
           <TabPane tab={<span><AreaChartOutlined /> Аналитика</span>} key="analytics">
             <Spin spinning={revenueLoading || heatmapLoading || funnelLoading}>
               <Row gutter={[16, 16]}>
-                {/* Revenue Area Chart */}
+                {/* Revenue Area Chart with Period Selector */}
                 <Col xs={24} lg={14}>
                   <Card className="card-luxury">
-                    <div className="flex-space-between mb-12">
-                      <Text className="title-gold text-16">Выручка за месяц</Text>
-                      <Space size="small">
-                        {revenueData && (
-                          <>
-                            <Text className="text-titanium text-12">Всего: <Text className="text-gold-bold">{revenueData.total.toLocaleString()} ₽</Text></Text>
-                            <Text className="text-titanium text-12">В день: <Text className="text-white-bold">{revenueData.avg_per_day.toLocaleString()} ₽</Text></Text>
-                          </>
-                        )}
-                        <Button size="small" icon={<ReloadOutlined />} onClick={fetchRevenueChart} type="text" className="btn-logout" />
+                    <div className="flex-space-between mb-12" style={{ flexWrap: 'wrap', gap: 8 }}>
+                      <Text className="title-gold text-16">Выручка</Text>
+                      <Space size="small" wrap>
+                        {/* Quick period buttons */}
+                        <Button size="small"
+                          className={!periodStart ? 'btn-gold' : 'btn-logout'}
+                          onClick={() => {
+                            setPeriodStart(null);
+                            setPeriodEnd(null);
+                            fetchRevenueChart();
+                          }}
+                        >Месяц</Button>
+                        <Button size="small"
+                          className={periodStart ? 'btn-gold' : 'btn-logout'}
+                          onClick={() => {
+                            const end = dayjs();
+                            const start = end.subtract(7, 'day');
+                            setPeriodStart(start.format('YYYY-MM-DD'));
+                            setPeriodEnd(end.format('YYYY-MM-DD'));
+                            fetchRevenueChart(start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD'));
+                          }}
+                        >Неделя</Button>
+                        <DatePicker.RangePicker
+                          size="small"
+                          className="input-luxury"
+                          style={{ width: 200 }}
+                          onChange={(dates) => {
+                            if (dates && dates[0] && dates[1]) {
+                              const s = dates[0].format('YYYY-MM-DD');
+                              const e = dates[1].format('YYYY-MM-DD');
+                              setPeriodStart(s);
+                              setPeriodEnd(e);
+                              fetchRevenueChart(s, e);
+                            }
+                          }}
+                        />
+                        <Button size="small" icon={<ReloadOutlined />}
+                          onClick={() => fetchRevenueChart(periodStart || undefined, periodEnd || undefined)}
+                          type="text" className="btn-logout" />
                       </Space>
                     </div>
+
+                    {/* Comparison cards */}
+                    {revenueData && (
+                      <Row gutter={[12, 12]} className="mb-12">
+                        <Col xs={12} sm={6}>
+                          <Card size="small" className="card-kpi" style={{ padding: '8px 12px' }}>
+                            <Statistic
+                              title={<Text className="text-titanium text-11">Текущий период</Text>}
+                              value={revenueData.total}
+                              precision={0}
+                              suffix={<Text className="text-titanium text-11">₽</Text>}
+                              valueStyle={{ color: '#C8A977', fontSize: '18px', fontWeight: 700 }}
+                            />
+                          </Card>
+                        </Col>
+                        <Col xs={12} sm={6}>
+                          <Card size="small" className="card-kpi" style={{ padding: '8px 12px' }}>
+                            <Statistic
+                              title={<Text className="text-titanium text-11">Прошлый период</Text>}
+                              value={revenueData.previous_total}
+                              precision={0}
+                              suffix={<Text className="text-titanium text-11">₽</Text>}
+                              valueStyle={{ color: '#AAB2BF', fontSize: '18px', fontWeight: 700 }}
+                            />
+                          </Card>
+                        </Col>
+                        <Col xs={12} sm={6}>
+                          <Card size="small" className="card-kpi" style={{ padding: '8px 12px' }}>
+                            <Statistic
+                              title={<Text className="text-titanium text-11">Изменение</Text>}
+                              value={revenueData.change_percent}
+                              precision={1}
+                              suffix={<Text className="text-titanium text-11">%</Text>}
+                              valueStyle={{
+                                color: revenueData.change_percent >= 0 ? '#4ECB71' : '#ff4d4f',
+                                fontSize: '18px', fontWeight: 700,
+                              }}
+                              prefix={revenueData.change_percent >= 0 ? '↑' : '↓'}
+                            />
+                          </Card>
+                        </Col>
+                        <Col xs={12} sm={6}>
+                          <Card size="small" className="card-kpi" style={{ padding: '8px 12px' }}>
+                            <Statistic
+                              title={<Text className="text-titanium text-11">В день (тек./прош.)</Text>}
+                              value={revenueData.avg_per_day}
+                              precision={0}
+                              suffix={
+                                <Text className="text-titanium text-11">
+                                  / {revenueData.previous_avg_per_day.toLocaleString()} ₽
+                                </Text>
+                              }
+                              valueStyle={{ color: '#FFFFFF', fontSize: '16px', fontWeight: 600 }}
+                            />
+                          </Card>
+                        </Col>
+                      </Row>
+                    )}
                     {revenueData && revenueData.daily.length > 0 ? (
                       <ResponsiveContainer width="100%" height={260}>
                         <AreaChart data={revenueData.daily}>
@@ -1612,7 +1788,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                       </ResponsiveContainer>
                     ) : (
                       <div className="text-center" style={{ padding: '60px 0' }}>
-                        <Text className="text-titanium text-13">Нет данных за месяц</Text>
+                        <Text className="text-titanium text-13">Нет данных за выбранный период</Text>
                       </div>
                     )}
                   </Card>
@@ -1664,7 +1840,31 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                   <Card className="card-luxury">
                     <div className="flex-space-between mb-12">
                       <Text className="title-gold text-16">Тепловая карта загрузки</Text>
-                      <Button size="small" icon={<ReloadOutlined />} onClick={fetchHeatmap} type="text" className="btn-logout" />
+                      <Space size="small" wrap>
+                        <Select
+                          size="small"
+                          className="input-luxury"
+                          placeholder="Все боксы"
+                          value={selectedBoxId}
+                          onChange={(v) => {
+                            setSelectedBoxId(v);
+                            fetchHeatmap(v);
+                          }}
+                          allowClear
+                          style={{ minWidth: 160 }}
+                          onClear={() => {
+                            setSelectedBoxId(undefined);
+                            fetchHeatmap(undefined);
+                          }}
+                        >
+                          {boxes.map((b) => (
+                            <Option key={b.id} value={b.id}>
+                              {b.name}
+                            </Option>
+                          ))}
+                        </Select>
+                        <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchHeatmap(selectedBoxId)} type="text" className="btn-logout" />
+                      </Space>
                     </div>
                     {heatmapData.length > 0 ? (
                       <>
@@ -1726,6 +1926,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                   onClick={() => openDiscountModal()}>Создать правило</Button>
               </div>
 
+
               {/* Таблица правил скидок */}
               <Card className="card-luxury" style={{ marginBottom: '16px' }}>
                 <Text className="title-gold text-16 d-block mb-8">Правила скидок</Text>
@@ -1764,15 +1965,27 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                         render: (val) => <Text className="text-gold-bold text-13">{val}%</Text>,
                       },
                       {
-                        title: <Text className="text-titanium text-12">Период</Text>,
-                        key: 'period',
+                        title: <Text className="text-titanium text-12">Привязка</Text>,
+                        key: 'binding',
                         render: (_, record) => (
                           <Text className="text-titanium text-12">
-                            {record.start_date ? dayjs(record.start_date).format('DD.MM') : '∞'}
-                            {' — '}
-                            {record.end_date ? dayjs(record.end_date).format('DD.MM') : '∞'}
+                            {record.service_name ? `📋 ${record.service_name}` : record.client_name ? `👤 ${record.client_name}` : '—'}
                           </Text>
                         ),
+                      },
+                      {
+                        title: <Text className="text-titanium text-12">Слот</Text>,
+                        key: 'slot',
+                        render: (_, record) => (
+                          <Text className="text-titanium text-12">
+                            {record.slot_start || '∞'} — {record.slot_end || '∞'}
+                          </Text>
+                        ),
+                      },
+                      {
+                        title: <Text className="text-titanium text-12">До</Text>,
+                        dataIndex: 'valid_until', key: 'valid_until',
+                        render: (val) => <Text className="text-titanium text-12">{val ? dayjs(val).format('DD.MM.YYYY') : '∞'}</Text>,
                       },
                       {
                         title: '',
@@ -1850,7 +2063,94 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                   />
                 )}
               </Card>
+
+              {/* ===== DISCOUNT ANALYTICS ===== */}
+              <Card className="card-luxury" style={{ marginTop: '16px' }}>
+                <div className="flex-space-between mb-12">
+                  <Text className="title-gold text-16"><AreaChartOutlined /> Аналитика скидок</Text>
+                  <Button size="small" icon={<ReloadOutlined />} onClick={fetchDiscountAnalytics} type="text" className="btn-logout" />
+                </div>
+                {discountAnalytics ? (
+                  <>
+                    <Row gutter={[12, 12]} className="mb-12">
+                      <Col xs={12} sm={6}>
+                        <Card size="small" className="card-kpi" style={{ padding: '8px 12px' }}>
+                          <Statistic title={<Text className="text-titanium text-11">Всего правил</Text>}
+                            value={discountAnalytics.total_rules}
+                            valueStyle={{ color: '#C8A977', fontSize: '18px', fontWeight: 700 }} />
+                        </Card>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Card size="small" className="card-kpi" style={{ padding: '8px 12px' }}>
+                          <Statistic title={<Text className="text-titanium text-11">Активных</Text>}
+                            value={discountAnalytics.active_rules}
+                            valueStyle={{ color: '#4ECB71', fontSize: '18px', fontWeight: 700 }} />
+                        </Card>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Card size="small" className="card-kpi" style={{ padding: '8px 12px' }}>
+                          <Statistic title={<Text className="text-titanium text-11">Применено раз</Text>}
+                            value={discountAnalytics.total_times_used}
+                            valueStyle={{ color: '#C8A977', fontSize: '18px', fontWeight: 700 }} />
+                        </Card>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Card size="small" className="card-kpi" style={{ padding: '8px 12px' }}>
+                          <Statistic title={<Text className="text-titanium text-11">Сумма скидок</Text>}
+                            value={discountAnalytics.total_discount_amount}
+                            precision={0} suffix={<Text className="text-titanium text-11">₽</Text>}
+                            valueStyle={{ color: '#FFFFFF', fontSize: '18px', fontWeight: 700 }} />
+                        </Card>
+                      </Col>
+                    </Row>
+                    {discountAnalytics.top_rules.length > 0 && (
+                      <Table dataSource={discountAnalytics.top_rules} rowKey="rule_id" pagination={false} size="small"
+                        columns={[
+                          { title: <Text className="text-titanium text-12">Правило</Text>, dataIndex: 'rule_name',
+                            render: (v: any, r: any) => <Space><Text className="text-white text-13">{v}</Text><Tag className="tag-status" color={DISCOUNT_TYPE_COLORS[r.rule_type]}>{DISCOUNT_TYPE_LABELS[r.rule_type] || r.rule_type}</Tag></Space> },
+                          { title: <Text className="text-titanium text-12">Использований</Text>, dataIndex: 'times_used',
+                            render: (v) => <Text className="text-white-bold text-13">{v}</Text> },
+                          { title: <Text className="text-titanium text-12">Скидка</Text>, dataIndex: 'total_discount',
+                            render: (v) => <Text className="text-gold-bold text-13">{v.toLocaleString()} ₽</Text> },
+                          { title: <Text className="text-titanium text-12">Клиентов</Text>, dataIndex: 'client_count',
+                            render: (v) => <Text className="text-titanium text-13">{v}</Text> },
+                        ]}
+                        components={{ header: { cell: (p: any) => <th {...p} className="table-header-cell" /> }, body: { row: (p: any) => <tr {...p} className="table-body-row" />, cell: (p: any) => <td {...p} className="table-body-cell" /> } }}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <Text className="text-titanium text-13">Нажмите «Обновить» для загрузки аналитики</Text>
+                )}
+              </Card>
             </Spin>
+          </TabPane>
+
+          {/* ===== TAB 9: CALENDAR ===== */}
+          <TabPane tab={<span><CalendarOutlined /> Календарь</span>} key="calendar">
+            <MasterCalendar />
+          </TabPane>
+
+          {/* ===== TAB 10: REPORTS ===== */}
+          <TabPane tab={<span><BarChartOutlined /> Отчёты</span>} key="reports">
+            <ReportManager />
+          </TabPane>
+
+          {/* ===== TAB 11: SERVICE ANALYTICS ===== */}
+          <TabPane tab={<span><AreaChartOutlined /> Аналитика услуг</span>} key="service-analytics">
+            <ServiceAnalytics />
+          </TabPane>
+
+          {/* ===== TAB 12: NOTIFICATIONS ===== */}
+          <TabPane tab={<span><BellOutlined /> Уведомления</span>} key="notifications">
+            <Tabs size="small" tabBarStyle={{ borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
+              <TabPane tab="📋 Список уведомлений" key="list">
+                <NotificationList title="Все уведомления" />
+              </TabPane>
+              <TabPane tab="⚙️ Настройки" key="settings">
+                <NotificationSettings />
+              </TabPane>
+            </Tabs>
           </TabPane>
         </Tabs>
       </Content>
@@ -2176,6 +2476,8 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
               <Select size="large" className="w-full" value={discountForm.type}
                 onChange={(v) => setDiscountForm(prev => ({ ...prev, type: v }))}>
                 <Option value="happy_hours">Happy Hours</Option>
+                <Option value="service">На услугу</Option>
+                <Option value="client">Персональная</Option>
                 <Option value="frequency">За частоту визитов</Option>
                 <Option value="win_back">Возврат клиентов</Option>
                 <Option value="cashback">Кэшбек</Option>
@@ -2188,34 +2490,98 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                 onChange={(e) => setDiscountForm(prev => ({ ...prev, discount_percent: Number(e.target.value) }))} />
             </Col>
           </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <span className="label-field">Дата начала</span>
-              <Input size="large" type="datetime-local" className="input-luxury"
-                value={discountForm.start_date}
-                onChange={(e) => setDiscountForm(prev => ({ ...prev, start_date: e.target.value }))} />
-            </Col>
-            <Col span={12}>
-              <span className="label-field">Дата окончания</span>
-              <Input size="large" type="datetime-local" className="input-luxury"
-                value={discountForm.end_date}
-                onChange={(e) => setDiscountForm(prev => ({ ...prev, end_date: e.target.value }))} />
-            </Col>
-          </Row>
+          {/* Time slot — только для happy_hours */}
+          {discountForm.type === 'happy_hours' && (
+            <Row gutter={16}>
+              <Col span={12}>
+                <span className="label-field">Время начала слота</span>
+                <TimePicker size="large" className="w-full input-luxury" format="HH:mm"
+                  value={discountForm.slot_start ? dayjs(discountForm.slot_start, 'HH:mm') : null}
+                  onChange={(t) => setDiscountForm(prev => ({ ...prev, slot_start: t ? t.format('HH:mm') : '' }))} />
+              </Col>
+              <Col span={12}>
+                <span className="label-field">Время конца слота</span>
+                <TimePicker size="large" className="w-full input-luxury" format="HH:mm"
+                  value={discountForm.slot_end ? dayjs(discountForm.slot_end, 'HH:mm') : null}
+                  onChange={(t) => setDiscountForm(prev => ({ ...prev, slot_end: t ? t.format('HH:mm') : '' }))} />
+              </Col>
+            </Row>
+          )}
+
+          {/* Услуга — для service */}
+          {discountForm.type === 'service' && (
+            <div>
+              <span className="label-field">Услуга *</span>
+              <Select size="large" className="w-full" placeholder="Выберите услугу"
+                value={discountForm.service_id}
+                onChange={(v) => setDiscountForm(prev => ({ ...prev, service_id: v }))}>
+                {services.map((s) => (<Option key={s.id} value={s.id}>{s.name}</Option>))}
+              </Select>
+            </div>
+          )}
+
+          {/* Клиент — для client */}
+          {discountForm.type === 'client' && (
+            <div>
+              <span className="label-field">Клиент *</span>
+              <Select size="large" className="w-full" placeholder="Выберите клиента" showSearch
+                value={discountForm.client_id}
+                onChange={(v) => setDiscountForm(prev => ({ ...prev, client_id: v }))}
+                filterOption={(input, option) => (option?.label as string || '').toLowerCase().includes(input.toLowerCase())}>
+                {allUsers.filter(u => u.role === 'client').map((u) => (
+                  <Option key={u.id} value={u.id} label={`${u.full_name} (${u.phone})`}>
+                    👤 {u.full_name} · {u.phone}
+                  </Option>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          {/* Срок действия */}
           <div>
-            <span className="label-field">Условия (JSON)</span>
-            <TextArea rows={3} className="input-luxury" placeholder='{"min_visits": 3, "hour_start": 9, "hour_end": 14}'
-              value={discountForm.conditions}
-              onChange={(e) => setDiscountForm(prev => ({ ...prev, conditions: e.target.value }))} />
+            <span className="label-field">Срок действия (до)</span>
+            <DatePicker size="large" className="w-full input-luxury"
+              value={discountForm.valid_until ? dayjs(discountForm.valid_until) : null}
+              onChange={(d) => setDiscountForm(prev => ({ ...prev, valid_until: d ? d.format('YYYY-MM-DD') : '' }))} />
           </div>
-          <div>
-            <Text className="text-titanium text-12 d-block mb-8">
-              <span className="text-gold">happy_hours:</span> {'{'} "hour_start": 9, "hour_end": 14 {'}'}<br />
-              <span className="text-gold">frequency:</span> {'{'} "min_visits": 3 {'}'}<br />
-              <span className="text-gold">win_back:</span> {'{'} "max_recency_days": 60 {'}'}<br />
-              <span className="text-gold">cashback:</span> {'{'} "points_percent": 5 {'}'}
-            </Text>
+
+          {/* Статус (Активна/Неактивна) */}
+          <div className="flex-space-between" style={{ padding: '8px 0' }}>
+            <Text className="text-titanium">Статус скидки</Text>
+            <Space>
+              <Switch
+                checked={discountForm.is_active}
+                onChange={(v) => setDiscountForm(prev => ({ ...prev, is_active: v }))}
+                checkedChildren="Активна"
+                unCheckedChildren="Неактивна"
+              />
+            </Space>
           </div>
+
+          {/* Условия (JSON) — для всех, кроме happy_hours */}
+          {discountForm.type !== 'happy_hours' && (
+            <div>
+              <span className="label-field">Условия (JSON)</span>
+              <TextArea rows={3} className="input-luxury" placeholder='{"min_visits": 3}'
+                value={discountForm.conditions}
+                onChange={(e) => setDiscountForm(prev => ({ ...prev, conditions: e.target.value }))} />
+            </div>
+          )}
+
+          {/* Подсказки по типам — для всех, кроме happy_hours */}
+          {discountForm.type !== 'happy_hours' && (
+            <div>
+              <Text className="text-titanium text-12 d-block mb-8">
+                <span className="text-gold">happy_hours:</span> слот задаётся выше ↑<br />
+                <span className="text-gold">service:</span> услуга выше ↑<br />
+                <span className="text-gold">client:</span> клиент выше ↑<br />
+                <span className="text-gold">frequency:</span> {'{'} "min_visits": 3 {'}'}<br />
+                <span className="text-gold">win_back:</span> {'{'} "max_recency_days": 60 {'}'}<br />
+                <span className="text-gold">cashback:</span> {'{'} "points_percent": 5 {'}'}<br />
+                <span className="text-gold">Любой тип:</span> {'{'} "min_price": 500 {'}'} — минимальная цена после скидки
+              </Text>
+            </div>
+          )}
           <Button type="primary" size="large" className="btn-gold" onClick={handleSaveDiscount} loading={discountSaving}>
             {editingDiscount ? 'Сохранить' : 'Создать'}
           </Button>

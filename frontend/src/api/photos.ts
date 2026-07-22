@@ -29,11 +29,22 @@ export interface Photo {
   url: string;
   thumbnail_url?: string;
   title?: string;
+  description?: string;
+  service_id?: number;
+  service_name?: string;
+  uploaded_by_id?: number;
+  uploader_name?: string;
   is_primary?: boolean;
   sort_order?: number;
   file_size?: number;
   mime_type?: string;
   created_at?: string;
+}
+
+export interface PortfolioService {
+  service_id: number;
+  service_name: string;
+  photo_count: number;
 }
 
 /* ============================================================
@@ -60,11 +71,18 @@ export async function uploadAppointmentPhoto(appointmentId: number, file: File):
   });
 }
 
-/** Загрузить фото в портфолио мастера */
-export async function uploadPortfolioPhoto(file: File, title?: string): Promise<Photo> {
+/** Загрузить фото в портфолио мастера (с привязкой к услуге) */
+export async function uploadPortfolioPhoto(
+  file: File,
+  title?: string,
+  serviceId?: number,
+  description?: string,
+): Promise<Photo> {
   const formData = new FormData();
   formData.append('file', file);
   if (title) formData.append('title', title);
+  if (serviceId !== undefined) formData.append('service_id', String(serviceId));
+  if (description) formData.append('description', description);
   return apiFetch<Photo>('/api/upload/portfolio', {
     method: 'POST',
     body: formData,
@@ -74,6 +92,18 @@ export async function uploadPortfolioPhoto(file: File, title?: string): Promise<
 /** Получить список фото для сущности */
 export async function getPhotos(entityType: string, entityId: number): Promise<Photo[]> {
   return apiFetch<Photo[]>(`/api/photos/${entityType}/${entityId}`);
+}
+
+/** Получить все портфолио-фото салона (с фильтром по услуге) */
+export async function getAllPortfolio(serviceId?: number): Promise<Photo[]> {
+  let path = '/api/portfolio';
+  if (serviceId !== undefined) path += `?service_id=${serviceId}`;
+  return apiFetch<Photo[]>(path);
+}
+
+/** Получить список услуг, по которым есть фото в портфолио */
+export async function getPortfolioServices(): Promise<PortfolioService[]> {
+  return apiFetch<PortfolioService[]>('/api/portfolio/services');
 }
 
 /** Удалить фото */

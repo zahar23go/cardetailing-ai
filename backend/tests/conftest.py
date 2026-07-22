@@ -59,7 +59,7 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
 
 from app.main import app, _hash_password, _create_token
 from app.core.database import Base, get_db
-from app.models import Tenant, User, UserRole, Service, Car, Appointment, AppointmentStatus, DiscountRule, Expense, Photo, EntityType, WorkingHours, AppointmentHistory, Payment, LoyaltyTierConfig
+from app.models import Box, Tenant, User, UserRole, Service, Car, Appointment, AppointmentStatus, DiscountRule, Expense, Photo, EntityType, WorkingHours, AppointmentHistory, Payment, LoyaltyTierConfig
 from app.core.image_service import validate_image, save_file_local, generate_filename
 
 # =========================================================================
