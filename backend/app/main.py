@@ -21,9 +21,9 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db, init_db
-from app.core.deepseek_client import get_ai_response, get_financier_response
+from app.core.deepseek_client import get_ai_response, get_financier_response, get_consultant_response
 from app.core.image_service import validate_image, save_file_local, generate_filename, delete_file_local
-from app.models import Box, Tenant, User, UserRole, AppointmentStatus, Service, Car, Appointment, Expense, DiscountRule, ClientDiscount, LoyaltyPoints, LoyaltyTierConfig, Photo, EntityType, Notification, UserNotificationSettings, WorkingHours, AppointmentHistory, Payment
+from app.models import Box, BoxService, Tenant, User, UserRole, AppointmentStatus, Service, Car, Appointment, Expense, DiscountRule, ClientDiscount, LoyaltyPoints, LoyaltyTierConfig, Photo, EntityType, Notification, UserNotificationSettings, WorkingHours, AppointmentHistory, Payment
 from app.schemas import (
     RegisterRequest, LoginRequest, AuthResponse, UserOut,
     ServiceCreate, ServiceUpdate, ServiceOut,
@@ -1319,6 +1319,41 @@ async def ai_financier(
     return FinancierResponse(response=response)
 
 
+# ========== AI CONSULTANT (for clients) ==========
+
+@app.post("/api/ai/consultant", response_model=FinancierResponse)
+async def ai_consultant(
+    request: FinancierRequest,
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """AI-консультант для клиентов: помогает выбрать услуги, отвечает на вопросы."""
+    tenant_id = UUID(current_user["tenant_id"])
+
+    # Загружаем все услуги салона
+    services_result = await db.execute(
+        select(Service).where(
+            Service.is_active == True,
+            Service.tenant_id == tenant_id,
+        ).order_by(Service.name)
+    )
+    services = services_result.scalars().all()
+
+    # Формируем контекст услуг
+    services_lines = []
+    for s in services:
+        cat = s.category or "Без категории"
+        services_lines.append(
+            f"• {s.name} (категория: {cat}) — {s.price} руб., ~{s.duration} мин., "
+            f"описание: {s.description or '—'}"
+        )
+
+    services_context = "\n".join(services_lines) if services_lines else "Услуги временно не загружены."
+
+    response = await get_consultant_response(request.question, services_context)
+    return FinancierResponse(response=response)
+
+
 # ========== EXPENSES & P&L ==========
 
 @app.get("/api/expenses")
@@ -2023,7 +2058,49 @@ async def get_loyalty_points(
     }
 
 
+# ========== SEGMENT HELPER ==========
+
+async def _get_client_segment(client_id: int, tenant_id: UUID, db: AsyncSession) -> str:
+    """Определить RFM-сегмент клиента."""
+    now = datetime.now(timezone.utc)
+
+    # Все завершённые записи клиента
+    appts_result = await db.execute(
+        select(Appointment).where(
+            Appointment.client_id == client_id,
+            Appointment.tenant_id == tenant_id,
+            Appointment.status == "completed",
+        ).order_by(Appointment.start_time)
+    )
+    appts = appts_result.scalars().all()
+
+    freq = len(appts)
+    monetary = sum(float(a.total_price or 0) for a in appts)
+
+    recency = 999
+    if appts:
+        last = max(a.start_time for a in appts)
+        recency = (now - last).days if last else 999
+
+    if freq == 0:
+        # Клиент без завершённых записей — новый
+        return "new"
+    elif recency <= 30 and freq > 10 and monetary > 100000:
+        return "vip"
+    elif recency <= 60 and freq > 5:
+        return "loyal"
+    elif freq == 1 and recency <= 30:
+        return "new"
+    elif 60 < recency <= 90:
+        return "sleeping"
+    elif recency > 90:
+        return "lost"
+    else:
+        return "regular"
+
+
 # ========== AUTO-APPLY DISCOUNT ON APPOINTMENT CREATE ==========
+
 
 async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
     """Автоматически применить скидку к записи (вызывается после создания)."""
@@ -2135,6 +2212,15 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
                     best_discount = rule.discount_percent
                     best_rule = rule
 
+        elif rule.type == "segment":
+            # Скидка по RFM-сегменту (например, {"segment": "vip"})
+            target_segment = conditions.get("segment", "")
+            if target_segment:
+                client_seg = await _get_client_segment(appointment.client_id, tenant_id, db)
+                if client_seg == target_segment:
+                    if rule.discount_percent > best_discount:
+                        best_discount = rule.discount_percent
+                        best_rule = rule
         elif rule.type == "cashback":
             # Кэшбек начисляется при завершении, не при создании — пропускаем
             continue
@@ -2154,7 +2240,6 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
         )
         appointment.discount_applied = effective_discount
         appointment.total_price = original_price - effective_discount
-
         cd = ClientDiscount(
             tenant_id=tenant_id,
             client_id=appointment.client_id,
@@ -2215,11 +2300,32 @@ async def get_boxes(
     db: AsyncSession = Depends(get_db),
 ):
     """Список всех боксов/зон тенанта."""
+    tenant_id = UUID(current_user["tenant_id"])
     result = await db.execute(
-        select(Box).where(Box.tenant_id == UUID(current_user["tenant_id"]))
+        select(Box).where(Box.tenant_id == tenant_id)
         .order_by(Box.sort_order, Box.name)
     )
-    return [BoxOut.model_validate(b) for b in result.scalars().all()]
+    boxes = result.scalars().all()
+
+    # Загружаем привязки услуг для всех боксов
+    box_ids = [b.id for b in boxes]
+    box_services_map: dict[int, list[int]] = {}
+    if box_ids:
+        bs_result = await db.execute(
+            select(BoxService).where(
+                BoxService.box_id.in_(box_ids),
+                BoxService.tenant_id == tenant_id,
+            )
+        )
+        for bs in bs_result.scalars().all():
+            box_services_map.setdefault(bs.box_id, []).append(bs.service_id)
+
+    out = []
+    for b in boxes:
+        bo = BoxOut.model_validate(b)
+        bo.service_ids = box_services_map.get(b.id, [])
+        out.append(bo)
+    return out
 
 
 @app.post("/api/boxes", response_model=BoxOut)
@@ -2229,17 +2335,27 @@ async def create_box(
     db: AsyncSession = Depends(get_db),
 ):
     """Создать новый бокс/зону."""
+    tenant_id = UUID(current_user["tenant_id"])
     box = Box(
         name=request.name,
         color=request.color,
         sort_order=request.sort_order,
         is_active=request.is_active,
-        tenant_id=UUID(current_user["tenant_id"]),
+        tenant_id=tenant_id,
     )
     db.add(box)
     await db.commit()
     await db.refresh(box)
-    return BoxOut.model_validate(box)
+
+    # Привязываем услуги, если указаны
+    if request.service_ids:
+        for sid in request.service_ids:
+            db.add(BoxService(box_id=box.id, service_id=sid, tenant_id=tenant_id))
+        await db.commit()
+
+    bo = BoxOut.model_validate(box)
+    bo.service_ids = request.service_ids or []
+    return bo
 
 
 @app.put("/api/boxes/{box_id}", response_model=BoxOut)
@@ -2250,20 +2366,47 @@ async def update_box(
     db: AsyncSession = Depends(get_db),
 ):
     """Обновить бокс/зону."""
+    tenant_id = UUID(current_user["tenant_id"])
     result = await db.execute(
-        select(Box).where(Box.id == box_id, Box.tenant_id == UUID(current_user["tenant_id"]))
+        select(Box).where(Box.id == box_id, Box.tenant_id == tenant_id)
     )
     box = result.scalar_one_or_none()
     if not box:
         raise HTTPException(status_code=404, detail="Бокс не найден")
 
     update_data = request.model_dump(exclude_unset=True)
+    # Обрабатываем service_ids отдельно
+    service_ids = update_data.pop("service_ids", None)
+
     for key, value in update_data.items():
         setattr(box, key, value)
 
+    # Обновляем привязку услуг
+    if service_ids is not None:
+        # Удаляем старые
+        await db.execute(
+            BoxService.__table__.delete().where(
+                BoxService.box_id == box_id,
+                BoxService.tenant_id == tenant_id,
+            )
+        )
+        # Добавляем новые
+        for sid in service_ids:
+            db.add(BoxService(box_id=box_id, service_id=sid, tenant_id=tenant_id))
+
     await db.commit()
     await db.refresh(box)
-    return BoxOut.model_validate(box)
+
+    # Загружаем итоговые service_ids
+    bs_result = await db.execute(
+        select(BoxService).where(
+            BoxService.box_id == box_id,
+            BoxService.tenant_id == tenant_id,
+        )
+    )
+    bo = BoxOut.model_validate(box)
+    bo.service_ids = [bs.service_id for bs in bs_result.scalars().all()]
+    return bo
 
 
 @app.delete("/api/boxes/{box_id}")
@@ -2800,82 +2943,90 @@ async def get_master_calendar(
     db: AsyncSession = Depends(get_db),
 ):
     """Получить календарь мастера на диапазон дат."""
-    tenant_id = UUID(current_user["tenant_id"])
+    try:
+        tenant_id = UUID(current_user["tenant_id"])
 
-    # Получаем мастера
-    result = await db.execute(select(User).where(User.id == master_id, User.tenant_id == tenant_id))
-    master = result.scalar_one_or_none()
-    if not master:
-        raise HTTPException(status_code=404, detail="Мастер не найден")
+        # Получаем мастера
+        result = await db.execute(select(User).where(User.id == master_id, User.tenant_id == tenant_id))
+        master = result.scalar_one_or_none()
+        if not master:
+            raise HTTPException(status_code=404, detail="Мастер не найден")
 
-    # Рабочие часы
-    wh_result = await db.execute(
-        select(WorkingHours).where(
-            WorkingHours.master_id == master_id,
-            WorkingHours.tenant_id == tenant_id,
-        ).order_by(WorkingHours.day_of_week)
-    )
-    working_hours = wh_result.scalars().all()
-
-    # Записи мастера на диапазон
-    from datetime import date as date_type
-    s_date = date_type.fromisoformat(start_date)
-    e_date = date_type.fromisoformat(end_date)
-    from datetime import datetime, time
-    s_dt = datetime.combine(s_date, time.min, tzinfo=timezone.utc)
-    e_dt = datetime.combine(e_date, time.max, tzinfo=timezone.utc)
-
-    appt_result = await db.execute(
-        select(Appointment)
-        .options(selectinload(Appointment.client), selectinload(Appointment.service), selectinload(Appointment.car))
-        .where(
-            Appointment.master_id == master_id,
-            Appointment.tenant_id == tenant_id,
-            Appointment.start_time >= s_dt,
-            Appointment.start_time <= e_dt,
+        # Рабочие часы
+        wh_result = await db.execute(
+            select(WorkingHours).where(
+                WorkingHours.master_id == master_id,
+                WorkingHours.tenant_id == tenant_id,
+            ).order_by(WorkingHours.day_of_week)
         )
-        .order_by(Appointment.start_time)
-    )
-    appts = appt_result.scalars().all()
+        working_hours = wh_result.scalars().all()
 
-    # Группировка по дням
-    from collections import defaultdict
-    days_map: dict[str, list] = defaultdict(list)
-    for a in appts:
-        day_key = a.start_time.strftime("%Y-%m-%d")
-        days_map[day_key].append(CalendarAppointment(
-            id=a.id,
-            client_id=a.client_id,
-            master_id=a.master_id,
-            car_id=a.car_id,
-            service_id=a.service_id,
-            start_time=a.start_time.isoformat(),
-            end_time=a.end_time.isoformat(),
-            status=a.status,
-            total_price=float(a.total_price or 0),
-            service_name=a.service.name if a.service else None,
-            client_name=a.client.full_name if a.client else None,
-            car_info=f"{a.car.make} {a.car.model}" if a.car else None,
-        ))
+        # Записи мастера на диапазон
+        from datetime import date as date_type
+        s_date = date_type.fromisoformat(start_date)
+        e_date = date_type.fromisoformat(end_date)
+        from datetime import datetime, time
+        s_dt = datetime.combine(s_date, time.min, tzinfo=timezone.utc)
+        e_dt = datetime.combine(e_date, time.max, tzinfo=timezone.utc)
 
-    days = []
-    current = s_date
-    while current <= e_date:
-        key = current.isoformat()
-        days.append(CalendarDay(
-            date=key,
-            day_of_week=current.weekday(),
-            appointments=days_map.get(key, []),
-        ))
-        from datetime import timedelta
-        current += timedelta(days=1)
+        appt_result = await db.execute(
+            select(Appointment)
+            .options(selectinload(Appointment.client), selectinload(Appointment.service), selectinload(Appointment.car))
+            .where(
+                Appointment.master_id == master_id,
+                Appointment.tenant_id == tenant_id,
+                Appointment.start_time >= s_dt,
+                Appointment.start_time <= e_dt,
+            )
+            .order_by(Appointment.start_time)
+        )
+        appts = appt_result.scalars().all()
 
-    return CalendarResponse(
-        master_id=master_id,
-        master_name=master.full_name,
-        days=days,
-        working_hours=[WorkingHoursOut.model_validate(w) for w in working_hours],
-    )
+        # Группировка по дням
+        from collections import defaultdict
+        days_map: dict[str, list] = defaultdict(list)
+        for a in appts:
+            day_key = a.start_time.strftime("%Y-%m-%d")
+            days_map[day_key].append(CalendarAppointment(
+                id=a.id,
+                client_id=a.client_id,
+                master_id=a.master_id,
+                car_id=a.car_id,
+                service_id=a.service_id,
+                start_time=a.start_time.isoformat(),
+                end_time=a.end_time.isoformat(),
+                status=a.status,
+                total_price=float(a.total_price or 0),
+                service_name=a.service.name if a.service else None,
+                client_name=a.client.full_name if a.client else None,
+                car_info=f"{a.car.make} {a.car.model}" if a.car else None,
+            ))
+
+        days = []
+        current = s_date
+        while current <= e_date:
+            key = current.isoformat()
+            days.append(CalendarDay(
+                date=key,
+                day_of_week=current.weekday(),
+                appointments=days_map.get(key, []),
+            ))
+            from datetime import timedelta
+            current += timedelta(days=1)
+
+        return CalendarResponse(
+            master_id=master_id,
+            master_name=master.full_name,
+            days=days,
+            working_hours=[WorkingHoursOut.model_validate(w) for w in working_hours],
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"[ERROR] get_master_calendar({master_id}): {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.put("/api/appointments/{appointment_id}/move")

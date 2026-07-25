@@ -230,9 +230,32 @@ class Box(Base):
     # relationships
     tenant = relationship("Tenant", back_populates="boxes")
     appointments = relationship("Appointment", back_populates="box")
+    box_services = relationship("BoxService", back_populates="box", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Box(id={self.id}, name='{self.name}')>"
+
+
+class BoxService(Base):
+    """Привязка услуг к боксам."""
+    __tablename__ = "box_services"
+
+    id = Column(Integer, primary_key=True, index=True)
+    box_id = Column(Integer, ForeignKey("boxes.id", ondelete="CASCADE"), nullable=False, index=True)
+    service_id = Column(Integer, ForeignKey("services.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # relationships
+    box = relationship("Box", back_populates="box_services")
+    service = relationship("Service")
+
+    def __repr__(self) -> str:
+        return f"<BoxService(box_id={self.box_id}, service_id={self.service_id})>"
 
 
 class Appointment(Base):

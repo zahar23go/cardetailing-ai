@@ -10,6 +10,7 @@ import {
   FileTextOutlined, PlusOutlined, HistoryOutlined,
   ShopOutlined, LogoutOutlined, CameraOutlined,
   BellOutlined, CrownOutlined,
+  BulbOutlined, SendOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import CarCard from './components/CarCard';
@@ -274,6 +275,29 @@ export default function ClientDashboard({ user, onLogout }: { user: User; onLogo
       fetchPortfolioServices();
     }
   }, [activeTab]);
+
+  // AI Consultant state
+  const [consultantMessages, setConsultantMessages] = useState<{role: 'user' | 'ai'; text: string}[]>([]);
+  const [consultantInput, setConsultantInput] = useState('');
+  const [consultantLoading, setConsultantLoading] = useState(false);
+
+  const handleConsultantQuestion = async () => {
+    const question = consultantInput.trim();
+    if (!question) return;
+    setConsultantMessages(prev => [...prev, { role: 'user', text: question }]);
+    setConsultantInput('');
+    setConsultantLoading(true);
+    try {
+      const data = await apiFetch<{response: string}>('/api/ai/consultant', {
+        method: 'POST',
+        body: JSON.stringify({ question }),
+      });
+      setConsultantMessages(prev => [...prev, { role: 'ai', text: data.response }]);
+    } catch (e: any) {
+      setConsultantMessages(prev => [...prev, { role: 'ai', text: `❌ ${e.message || 'Ошибка соединения'}` }]);
+    }
+    setConsultantLoading(false);
+  };
 
   const handleCancelAppointment = async (appointmentId: number) => {
     setCancellingId(appointmentId);
@@ -729,6 +753,7 @@ export default function ClientDashboard({ user, onLogout }: { user: User; onLogo
               masterId={user.id}
               readonly={user.role === 'client'}
               allServices={portfolioServices}
+              showAllSalon={user.role === 'client'}
             />
           </TabPane>
 
@@ -739,6 +764,108 @@ export default function ClientDashboard({ user, onLogout }: { user: User; onLogo
                 <LoyaltyCard />
               </Col>
             </Row>
+          </TabPane>
+
+          {/* ===== TAB: AI CONSULTANT ===== */}
+          <TabPane tab={<span><BulbOutlined /> AI Консультант</span>} key="consultant">
+            <Card className="card-luxury">
+              <div className="flex-space-between" style={{ marginBottom: '16px' }}>
+                <div>
+                  <Text className="title-gold" style={{ fontSize: '18px', fontWeight: 700 }}>AI Консультант</Text>
+                  <Text className="text-titanium d-block text-13">
+                    Помогу выбрать услугу, расскажу о ценах и дам совет по уходу за авто
+                  </Text>
+                </div>
+                <BulbOutlined className="text-gold" style={{ fontSize: '28px' }} />
+              </div>
+
+              <div style={{
+                height: '360px', overflowY: 'auto', marginBottom: '12px',
+                display: 'flex', flexDirection: 'column', gap: '12px',
+                padding: '4px',
+              }}>
+                {consultantMessages.length === 0 ? (
+                  <div className="text-center" style={{ marginTop: '80px' }}>
+                    <BulbOutlined className="text-gold" style={{ fontSize: '40px', opacity: 0.5 }} />
+                    <Text className="text-titanium d-block text-14" style={{ marginTop: '12px' }}>
+                      Задайте вопрос об услугах салона
+                    </Text>
+                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                      {['Какие услуги вы предлагаете?', 'Что лучше: полировка или керамика?', 'Сколько стоит химчистка салона?'].map(q => (
+                        <Button
+                          key={q}
+                          size="small"
+                          className="btn-gold-secondary"
+                          style={{ width: '320px', height: '36px', fontSize: '13px' }}
+                          onClick={() => {
+                            setConsultantInput(q);
+                            setTimeout(() => handleConsultantQuestion(), 100);
+                          }}
+                        >{q}</Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  consultantMessages.map((msg, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        maxWidth: '85%',
+                        alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      }}
+                    >
+                      <Card
+                        size="small"
+                        className={msg.role === 'user' ? 'card-detail' : 'card-luxury'}
+                        style={{
+                          padding: msg.role === 'user' ? '8px 14px' : '12px 16px',
+                          borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                          border: msg.role === 'user' ? '1px solid rgba(200,169,119,0.2)' : undefined,
+                          marginBottom: 0,
+                        }}
+                      >
+                        {msg.role === 'user' ? (
+                          <Text className="text-white text-14">{msg.text}</Text>
+                        ) : (
+                          <Text className="text-titanium text-13" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</Text>
+                        )}
+                      </Card>
+                    </div>
+                  ))
+                )}
+                {consultantLoading && (
+                  <div style={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
+                    <Card size="small" className="card-luxury" style={{ padding: '12px 16px', borderRadius: '16px 16px 16px 4px', marginBottom: 0 }}>
+                      <Text className="text-titanium text-13">🤔 Подбираю информацию...</Text>
+                    </Card>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-space-between" style={{ gap: '8px' }}>
+                <Input.TextArea
+                  className="input-luxury"
+                  placeholder="Спросите об услугах..."
+                  value={consultantInput}
+                  onChange={(e) => setConsultantInput(e.target.value)}
+                  onPressEnter={(e) => {
+                    if (!e.shiftKey) {
+                      e.preventDefault();
+                      handleConsultantQuestion();
+                    }
+                  }}
+                  rows={1}
+                  style={{ flex: 1, height: '46px', resize: 'none', paddingTop: '12px' }}
+                />
+                <Button
+                  className="btn-gold"
+                  style={{ width: '56px', height: '46px', padding: 0, minWidth: '56px' }}
+                  onClick={handleConsultantQuestion}
+                  loading={consultantLoading}
+                  icon={<SendOutlined />}
+                />
+              </div>
+            </Card>
           </TabPane>
 
           {/* ===== TAB: NOTIFICATIONS ===== */}

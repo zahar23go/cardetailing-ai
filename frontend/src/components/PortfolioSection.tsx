@@ -7,7 +7,7 @@ import {
   Typography, Spin, Select, Button, Space, message, Row, Col, Card,
 } from 'antd';
 import { PlusOutlined, FilterOutlined } from '@ant-design/icons';
-import { getPhotos, deletePhoto, setPrimaryPhoto, getPortfolioServices } from '../api/photos';
+import { getPhotos, deletePhoto, setPrimaryPhoto, getPortfolioServices, getAllPortfolio } from '../api/photos';
 import type { Photo, PortfolioService } from '../api/photos';
 import Gallery from './Gallery';
 import PortfolioUploadModal from './PortfolioUploadModal';
@@ -22,12 +22,15 @@ interface PortfolioSectionProps {
   readonly?: boolean;
   /** Список всех услуг для селектора */
   allServices?: { id: number; name: string }[];
+  /** Показывать все фото салона (а не только мастера) */
+  showAllSalon?: boolean;
 }
 
 export default function PortfolioSection({
   masterId,
   readonly = false,
   allServices = [],
+  showAllSalon = false,
 }: PortfolioSectionProps) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,7 +41,7 @@ export default function PortfolioSection({
   const fetchPhotos = async () => {
     setLoading(true);
     try {
-      const data = await getPhotos('portfolio', masterId);
+      const data = showAllSalon ? await getAllPortfolio() : await getPhotos('portfolio', masterId);
       setPhotos(data);
     } catch {
       message.error('Ошибка загрузки портфолио');

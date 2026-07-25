@@ -586,3 +586,79 @@ class TestDiscountAnalyticsNew:
         assert top["client_count"] >= 1
         assert "rule_name" in top
         assert "rule_type" in top
+
+
+class TestSegmentDiscount:
+    """Тесты скидок по RFM-сегменту."""
+
+    # ------------------------------------------------------------------
+    # 1. Скидка для новых клиентов
+    # ------------------------------------------------------------------
+    async def test_segment_discount_new_client(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        admin_headers: dict,
+        test_service,
+        test_car,
+    ):
+        """✅ Скидка по сегменту 'new' применяется (клиент без истории)."""
+        # Создаём правило: 10% для новых клиентов
+        resp = await client.post("/api/discounts", json={
+            "name": "Новым клиентам",
+            "type": "segment",
+            "conditions": {"segment": "new"},
+            "discount_percent": 10,
+            "is_active": True,
+        }, headers=admin_headers)
+        assert resp.status_code == 200
+
+        # Создаём запись (клиент без завершённых записей → сегмент "new")
+        appt_time = datetime.now(timezone.utc) + timedelta(hours=2)
+        resp = await client.post("/api/appointments", json={
+            "service_id": test_service.id,
+            "car_id": test_car.id,
+            "start_time": appt_time.isoformat(),
+        }, headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+
+        # Скидка должна быть применена
+        assert data["discount_applied"] > 0, f"Скидка не применена: {data}"
+        assert data["total_price"] < test_service.price
+
+    # ------------------------------------------------------------------
+    # 2. Скидка не применяется, если сегмент не совпадает
+    # ------------------------------------------------------------------
+    async def test_segment_discount_wrong_segment(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        admin_headers: dict,
+        test_service,
+        test_car,
+    ):
+        """❌ Скидка для VIP не применяется для нового клиента."""
+        # Создаём правило: 20% для VIP
+        resp = await client.post("/api/discounts", json={
+            "name": "VIP скидка",
+            "type": "segment",
+            "conditions": {"segment": "vip"},
+            "discount_percent": 20,
+            "is_active": True,
+        }, headers=admin_headers)
+        assert resp.status_code == 200
+
+        # Новый клиент — не VIP
+        appt_time = datetime.now(timezone.utc) + timedelta(hours=3)
+        resp = await client.post("/api/appointments", json={
+            "service_id": test_service.id,
+            "car_id": test_car.id,
+            "start_time": appt_time.isoformat(),
+        }, headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+
+        # Скидка не должна быть применена
+        assert data["discount_applied"] == 0, f"Скидка ошибочно применена: {data}"
+        assert data["total_price"] == test_service.price

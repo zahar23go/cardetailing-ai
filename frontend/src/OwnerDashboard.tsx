@@ -389,6 +389,10 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [selectedBoxId, setSelectedBoxId] = useState<number | undefined>(undefined);
   const [funnelData, setFunnelData] = useState<FunnelData | null>(null);
   const [funnelLoading, setFunnelLoading] = useState(false);
+  const [boxSettingsModal, setBoxSettingsModal] = useState(false);
+  const [boxesFull, setBoxesFull] = useState<any[]>([]);
+  const [boxSettingsSaving, setBoxSettingsSaving] = useState(false);
+  const [boxEditServices, setBoxEditServices] = useState<Record<number, number[]>>({});
 
   // Period selector state
   const [periodStart, setPeriodStart] = useState<string | null>(null);
@@ -510,6 +514,31 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       if (data.boxes) setBoxes(data.boxes);
     } catch { /* ignore */ }
     setHeatmapLoading(false);
+  };
+
+  const fetchBoxesFull = async () => {
+    try {
+      const data = await apiFetch<any[]>('/api/boxes');
+      setBoxesFull(data);
+    } catch {
+      message.error('Ошибка загрузки боксов');
+    }
+  };
+
+  const handleSaveBoxSettings = async (boxId: number, serviceIds: number[]) => {
+    setBoxSettingsSaving(true);
+    try {
+      await apiFetch(`/api/boxes/${boxId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ service_ids: serviceIds }),
+      });
+      message.success('Настройки бокса сохранены');
+      fetchBoxesFull();
+      fetchHeatmap(selectedBoxId);
+    } catch (e: any) {
+      message.error(e.message || 'Ошибка сохранения');
+    }
+    setBoxSettingsSaving(false);
   };
 
   const fetchFunnel = async () => {
@@ -650,6 +679,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     happy_hours: 'Happy Hours',
     service: 'На услугу',
     client: 'Персональная',
+    segment: 'По сегменту',
     frequency: 'За частоту',
     win_back: 'Возврат',
     cashback: 'Кэшбек',
@@ -659,6 +689,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     happy_hours: 'blue',
     service: 'gold',
     client: 'purple',
+    segment: 'cyan',
     frequency: 'green',
     win_back: 'orange',
     cashback: 'purple',
@@ -1863,6 +1894,9 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                             </Option>
                           ))}
                         </Select>
+                        <Button size="small" icon={<EditOutlined />}
+                          onClick={() => setBoxSettingsModal(true)}
+                          className="btn-action-gold">Настройка</Button>
                         <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchHeatmap(selectedBoxId)} type="text" className="btn-logout" />
                       </Space>
                     </div>
@@ -1895,10 +1929,10 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                                       borderRadius: 4, display: 'flex', alignItems: 'center',
                                       justifyContent: 'center',
                                     }}
-                                    title={count > 0 ? `${count} записей · ${cell?.revenue.toLocaleString()} ₽` : ''}
+                                    title={count > 0 ? `${count} записей · ${cell?.revenue.toLocaleString()} ₽` : '✅ Свободно'}
                                   >
                                     <Text className="text-11" style={{ color: count > maxCount * 0.5 ? '#0B0D10' : '#AAB2BF' }}>
-                                      {count || ''}
+                                      {count || '○'}
                                     </Text>
                                   </div>
                                 );
@@ -2478,6 +2512,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                 <Option value="happy_hours">Happy Hours</Option>
                 <Option value="service">На услугу</Option>
                 <Option value="client">Персональная</Option>
+                <Option value="segment">По сегменту (VIP, Лояльные...)</Option>
                 <Option value="frequency">За частоту визитов</Option>
                 <Option value="win_back">Возврат клиентов</Option>
                 <Option value="cashback">Кэшбек</Option>
@@ -2537,6 +2572,26 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             </div>
           )}
 
+          {/* Сегмент — для segment */}
+          {discountForm.type === 'segment' && (
+            <div>
+              <span className="label-field">Сегмент клиентов *</span>
+              <Select size="large" className="w-full" placeholder="Выберите сегмент"
+                value={discountForm.conditions ? JSON.parse(discountForm.conditions).segment : undefined}
+                onChange={(v) => setDiscountForm(prev => ({
+                  ...prev,
+                  conditions: JSON.stringify({ segment: v }),
+                }))}>
+                <Option value="vip">⭐ VIP</Option>
+                <Option value="loyal">💎 Лояльные</Option>
+                <Option value="regular">🔄 Постоянные</Option>
+                <Option value="new">🆕 Новые</Option>
+                <Option value="sleeping">😴 Спящие</Option>
+                <Option value="lost">🚫 Ушедшие</Option>
+              </Select>
+            </div>
+          )}
+
           {/* Срок действия */}
           <div>
             <span className="label-field">Срок действия (до)</span>
@@ -2558,8 +2613,8 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             </Space>
           </div>
 
-          {/* Условия (JSON) — для всех, кроме happy_hours */}
-          {discountForm.type !== 'happy_hours' && (
+          {/* Условия (JSON) — для всех, кроме happy_hours и segment */}
+          {discountForm.type !== 'happy_hours' && discountForm.type !== 'segment' && (
             <div>
               <span className="label-field">Условия (JSON)</span>
               <TextArea rows={3} className="input-luxury" placeholder='{"min_visits": 3}'
@@ -2568,13 +2623,14 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             </div>
           )}
 
-          {/* Подсказки по типам — для всех, кроме happy_hours */}
-          {discountForm.type !== 'happy_hours' && (
+          {/* Подсказки по типам — для всех, кроме happy_hours и segment */}
+          {discountForm.type !== 'happy_hours' && discountForm.type !== 'segment' && (
             <div>
               <Text className="text-titanium text-12 d-block mb-8">
                 <span className="text-gold">happy_hours:</span> слот задаётся выше ↑<br />
                 <span className="text-gold">service:</span> услуга выше ↑<br />
                 <span className="text-gold">client:</span> клиент выше ↑<br />
+                <span className="text-gold">segment:</span> сегмент выбирается выше ↑<br />
                 <span className="text-gold">frequency:</span> {'{'} "min_visits": 3 {'}'}<br />
                 <span className="text-gold">win_back:</span> {'{'} "max_recency_days": 60 {'}'}<br />
                 <span className="text-gold">cashback:</span> {'{'} "points_percent": 5 {'}'}<br />
@@ -2586,6 +2642,69 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             {editingDiscount ? 'Сохранить' : 'Создать'}
           </Button>
         </Space>
+      </Modal>
+
+      {/* ===== BOX SETTINGS MODAL ===== */}
+      <Modal
+        title={<Text className="text-white">⚙️ Настройка боксов</Text>}
+        open={boxSettingsModal}
+        onCancel={() => setBoxSettingsModal(false)}
+        footer={null}
+        width={600}
+        className="modal-command"
+        afterOpenChange={async (open) => {
+          if (open) {
+            const data = await apiFetch<any[]>('/api/boxes');
+            setBoxesFull(data);
+            const init: Record<number, number[]> = {};
+            data.forEach((b: any) => { init[b.id] = b.service_ids || []; });
+            setBoxEditServices(init);
+          }
+        }}
+      >
+        <Spin spinning={boxSettingsSaving}>
+          {boxesFull.length === 0 ? (
+            <Text className="text-titanium text-13">Нет боксов. Создайте их через API.</Text>
+          ) : (
+            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+              {boxesFull.map((box: any) => (
+                <Card key={box.id} size="small" className="card-luxury">
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <div className="flex-space-between">
+                      <Text className="text-white text-14">{box.name}</Text>
+                      <Tag color={box.is_active ? 'green' : 'default'}>
+                        {box.is_active ? 'Активен' : 'Неактивен'}
+                      </Tag>
+                    </div>
+                    <div>
+                      <Text className="text-titanium text-12 d-block mb-4">Привязанные услуги</Text>
+                      <Select
+                        mode="multiple"
+                        size="small"
+                        className="w-full input-luxury"
+                        placeholder="Выберите услуги"
+                        value={boxEditServices[box.id] || []}
+                        onChange={(vals) => setBoxEditServices(prev => ({ ...prev, [box.id]: vals }))}
+                        style={{ width: '100%' }}
+                      >
+                        {services.map((s) => (
+                          <Option key={s.id} value={s.id}>{s.name}</Option>
+                        ))}
+                      </Select>
+                    </div>
+                    <Button
+                      size="small"
+                      className="btn-gold"
+                      style={{ alignSelf: 'flex-end' }}
+                      onClick={() => handleSaveBoxSettings(box.id, boxEditServices[box.id] || [])}
+                      loading={boxSettingsSaving}
+                    >Сохранить</Button>
+                  </Space>
+                </Card>
+              ))}
+            </Space>
+          )}
+        </Spin>
       </Modal>
     </Layout>
   );

@@ -235,3 +235,70 @@ class TestHeatmapBoxes:
         data = resp.json()
         assert len(data["cells"]) == 84
         assert all(c["count"] == 0 for c in data["cells"])
+
+
+class TestBoxServices:
+    """Тесты привязки услуг к боксам (box-service)."""
+
+    # ------------------------------------------------------------------
+    # 1. Создание бокса с привязкой услуг
+    # ------------------------------------------------------------------
+    async def test_create_box_with_service_ids(
+        self,
+        client: AsyncClient,
+        admin_headers: dict,
+        test_service,
+    ):
+        """✅ Создание бокса с привязкой к услугам."""
+        resp = await client.post("/api/boxes", json={
+            "name": "Бокс полировки",
+            "service_ids": [test_service.id],
+        }, headers=admin_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["service_ids"] == [test_service.id]
+
+    # ------------------------------------------------------------------
+    # 2. Обновление привязки услуг бокса
+    # ------------------------------------------------------------------
+    async def test_update_box_service_ids(
+        self,
+        client: AsyncClient,
+        admin_headers: dict,
+        test_service,
+    ):
+        """✅ Обновление списка услуг, привязанных к боксу."""
+        # Создаём бокс без услуг
+        resp = await client.post("/api/boxes", json={"name": "Бокс тест"}, headers=admin_headers)
+        assert resp.status_code == 200
+        box = resp.json()
+        assert box["service_ids"] == []
+
+        # Обновляем — добавляем услугу
+        resp = await client.put(f"/api/boxes/{box['id']}", json={
+            "service_ids": [test_service.id],
+        }, headers=admin_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert test_service.id in data["service_ids"]
+
+    # ------------------------------------------------------------------
+    # 3. Получение боксов включает service_ids
+    # ------------------------------------------------------------------
+    async def test_list_boxes_includes_service_ids(
+        self,
+        client: AsyncClient,
+        admin_headers: dict,
+        test_service,
+    ):
+        """✅ GET /api/boxes возвращает service_ids для каждого бокса."""
+        await client.post("/api/boxes", json={
+            "name": "Бокс с услугой",
+            "service_ids": [test_service.id],
+        }, headers=admin_headers)
+
+        resp = await client.get("/api/boxes", headers=admin_headers)
+        assert resp.status_code == 200
+        boxes = resp.json()
+        # Хотя бы один бокс имеет service_ids
+        assert any(b.get("service_ids") for b in boxes)

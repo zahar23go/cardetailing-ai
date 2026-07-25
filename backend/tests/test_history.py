@@ -154,3 +154,56 @@ class TestHistory:
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] >= 1
+
+    async def test_history_detail_endpoint(
+        self,
+        client,
+        auth_headers,
+        test_service,
+        test_car,
+    ):
+        """✅ Эндпоинт деталей истории возвращает корректные данные."""
+        # Создаём запись (автоматически логируется create)
+        start = (datetime.now(timezone.utc) + timedelta(days=5)).isoformat()
+        create_resp = await client.post(
+            "/api/appointments",
+            json={"service_id": test_service.id, "car_id": test_car.id, "start_time": start},
+            headers=auth_headers,
+        )
+        assert create_resp.status_code == 200
+        appt_id = create_resp.json()["id"]
+
+        # Получаем список истории, чтобы найти ID записи истории
+        history_resp = await client.get(
+            f"/api/appointments/{appt_id}/history",
+            headers=auth_headers,
+        )
+        assert history_resp.status_code == 200
+        history_data = history_resp.json()
+        assert history_data["total"] >= 1
+        history_id = history_data["items"][0]["id"]
+
+        # Детали истории
+        resp = await client.get(
+            f"/api/appointments/{appt_id}/history/{history_id}",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["id"] == history_id
+        assert data["appointment_id"] == appt_id
+        assert data["change_type"] == "create"
+        assert data["changed_by"] is not None
+        assert "full_name" in data["changed_by"]
+
+    async def test_history_detail_not_found(
+        self,
+        client,
+        auth_headers,
+    ):
+        """❌ Несуществующая запись истории возвращает 404."""
+        resp = await client.get(
+            "/api/appointments/99999/history/99999",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 404

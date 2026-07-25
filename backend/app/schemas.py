@@ -437,6 +437,7 @@ class BoxCreate(BaseModel):
     color: Optional[str] = None
     sort_order: int = 0
     is_active: bool = True
+    service_ids: list[int] = []
 
 
 class BoxUpdate(BaseModel):
@@ -444,6 +445,7 @@ class BoxUpdate(BaseModel):
     color: Optional[str] = None
     sort_order: Optional[int] = None
     is_active: Optional[bool] = None
+    service_ids: Optional[list[int]] = None
 
 
 class BoxOut(BaseModel):
@@ -453,6 +455,16 @@ class BoxOut(BaseModel):
     sort_order: int = 0
     is_active: bool = True
     created_at: Optional[datetime] = None
+    service_ids: list[int] = []
+
+    model_config = {"from_attributes": True}
+
+
+class BoxServiceOut(BaseModel):
+    id: int
+    box_id: int
+    service_id: int
+    service_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
