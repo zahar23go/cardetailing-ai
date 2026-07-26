@@ -110,9 +110,26 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
 
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
+  // Services for portfolio upload
+  const [masterServices, setMasterServices] = useState<{ id: number; name: string }[]>([]);
+
+  const fetchMasterServices = async () => {
+    try {
+      const data = await apiFetch<{items: { id: number; name: string }[]; total: number}>('/api/services?skip=0&limit=100');
+      setMasterServices(data.items);
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     fetchAppointments();
   }, []);
+
+  // Load services when Profile tab opens
+  useEffect(() => {
+    if (activeTab === 'profile') {
+      fetchMasterServices();
+    }
+  }, [activeTab]);
 
   const fetchAppointments = async () => {
     setLoading(true);
@@ -528,7 +545,7 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
 
               {/* Портфолио мастера */}
               <div className="mt-4">
-                <PortfolioSection masterId={user.id} />
+                <PortfolioSection masterId={user.id} allServices={masterServices} />
               </div>
             </motion.div>
           </TabPane>

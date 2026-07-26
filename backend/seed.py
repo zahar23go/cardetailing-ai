@@ -25,7 +25,7 @@ import bcrypt
 # Import all models so they register on Base.metadata
 import app.models  # noqa: F401
 from app.core.database import async_session_maker
-from app.models import Tenant, User, Car, Service, Appointment, AppointmentStatus, Expense
+from app.models import Tenant, User, Car, Service, Appointment, AppointmentStatus, Expense, Box, BoxService
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -138,6 +138,28 @@ async def seed() -> None:
             print("[SKIP] No services found. Seed services first.")
             return
         print(f"[OK] Found {len(services)} existing services")
+
+        # ---- 0.5. Create boxes ----
+        BOXES = [
+            {"name": "Бокс 1 — мойка",    "color": "#4DABF7", "sort_order": 0, "service_names": ["Мойка кузова", "Мойка двигателя"]},
+            {"name": "Бокс 2 — полировка", "color": "#FF6B6B", "sort_order": 1, "service_names": ["Полировка кузова", "Полировка фар"]},
+            {"name": "Бокс 3 — химчистка", "color": "#4ECB71", "sort_order": 2, "service_names": ["Химчистка салона", "Химчистка сидений"]},
+        ]
+        existing_boxes = await session.execute(sa_select(Box).where(Box.tenant_id == TENANT_ID))
+        if existing_boxes.scalars().all():
+            print(f"[SKIP] Boxes already exist")
+        else:
+            for bd in BOXES:
+                box = Box(name=bd["name"], color=bd["color"], sort_order=bd["sort_order"], is_active=True, tenant_id=TENANT_ID)
+                session.add(box)
+                await session.flush()
+                # Link services by name
+                for srv_name in bd["service_names"]:
+                    for s in services:
+                        if s.name.lower() == srv_name.lower():
+                            session.add(BoxService(box_id=box.id, service_id=s.id, tenant_id=TENANT_ID))
+                            break
+                print(f"[OK] Created box: {box.name} (id={box.id})")
 
         # ---- 1. Create masters ----
         master_ids = []
@@ -267,6 +289,20 @@ async def seed() -> None:
             car_ids_by_client.setdefault(car.client_id, []).append(car.id)
         print(f"[OK] Total cars loaded: {len(all_cars)}")
 
+        # ---- 3.5. Load boxes and their service mappings for box_id assignment ----
+        box_result = await session.execute(
+            sa_select(Box).where(Box.tenant_id == TENANT_ID)
+        )
+        all_boxes = box_result.scalars().all()
+        box_service_map: dict[int, int] = {}  # service_id -> box_id
+        if all_boxes:
+            bs_result = await session.execute(
+                sa_select(BoxService).where(BoxService.tenant_id == TENANT_ID)
+            )
+            for bs in bs_result.scalars().all():
+                box_service_map[bs.service_id] = bs.box_id
+        print(f"[OK] Loaded {len(all_boxes)} boxes, {len(box_service_map)} service-to-box mappings")
+
         # ---- 4. Create appointments (30-50 over last 3 months) ----
         appointment_count = random.randint(35, 45)
         created_appts = 0
@@ -325,6 +361,7 @@ async def seed() -> None:
                 master_id=master_id,
                 car_id=car_id,
                 service_id=service_id,
+                box_id=box_service_map.get(service_id),
                 start_time=start_time,
                 end_time=end_time,
                 status=status,

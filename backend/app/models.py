@@ -389,6 +389,9 @@ class Expense(Base):
 
 class DiscountType(str, enum.Enum):
     happy_hours = "happy_hours"
+    service = "service"
+    client = "client"
+    segment = "segment"
     frequency = "frequency"
     win_back = "win_back"
     cashback = "cashback"

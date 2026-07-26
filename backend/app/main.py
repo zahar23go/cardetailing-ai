@@ -610,6 +610,19 @@ async def create_appointment(
 
     end_time = start_time + timedelta(minutes=service.duration)
 
+    # Авто-назначение бокса по услуге, если не указан
+    box_id = request.box_id
+    if box_id is None:
+        bs_result = await db.execute(
+            select(BoxService).where(
+                BoxService.service_id == request.service_id,
+                BoxService.tenant_id == UUID(current_user["tenant_id"]),
+            ).limit(1)
+        )
+        bs = bs_result.scalar_one_or_none()
+        if bs:
+            box_id = bs.box_id
+
     appointment = Appointment(
         client_id=current_user["id"],
         service_id=request.service_id,
@@ -619,7 +632,7 @@ async def create_appointment(
         total_price=service.price,
         status="pending",
         client_notes=request.notes or request.client_notes,
-        box_id=request.box_id,
+        box_id=box_id,
         tenant_id=UUID(current_user["tenant_id"]),
     )
     db.add(appointment)
@@ -1339,13 +1352,31 @@ async def ai_consultant(
     )
     services = services_result.scalars().all()
 
+    # Загружаем количество фото в портфолио по каждой услуге
+    portfolio_counts: dict[int, int] = {}
+    if services:
+        sids = [s.id for s in services]
+        count_result = await db.execute(
+            select(Photo.service_id, func.count(Photo.id))
+            .where(
+                Photo.tenant_id == tenant_id,
+                Photo.entity_type == "portfolio",
+                Photo.service_id.in_(sids),
+            )
+            .group_by(Photo.service_id)
+        )
+        for row in count_result.all():
+            portfolio_counts[row[0]] = row[1]
+
     # Формируем контекст услуг
     services_lines = []
     for s in services:
         cat = s.category or "Без категории"
+        photo_count = portfolio_counts.get(s.id, 0)
+        photo_hint = f", фото в портфолио: {photo_count}" if photo_count else ""
         services_lines.append(
             f"• {s.name} (категория: {cat}) — {s.price} руб., ~{s.duration} мин., "
-            f"описание: {s.description or '—'}"
+            f"описание: {s.description or '—'}{photo_hint}"
         )
 
     services_context = "\n".join(services_lines) if services_lines else "Услуги временно не загружены."
@@ -2117,11 +2148,12 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
     now = datetime.now(timezone.utc)
     tenant_id = appointment.tenant_id
 
-    # Загружаем активные правила скидок
+    # Загружаем активные правила скидок (непросроченные)
     rules_result = await db.execute(
         select(DiscountRule).where(
             DiscountRule.tenant_id == tenant_id,
             DiscountRule.is_active == True,
+            (DiscountRule.valid_until == None) | (DiscountRule.valid_until >= now),
         )
     )
     rules = rules_result.scalars().all()

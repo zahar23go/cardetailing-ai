@@ -393,6 +393,14 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [boxesFull, setBoxesFull] = useState<any[]>([]);
   const [boxSettingsSaving, setBoxSettingsSaving] = useState(false);
   const [boxEditServices, setBoxEditServices] = useState<Record<number, number[]>>({});
+  const [newBoxName, setNewBoxName] = useState('');
+  const [newBoxColor, setNewBoxColor] = useState('');
+  const [creatingBox, setCreatingBox] = useState(false);
+
+  // Heatmap cell click state
+  const [heatmapModalOpen, setHeatmapModalOpen] = useState(false);
+  const [heatmapSlotAppts, setHeatmapSlotAppts] = useState<Appointment[]>([]);
+  const [heatmapSlotLabel, setHeatmapSlotLabel] = useState('');
 
   // Period selector state
   const [periodStart, setPeriodStart] = useState<string | null>(null);
@@ -409,6 +417,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     fetchPL();
     fetchRevenueChart();
     fetchHeatmap();
+    fetchBoxes();
     fetchFunnel();
     fetchRFM();
     fetchDiscounts();
@@ -516,6 +525,13 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     setHeatmapLoading(false);
   };
 
+  const fetchBoxes = async () => {
+    try {
+      const data = await apiFetch<any[]>('/api/boxes');
+      setBoxes(data.map((b: any) => ({ id: b.id, name: b.name, color: b.color, sort_order: b.sort_order, is_active: b.is_active })));
+    } catch { /* ignore */ }
+  };
+
   const fetchBoxesFull = async () => {
     try {
       const data = await apiFetch<any[]>('/api/boxes');
@@ -539,6 +555,58 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       message.error(e.message || 'Ошибка сохранения');
     }
     setBoxSettingsSaving(false);
+  };
+
+  const handleCreateBox = async () => {
+    if (!newBoxName.trim()) { message.warning('Укажите название бокса'); return; }
+    setCreatingBox(true);
+    try {
+      await apiFetch('/api/boxes', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newBoxName.trim(),
+          color: newBoxColor.trim() || null,
+          sort_order: boxesFull.length,
+          is_active: true,
+        }),
+      });
+      message.success('✅ Бокс создан');
+      setNewBoxName('');
+      setNewBoxColor('');
+      fetchBoxesFull();
+      fetchHeatmap(selectedBoxId);
+    } catch (e: any) {
+      message.error(e.message || 'Ошибка создания бокса');
+    }
+    setCreatingBox(false);
+  };
+
+  const handleDeleteBox = async (boxId: number, boxName: string) => {
+    try {
+      await apiFetch(`/api/boxes/${boxId}`, { method: 'DELETE' });
+      message.success(`✅ Бокс «${boxName}» удалён`);
+      fetchBoxesFull();
+      fetchHeatmap(selectedBoxId);
+    } catch (e: any) {
+      message.error(e.message || 'Ошибка удаления бокса');
+    }
+  };
+
+  const handleHeatmapCellClick = (day: number, hour: number) => {
+    const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const cell = heatmapData.find(c => c.day === day && c.hour === hour);
+    const count = cell?.count || 0;
+    setHeatmapSlotLabel(`${dayNames[day]} ${hour}:00 (${count} зап.)`);
+
+    // Фильтруем appointments по дню недели и часу
+    const filtered = appointments.filter(a => {
+      const start = new Date(a.start_time);
+      return start.getDay() === day && start.getHours() === hour;
+    });
+    // Сортируем по времени
+    filtered.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    setHeatmapSlotAppts(filtered);
+    setHeatmapModalOpen(true);
   };
 
   const fetchFunnel = async () => {
@@ -1888,9 +1956,12 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                             fetchHeatmap(undefined);
                           }}
                         >
-                          {boxes.map((b) => (
+                          {boxes.filter(b => b.is_active !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map((b) => (
                             <Option key={b.id} value={b.id}>
-                              {b.name}
+                              <Space size={4}>
+                                <span style={{ color: b.color || '#C8A977', fontSize: 14, lineHeight: 1 }}>●</span>
+                                {b.name}
+                              </Space>
                             </Option>
                           ))}
                         </Select>
@@ -1927,9 +1998,10 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                                     style={{
                                       width: '8.33%', height: 32, backgroundColor: bgColor,
                                       borderRadius: 4, display: 'flex', alignItems: 'center',
-                                      justifyContent: 'center',
+                                      justifyContent: 'center', cursor: 'pointer',
                                     }}
                                     title={count > 0 ? `${count} записей · ${cell?.revenue.toLocaleString()} ₽` : '✅ Свободно'}
+                                    onClick={() => handleHeatmapCellClick(day, hour)}
                                   >
                                     <Text className="text-11" style={{ color: count > maxCount * 0.5 ? '#0B0D10' : '#AAB2BF' }}>
                                       {count || '○'}
@@ -2648,7 +2720,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       <Modal
         title={<Text className="text-white">⚙️ Настройка боксов</Text>}
         open={boxSettingsModal}
-        onCancel={() => setBoxSettingsModal(false)}
+        onCancel={() => { setBoxSettingsModal(false); setNewBoxName(''); setNewBoxColor(''); }}
         footer={null}
         width={600}
         className="modal-command"
@@ -2659,22 +2731,65 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             const init: Record<number, number[]> = {};
             data.forEach((b: any) => { init[b.id] = b.service_ids || []; });
             setBoxEditServices(init);
+            setNewBoxName('');
+            setNewBoxColor('');
           }
         }}
       >
-        <Spin spinning={boxSettingsSaving}>
+        <Spin spinning={boxSettingsSaving || creatingBox}>
+          {/* Create new box */}
+          <Card size="small" className="card-luxury" style={{ marginBottom: 16 }}>
+            <Text className="text-white text-14 d-block mb-8">➕ Создать новый бокс</Text>
+            <Space direction="vertical" style={{ width: '100%' }} size="small">
+              <div className="flex-space-between" style={{ gap: 8 }}>
+                <Input
+                  size="small"
+                  className="input-luxury"
+                  placeholder="Название бокса"
+                  value={newBoxName}
+                  onChange={(e) => setNewBoxName(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <Input
+                  size="small"
+                  className="input-luxury"
+                  placeholder="Цвет (#C8A977)"
+                  value={newBoxColor}
+                  onChange={(e) => setNewBoxColor(e.target.value)}
+                  style={{ width: 110 }}
+                />
+                <Button
+                  size="small"
+                  className="btn-gold"
+                  onClick={handleCreateBox}
+                  loading={creatingBox}
+                >Создать</Button>
+              </div>
+            </Space>
+          </Card>
+
           {boxesFull.length === 0 ? (
-            <Text className="text-titanium text-13">Нет боксов. Создайте их через API.</Text>
+            <Text className="text-titanium text-13">Нет боксов. Создайте первый бокс выше.</Text>
           ) : (
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
               {boxesFull.map((box: any) => (
                 <Card key={box.id} size="small" className="card-luxury">
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <div className="flex-space-between">
-                      <Text className="text-white text-14">{box.name}</Text>
-                      <Tag color={box.is_active ? 'green' : 'default'}>
-                        {box.is_active ? 'Активен' : 'Неактивен'}
-                      </Tag>
+                      <Space>
+                        <Text className="text-white text-14">{box.name}</Text>
+                        <Tag color={box.is_active ? 'green' : 'default'}>
+                          {box.is_active ? 'Активен' : 'Неактивен'}
+                        </Tag>
+                      </Space>
+                      <Popconfirm
+                        title={`Удалить бокс «${box.name}»?`}
+                        description="Записи в этом боксе останутся, но бокс будет удалён."
+                        onConfirm={() => handleDeleteBox(box.id, box.name)}
+                        okText="Да, удалить" cancelText="Отмена" okButtonProps={{ danger: true }}
+                      >
+                        <Button size="small" icon={<DeleteOutlined />} className="btn-action-danger" />
+                      </Popconfirm>
                     </div>
                     <div>
                       <Text className="text-titanium text-12 d-block mb-4">Привязанные услуги</Text>
@@ -2705,6 +2820,48 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             </Space>
           )}
         </Spin>
+      </Modal>
+
+      {/* ===== HEATMAP SLOT DETAIL MODAL ===== */}
+      <Modal
+        title={<Text className="text-white">📅 {heatmapSlotLabel}</Text>}
+        open={heatmapModalOpen}
+        onCancel={() => setHeatmapModalOpen(false)}
+        footer={null}
+        className="modal-command"
+        width={520}
+      >
+        {heatmapSlotAppts.length === 0 ? (
+          <div style={{ padding: '24px 0', textAlign: 'center' }}>
+            <Text className="text-titanium">Нет записей в этот слот</Text>
+          </div>
+        ) : (
+          <List
+            dataSource={heatmapSlotAppts}
+            renderItem={(item) => (
+              <List.Item style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                  <Space>
+                    <Text className="text-white-bold text-13">{item.service_name || `Услуга #${item.service_id}`}</Text>
+                    <Tag color={STATUS_COLORS[item.status]} className="tag-status">
+                      {STATUS_LABELS[item.status]}
+                    </Tag>
+                  </Space>
+                  <Space size="small">
+                    {item.client && <Text className="text-titanium text-12">👤 {item.client.full_name}</Text>}
+                    {item.master && <Text className="text-titanium text-12">🔧 {item.master.full_name}</Text>}
+                  </Space>
+                  <div className="flex-space-between">
+                    <Text className="text-titanium text-12">
+                      🕐 {dayjs(item.start_time).format('HH:mm')} — {dayjs(item.end_time).format('HH:mm')}
+                    </Text>
+                    <Text className="text-gold-bold text-13">{formatCurrency(item.total_price)}</Text>
+                  </div>
+                </Space>
+              </List.Item>
+            )}
+          />
+        )}
       </Modal>
     </Layout>
   );
