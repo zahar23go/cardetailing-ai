@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Typography, Card, Row, Col, Statistic, Table, Button, Tag, Space, Tabs,
-  message, Modal, Select, Input, Popconfirm, Badge, Layout, List,
+  message, Modal, Select, Input, InputNumber, Popconfirm, Badge, Layout, List,
   Empty, Spin, Tooltip, DatePicker, TimePicker, Switch, ColorPicker,
 } from 'antd';
 import {
@@ -426,12 +426,17 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [discountModal, setDiscountModal] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<DiscountRule | null>(null);
   const [discountForm, setDiscountForm] = useState({
-    name: '', type: 'happy_hours', conditions: '{}',
+    name: '', type: 'happy_hours',
     discount_percent: 0, slot_start: '', slot_end: '',
     service_id: undefined as number | undefined,
     client_id: undefined as number | undefined,
     valid_until: '',
     is_active: true,
+    // Поля конструктора условий
+    minVisits: 3,
+    maxRecencyDays: 60,
+    pointsPercent: 5,
+    segment: undefined as string | undefined,
   });
   const [discountSaving, setDiscountSaving] = useState(false);
 
@@ -768,10 +773,10 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const openDiscountModal = (rule?: DiscountRule) => {
     if (rule) {
       setEditingDiscount(rule);
+      const cond = rule.conditions || {};
       setDiscountForm({
         name: rule.name,
         type: rule.type,
-        conditions: JSON.stringify(rule.conditions || {}, null, 2),
         discount_percent: rule.discount_percent,
         slot_start: rule.slot_start || '',
         slot_end: rule.slot_end || '',
@@ -779,16 +784,24 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         client_id: rule.client_id || undefined,
         valid_until: rule.valid_until || '',
         is_active: rule.is_active,
+        minVisits: cond.min_visits || 3,
+        maxRecencyDays: cond.max_recency_days || 60,
+        pointsPercent: cond.points_percent || 5,
+        segment: cond.segment || undefined,
       });
     } else {
       setEditingDiscount(null);
       setDiscountForm({
-        name: '', type: 'happy_hours', conditions: '{}',
+        name: '', type: 'happy_hours',
         discount_percent: 0, slot_start: '', slot_end: '',
         service_id: undefined,
         client_id: undefined,
         valid_until: '',
         is_active: true,
+        minVisits: 3,
+        maxRecencyDays: 60,
+        pointsPercent: 5,
+        segment: undefined,
       });
     }
     setDiscountModal(true);
@@ -799,8 +812,24 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     if (!discountForm.discount_percent) { message.warning('Укажите процент скидки'); return; }
     setDiscountSaving(true);
     try {
+      // Собираем conditions из полей конструктора в зависимости от типа
       let conditions: Record<string, any> = {};
-      try { conditions = JSON.parse(discountForm.conditions); } catch { conditions = {}; }
+      if (discountForm.type === 'happy_hours') {
+        conditions.hour_start = discountForm.slot_start;
+        conditions.hour_end = discountForm.slot_end;
+      } else if (discountForm.type === 'frequency') {
+        conditions.min_visits = discountForm.minVisits;
+      } else if (discountForm.type === 'win_back') {
+        conditions.max_recency_days = discountForm.maxRecencyDays;
+      } else if (discountForm.type === 'cashback') {
+        conditions.points_percent = discountForm.pointsPercent;
+      } else if (discountForm.type === 'segment') {
+        conditions.segment = discountForm.segment;
+      } else if (discountForm.type === 'service') {
+        // service_id передаётся отдельным полем
+      } else if (discountForm.type === 'client') {
+        // client_id передаётся отдельным полем
+      }
       const body = {
         name: discountForm.name,
         type: discountForm.type,
@@ -2783,11 +2812,8 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             <div>
               <span className="label-field">Сегмент клиентов *</span>
               <Select size="large" className="w-full" placeholder="Выберите сегмент"
-                value={discountForm.conditions ? JSON.parse(discountForm.conditions).segment : undefined}
-                onChange={(v) => setDiscountForm(prev => ({
-                  ...prev,
-                  conditions: JSON.stringify({ segment: v }),
-                }))}>
+                value={discountForm.segment}
+                onChange={(v) => setDiscountForm(prev => ({ ...prev, segment: v }))}>
                 <Option value="vip">⭐ VIP</Option>
                 <Option value="loyal">💎 Лояльные</Option>
                 <Option value="regular">🔄 Постоянные</Option>
@@ -2819,31 +2845,60 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             </Space>
           </div>
 
-          {/* Условия (JSON) — для всех, кроме happy_hours и segment */}
-          {discountForm.type !== 'happy_hours' && discountForm.type !== 'segment' && (
+          {/* Конструктор условий — frequency */}
+          {discountForm.type === 'frequency' && (
             <div>
-              <span className="label-field">Условия (JSON)</span>
-              <TextArea rows={3} className="input-luxury" placeholder='{"min_visits": 3}'
-                value={discountForm.conditions}
-                onChange={(e) => setDiscountForm(prev => ({ ...prev, conditions: e.target.value }))} />
+              <span className="label-field">Минимальное количество визитов</span>
+              <InputNumber
+                size="large"
+                className="w-full input-luxury"
+                min={1}
+                max={100}
+                value={discountForm.minVisits}
+                onChange={(v) => setDiscountForm(prev => ({ ...prev, minVisits: v || 1 }))}
+                style={{ width: '100%' }}
+              />
             </div>
           )}
 
-          {/* Подсказки по типам — для всех, кроме happy_hours и segment */}
-          {discountForm.type !== 'happy_hours' && discountForm.type !== 'segment' && (
+          {/* Конструктор условий — win_back */}
+          {discountForm.type === 'win_back' && (
             <div>
-              <Text className="text-titanium text-12 d-block mb-8">
-                <span className="text-gold">happy_hours:</span> слот задаётся выше ↑<br />
-                <span className="text-gold">service:</span> услуга выше ↑<br />
-                <span className="text-gold">client:</span> клиент выше ↑<br />
-                <span className="text-gold">segment:</span> сегмент выбирается выше ↑<br />
-                <span className="text-gold">frequency:</span> {'{'} "min_visits": 3 {'}'}<br />
-                <span className="text-gold">win_back:</span> {'{'} "max_recency_days": 60 {'}'}<br />
-                <span className="text-gold">cashback:</span> {'{'} "points_percent": 5 {'}'}<br />
-                <span className="text-gold">Любой тип:</span> {'{'} "min_price": 500 {'}'} — минимальная цена после скидки
+              <span className="label-field">Максимум дней без записи</span>
+              <InputNumber
+                size="large"
+                className="w-full input-luxury"
+                min={1}
+                max={365}
+                value={discountForm.maxRecencyDays}
+                onChange={(v) => setDiscountForm(prev => ({ ...prev, maxRecencyDays: v || 30 }))}
+                style={{ width: '100%' }}
+              />
+              <Text className="text-titanium text-12 d-block" style={{ marginTop: 4 }}>
+                Если клиент не был больше указанного количества дней — применяется скидка
               </Text>
             </div>
           )}
+
+          {/* Конструктор условий — cashback */}
+          {discountForm.type === 'cashback' && (
+            <div>
+              <span className="label-field">Процент кэшбэка</span>
+              <InputNumber
+                size="large"
+                className="w-full input-luxury"
+                min={1}
+                max={100}
+                value={discountForm.pointsPercent}
+                onChange={(v) => setDiscountForm(prev => ({ ...prev, pointsPercent: v || 1 }))}
+                style={{ width: '100%' }}
+              />
+              <Text className="text-titanium text-12 d-block" style={{ marginTop: 4 }}>
+                Сколько процентов от суммы записи начислять баллами
+              </Text>
+            </div>
+          )}
+
           <Button type="primary" size="large" className="btn-gold" onClick={handleSaveDiscount} loading={discountSaving}>
             {editingDiscount ? 'Сохранить' : 'Создать'}
           </Button>
