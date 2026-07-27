@@ -562,9 +562,13 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     setRevenueLoading(true);
     try {
       let path = '/api/analytics/revenue';
+      const params = new URLSearchParams();
+      params.set('_t', String(Date.now())); // cache-busting
       if (start && end) {
-        path += `?start_date=${start}&end_date=${end}`;
+        params.set('start_date', start);
+        params.set('end_date', end);
       }
+      path += '?' + params.toString();
       const data = await apiFetch<RevenueData>(path);
       setRevenueData(data);
     } catch { /* ignore */ }
