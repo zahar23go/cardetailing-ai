@@ -1804,7 +1804,7 @@ async def get_funnel(
             color=stage_colors[s],
         ))
 
-    conversion = round(counts["completed"] / counts["pending"] * 100, 1) if counts["pending"] else 0
+    conversion = round(counts["completed"] / total * 100, 1) if total else 0
 
     return FunnelResponse(
         stages=stages,
