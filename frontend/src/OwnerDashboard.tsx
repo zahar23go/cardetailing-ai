@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Typography, Card, Row, Col, Statistic, Table, Button, Tag, Space, Tabs,
   message, Modal, Select, Input, Popconfirm, Badge, Layout, List,
-  Empty, Spin, Tooltip, DatePicker, TimePicker, Switch,
+  Empty, Spin, Tooltip, DatePicker, TimePicker, Switch, ColorPicker,
 } from 'antd';
 import {
   CrownOutlined, ToolOutlined,
@@ -281,6 +281,64 @@ const STATUS_LABELS: Record<string, string> = {
   no_show: 'Не явился',
 };
 
+const COLOR_MAP: Record<string, string> = {
+  'красный': '#FF6B6B',
+  'синий': '#4DABF7',
+  'зелёный': '#4ECB71',
+  'зеленый': '#4ECB71',
+  'жёлтый': '#FFD93D',
+  'желтый': '#FFD93D',
+  'оранжевый': '#FF9F43',
+  'фиолетовый': '#A66CFF',
+  'розовый': '#FF6B9D',
+  'серый': '#95A5A6',
+  'чёрный': '#2D3436',
+  'черный': '#2D3436',
+  'белый': '#FFFFFF',
+};
+
+function normalizeColor(color: string | null | undefined): string | null {
+  if (!color) return null;
+  const trimmed = color.trim();
+  if (!trimmed) return null;
+  // Если это уже hex-код, возвращаем как есть
+  if (/^#[0-9A-Fa-f]{3,8}$/.test(trimmed)) return trimmed;
+  // Иначе ищем в маппинге русских названий
+  return COLOR_MAP[trimmed.toLowerCase()] || trimmed;
+}
+
+function hexToRgb(hex: string): string {
+  return hexToRgbArray(hex).join(', ');
+}
+
+function hexToRgbArray(hex: string): number[] {
+  const clean = hex.replace('#', '');
+  if (clean.length === 3) {
+    return [
+      parseInt(clean[0] + clean[0], 16),
+      parseInt(clean[1] + clean[1], 16),
+      parseInt(clean[2] + clean[2], 16),
+    ];
+  }
+  return [
+    parseInt(clean.substring(0, 2), 16),
+    parseInt(clean.substring(2, 4), 16),
+    parseInt(clean.substring(4, 6), 16),
+  ];
+}
+
+function isLightColor(color: string | null | undefined): boolean {
+  if (!color) return false;
+  try {
+    const [r, g, b] = hexToRgbArray(color);
+    // Яркость по формуле WCAG: (0.299*R + 0.587*G + 0.114*B)
+    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+    return brightness > 180;
+  } catch {
+    return false;
+  }
+}
+
 const ROLE_LABELS: Record<string, string> = {
   client: '👤 Клиент',
   master: '🔧 Мастер',
@@ -396,6 +454,8 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [newBoxName, setNewBoxName] = useState('');
   const [newBoxColor, setNewBoxColor] = useState('');
   const [creatingBox, setCreatingBox] = useState(false);
+  const [editingBox, setEditingBox] = useState<any>(null);
+  const [editBoxModalOpen, setEditBoxModalOpen] = useState(false);
 
   // Heatmap cell click state
   const [heatmapModalOpen, setHeatmapModalOpen] = useState(false);
@@ -565,7 +625,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         method: 'POST',
         body: JSON.stringify({
           name: newBoxName.trim(),
-          color: newBoxColor.trim() || null,
+          color: normalizeColor(newBoxColor),
           sort_order: boxesFull.length,
           is_active: true,
         }),
@@ -590,6 +650,35 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     } catch (e: any) {
       message.error(e.message || 'Ошибка удаления бокса');
     }
+  };
+
+  const openEditBoxModal = (box: any) => {
+    setEditingBox(box);
+    setEditBoxModalOpen(true);
+  };
+
+  const handleEditBox = async () => {
+    if (!editingBox) return;
+    if (!editingBox.name?.trim()) { message.warning('Укажите название бокса'); return; }
+    setBoxSettingsSaving(true);
+    try {
+      await apiFetch(`/api/boxes/${editingBox.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: editingBox.name.trim(),
+          color: normalizeColor(editingBox.color),
+          service_ids: boxEditServices[editingBox.id] || [],
+        }),
+      });
+      message.success('✅ Бокс обновлён');
+      setEditBoxModalOpen(false);
+      setEditingBox(null);
+      fetchBoxesFull();
+      fetchHeatmap(selectedBoxId);
+    } catch (e: any) {
+      message.error(e.message || 'Ошибка обновления бокса');
+    }
+    setBoxSettingsSaving(false);
   };
 
   const handleHeatmapCellClick = (day: number, hour: number) => {
@@ -1956,14 +2045,39 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                             fetchHeatmap(undefined);
                           }}
                         >
-                          {boxes.filter(b => b.is_active !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map((b) => (
-                            <Option key={b.id} value={b.id}>
-                              <Space size={4}>
-                                <span style={{ color: b.color || '#C8A977', fontSize: 14, lineHeight: 1 }}>●</span>
-                                {b.name}
-                              </Space>
-                            </Option>
-                          ))}
+                          {boxes.filter(b => b.is_active !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map((b) => {
+                            const boxFull = boxesFull.find((bf: any) => bf.id === b.id);
+                            const boxServiceNames = (boxFull?.service_ids || [])
+                              .map((sid: number) => services.find(s => s.id === sid)?.name)
+                              .filter(Boolean)
+                              .join(', ');
+                            return (
+                              <Option key={b.id} value={b.id}>
+                                <Tooltip title={boxServiceNames || 'Нет услуг'} mouseEnterDelay={0.5}>
+                                  <Space size={4}>
+                                    <div style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: '50%',
+                                      backgroundColor: b.color || '#C8A977',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: isLightColor(b.color) ? '#000000' : '#FFFFFF',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      flexShrink: 0,
+                                      cursor: 'pointer',
+                                      textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                                    }}>
+                                      {b.id}
+                                    </div>
+                                    <span style={{ color: '#FFFFFF' }}>{b.name}</span>
+                                  </Space>
+                                </Tooltip>
+                              </Option>
+                            );
+                          })}
                         </Select>
                         <Button size="small" icon={<EditOutlined />}
                           onClick={() => setBoxSettingsModal(true)}
@@ -1981,6 +2095,8 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                         {[0,1,2,3,4,5,6].map(day => {
                           const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
                           const maxCount = Math.max(...heatmapData.map(c => c.count), 1);
+                          const selectedBoxColor = boxes.find(b => b.id === selectedBoxId)?.color;
+                          const boxRgb = selectedBoxColor ? hexToRgb(selectedBoxColor) : null;
                           return (
                             <div key={day} className="flex-space-between" style={{ marginBottom: 4 }}>
                               <Text className="text-titanium text-11" style={{ width: 36 }}>{dayNames[day]}</Text>
@@ -1989,7 +2105,9 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                                 const count = cell?.count || 0;
                                 const intensity = count / maxCount;
                                 const bgColor = count > 0
-                                  ? `rgba(200, 169, 119, ${0.1 + intensity * 0.6})`
+                                  ? boxRgb
+                                    ? `rgba(${boxRgb}, ${0.15 + intensity * 0.7})`
+                                    : `rgba(200, 169, 119, ${0.1 + intensity * 0.6})`
                                   : 'rgba(255,255,255,0.02)';
                                 return (
                                   <div
@@ -1999,6 +2117,10 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                                       width: '8.33%', height: 32, backgroundColor: bgColor,
                                       borderRadius: 4, display: 'flex', alignItems: 'center',
                                       justifyContent: 'center', cursor: 'pointer',
+                                      ...(selectedBoxId && count > 0 ? {
+                                        border: `2px solid ${selectedBoxColor || '#C8A977'}`,
+                                        boxShadow: `0 0 6px rgba(${boxRgb}, 0.3)`,
+                                      } : {}),
                                     }}
                                     title={count > 0 ? `${count} записей · ${cell?.revenue.toLocaleString()} ₽` : '✅ Свободно'}
                                     onClick={() => handleHeatmapCellClick(day, hour)}
@@ -2739,30 +2861,69 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         <Spin spinning={boxSettingsSaving || creatingBox}>
           {/* Create new box */}
           <Card size="small" className="card-luxury" style={{ marginBottom: 16 }}>
-            <Text className="text-white text-14 d-block mb-8">➕ Создать новый бокс</Text>
-            <Space direction="vertical" style={{ width: '100%' }} size="small">
-              <div className="flex-space-between" style={{ gap: 8 }}>
-                <Input
-                  size="small"
-                  className="input-luxury"
-                  placeholder="Название бокса"
-                  value={newBoxName}
-                  onChange={(e) => setNewBoxName(e.target.value)}
-                  style={{ flex: 1 }}
-                />
-                <Input
-                  size="small"
-                  className="input-luxury"
-                  placeholder="Цвет (#C8A977)"
-                  value={newBoxColor}
-                  onChange={(e) => setNewBoxColor(e.target.value)}
-                  style={{ width: 110 }}
-                />
+            <Text className="text-white text-14 d-block mb-8" style={{ textAlign: 'center' }}>➕ Создать новый бокс</Text>
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              {/* Капсула-предпросмотр с инлайн-вводом */}
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div
+                  style={{
+                    backgroundColor: normalizeColor(newBoxColor) || '#4DABF7',
+                    borderRadius: 30,
+                    padding: '6px 16px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    border: '2px solid rgba(255,255,255,0.15)',
+                    minWidth: 240,
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Input
+                    value={newBoxName}
+                    onChange={(e) => setNewBoxName(e.target.value)}
+                    placeholder="Название бокса"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: isLightColor(normalizeColor(newBoxColor)) ? '#000000' : '#FFFFFF',
+                      fontWeight: 600,
+                      fontSize: 16,
+                      minWidth: 100,
+                      flex: 1,
+                      outline: 'none',
+                      boxShadow: 'none',
+                    }}
+                  />
+                  <Input
+                    value={newBoxColor}
+                    onChange={(e) => setNewBoxColor(e.target.value)}
+                    placeholder="#C8A977"
+                    style={{
+                      background: 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: isLightColor(normalizeColor(newBoxColor)) ? '#000000' : '#FFFFFF',
+                      fontSize: 12,
+                      width: 80,
+                      borderRadius: 12,
+                      padding: '4px 8px',
+                      outline: 'none',
+                      boxShadow: 'none',
+                    }}
+                  />
+                  <ColorPicker
+                    value={normalizeColor(newBoxColor) || '#4DABF7'}
+                    onChange={(color) => setNewBoxColor(color.toHexString())}
+                    size="small"
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <Button
-                  size="small"
                   className="btn-gold"
                   onClick={handleCreateBox}
                   loading={creatingBox}
+                  style={{ width: 200 }}
                 >Создать</Button>
               </div>
             </Space>
@@ -2777,19 +2938,39 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <div className="flex-space-between">
                       <Space>
-                        <Text className="text-white text-14">{box.name}</Text>
+                        <Tooltip
+                          title={`Услуги: ${(box.service_ids || []).map((sid: number) => services.find(s => s.id === sid)?.name).filter(Boolean).join(', ') || 'не выбраны'}`}
+                          mouseEnterDelay={0.5}
+                        >
+                          <Text className="text-white text-14">{box.name}</Text>
+                        </Tooltip>
                         <Tag color={box.is_active ? 'green' : 'default'}>
                           {box.is_active ? 'Активен' : 'Неактивен'}
                         </Tag>
                       </Space>
-                      <Popconfirm
-                        title={`Удалить бокс «${box.name}»?`}
-                        description="Записи в этом боксе останутся, но бокс будет удалён."
-                        onConfirm={() => handleDeleteBox(box.id, box.name)}
-                        okText="Да, удалить" cancelText="Отмена" okButtonProps={{ danger: true }}
-                      >
-                        <Button size="small" icon={<DeleteOutlined />} className="btn-action-danger" />
-                      </Popconfirm>
+                      <Space>
+                        <Button
+                          icon={<EditOutlined />}
+                          onClick={() => openEditBoxModal(box)}
+                          style={{
+                            backgroundColor: 'transparent',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            color: '#C8A977',
+                            fontSize: 13,
+                            height: 32,
+                          }}
+                        >
+                          Редактировать
+                        </Button>
+                        <Popconfirm
+                          title={`Удалить бокс «${box.name}»?`}
+                          description="Записи в этом боксе останутся, но бокс будет удалён."
+                          onConfirm={() => handleDeleteBox(box.id, box.name)}
+                          okText="Да, удалить" cancelText="Отмена" okButtonProps={{ danger: true }}
+                        >
+                          <Button size="small" icon={<DeleteOutlined />} className="btn-action-danger" />
+                        </Popconfirm>
+                      </Space>
                     </div>
                     <div>
                       <Text className="text-titanium text-12 d-block mb-4">Привязанные услуги</Text>
@@ -2806,6 +2987,18 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                           <Option key={s.id} value={s.id}>{s.name}</Option>
                         ))}
                       </Select>
+                      {(boxEditServices[box.id] || []).length > 0 && (
+                        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {(boxEditServices[box.id] || []).map((sid: number) => {
+                            const svc = services.find(s => s.id === sid);
+                            return svc ? (
+                              <Tag key={svc.id} color={box.color || '#C8A977'} style={{ borderRadius: 4 }}>
+                                {svc.name}
+                              </Tag>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
                     </div>
                     <Button
                       size="small"
@@ -2820,6 +3013,78 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             </Space>
           )}
         </Spin>
+      </Modal>
+
+      {/* ===== EDIT BOX MODAL ===== */}
+      <Modal
+        title={<Text className="text-white">✏️ Редактировать бокс</Text>}
+        open={editBoxModalOpen}
+        onCancel={() => { setEditBoxModalOpen(false); setEditingBox(null); }}
+        footer={null}
+        width={480}
+        className="modal-command"
+      >
+        {editingBox && (
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <div>
+              <span className="label-field">Название</span>
+              <Input
+                size="large"
+                className="input-luxury"
+                placeholder="Название бокса"
+                value={editingBox.name}
+                onChange={(e) => setEditingBox((prev: any) => ({ ...prev, name: e.target.value }))}
+              />
+            </div>
+            <div>
+              <span className="label-field">Цвет</span>
+              <Input
+                size="large"
+                className="input-luxury"
+                placeholder="#C8A977"
+                value={editingBox.color || ''}
+                onChange={(e) => setEditingBox((prev: any) => ({ ...prev, color: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Tooltip title="Выберите услуги, которые доступны в этом боксе" mouseEnterDelay={0.5}>
+                <span className="label-field">Привязанные услуги</span>
+              </Tooltip>
+              <Select
+                mode="multiple"
+                size="large"
+                className="w-full input-luxury"
+                placeholder="Выберите услуги"
+                value={boxEditServices[editingBox.id] || []}
+                onChange={(vals) => setBoxEditServices(prev => ({ ...prev, [editingBox.id]: vals }))}
+                style={{ width: '100%' }}
+              >
+                {services.map((s) => (
+                  <Option key={s.id} value={s.id}>{s.name}</Option>
+                ))}
+              </Select>
+              {(boxEditServices[editingBox.id] || []).length > 0 && (
+                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {(boxEditServices[editingBox.id] || []).map((sid: number) => {
+                    const svc = services.find(s => s.id === sid);
+                    return svc ? (
+                      <Tag key={svc.id} color={editingBox.color || '#C8A977'} style={{ borderRadius: 4 }}>
+                        {svc.name}
+                      </Tag>
+                    ) : null;
+                  })}
+                </div>
+              )}
+            </div>
+            <Button
+              type="primary"
+              size="large"
+              className="btn-gold"
+              onClick={handleEditBox}
+              loading={boxSettingsSaving}
+            >Сохранить</Button>
+          </Space>
+        )}
       </Modal>
 
       {/* ===== HEATMAP SLOT DETAIL MODAL ===== */}
