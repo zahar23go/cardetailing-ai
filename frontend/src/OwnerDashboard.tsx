@@ -369,6 +369,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [servicesLoading, setServicesLoading] = useState(false);
   const [servicesTotal, setServicesTotal] = useState(0);
   const [servicesPage, setServicesPage] = useState(1);
+  const [allServices, setAllServices] = useState<Service[]>([]);
 
   const [users, setUsers] = useState<RfmClient[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -476,6 +477,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     fetchKpi();
     fetchAppointments();
     fetchServices();
+    fetchAllServices();
     fetchUsers();
     fetchAllUsers();
     fetchExpenses();
@@ -522,6 +524,13 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       setServicesPage(page);
     } catch { message.error('Ошибка загрузки услуг'); }
     setServicesLoading(false);
+  };
+
+  const fetchAllServices = async () => {
+    try {
+      const data = await apiFetch<{items: Service[]; total: number}>(`/api/services?skip=0&limit=500`);
+      setAllServices(data.items);
+    } catch { /* ignore */ }
   };
 
   const fetchUsers = async () => {
@@ -2785,7 +2794,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
               <Select size="large" className="w-full" placeholder="Выберите услугу"
                 value={discountForm.service_id}
                 onChange={(v) => setDiscountForm(prev => ({ ...prev, service_id: v }))}>
-                {services.map((s) => (<Option key={s.id} value={s.id}>{s.name}</Option>))}
+                {allServices.map((s) => (<Option key={s.id} value={s.id}>{s.name} — {s.price} ₽</Option>))}
               </Select>
             </div>
           )}
@@ -3050,7 +3059,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                         onChange={(vals) => setBoxEditServices(prev => ({ ...prev, [box.id]: vals }))}
                         style={{ width: '100%' }}
                       >
-                        {services.map((s) => (
+                        {allServices.map((s) => (
                           <Option key={s.id} value={s.id}>{s.name}</Option>
                         ))}
                       </Select>
@@ -3126,7 +3135,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                 onChange={(vals) => setBoxEditServices(prev => ({ ...prev, [editingBox.id]: vals }))}
                 style={{ width: '100%' }}
               >
-                {services.map((s) => (
+                {allServices.map((s) => (
                   <Option key={s.id} value={s.id}>{s.name}</Option>
                 ))}
               </Select>
