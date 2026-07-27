@@ -1749,23 +1749,28 @@ async def get_heatmap(
 
 @app.get("/api/analytics/funnel", response_model=FunnelResponse)
 async def get_funnel(
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
     current_user: dict = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Воронка продаж: конверсия по статусам."""
+    """Воронка продаж: конверсия по статусам за период (по дате создания записи)."""
     tenant_id = UUID(current_user["tenant_id"])
     now = datetime.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    if month_start.month == 12:
-        next_month = month_start.replace(year=month_start.year + 1, month=1)
+    # Определяем границы периода по created_at
+    if start_date and end_date:
+        date_from = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+        date_to = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
     else:
-        next_month = month_start.replace(month=month_start.month + 1)
+        # По умолчанию — последние 30 дней
+        date_to = now
+        date_from = date_to - timedelta(days=30)
 
     result = await db.execute(
         select(Appointment).where(
-            Appointment.start_time >= month_start,
-            Appointment.start_time < next_month,
+            Appointment.created_at >= date_from,
+            Appointment.created_at <= date_to,
             Appointment.tenant_id == tenant_id,
         )
     )

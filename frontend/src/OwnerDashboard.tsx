@@ -702,10 +702,18 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     setHeatmapModalOpen(true);
   };
 
-  const fetchFunnel = async () => {
+  const fetchFunnel = async (start?: string, end?: string) => {
     setFunnelLoading(true);
     try {
-      const data = await apiFetch<FunnelData>('/api/analytics/funnel');
+      let path = '/api/analytics/funnel';
+      const params = new URLSearchParams();
+      params.set('_t', String(Date.now())); // cache-busting
+      if (start && end) {
+        params.set('start_date', start);
+        params.set('end_date', end);
+      }
+      path += '?' + params.toString();
+      const data = await apiFetch<FunnelData>(path);
       setFunnelData(data);
     } catch { /* ignore */ }
     setFunnelLoading(false);
@@ -1995,7 +2003,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                         {funnelData && (
                           <Text className="text-titanium text-12">Конверсия: <Text className="text-gold-bold">{funnelData.conversion_rate}%</Text></Text>
                         )}
-                        <Button size="small" icon={<ReloadOutlined />} onClick={fetchFunnel} type="text" className="btn-logout" />
+                        <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchFunnel(periodStart || undefined, periodEnd || undefined)} type="text" className="btn-logout" />
                       </Space>
                     </div>
                     {funnelData && funnelData.stages.length > 0 ? (
