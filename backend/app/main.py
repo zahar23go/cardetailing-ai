@@ -2043,11 +2043,40 @@ async def delete_discount_rule(
 async def get_loyalty_points(
     current_user: dict = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
+    client_id: int | None = Query(None, description="Фильтр по ID клиента (возвращает одного)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ):
-    """Получить баланс баллов всех клиентов."""
+    """Получить баланс баллов клиентов."""
     tenant_id = UUID(current_user["tenant_id"])
+
+    if client_id is not None:
+        # Один конкретный клиент — ищем его баллы напрямую
+        points_result = await db.execute(
+            select(LoyaltyPoints).where(
+                LoyaltyPoints.client_id == client_id,
+                LoyaltyPoints.tenant_id == tenant_id,
+            )
+        )
+        lp = points_result.scalar_one_or_none()
+        user_result = await db.execute(
+            select(User).where(User.id == client_id, User.tenant_id == tenant_id)
+        )
+        user = user_result.scalar_one_or_none()
+        if not user:
+            return {"items": [], "total": 0}
+
+        return {
+            "items": [LoyaltyPointsSummary(
+                client_id=user.id,
+                full_name=user.full_name,
+                phone=user.phone,
+                balance=lp.balance if lp else 0,
+                total_earned=lp.total_earned if lp else 0,
+                total_spent=lp.total_spent if lp else 0,
+            )],
+            "total": 1,
+        }
 
     # Все клиенты тенанта (с пагинацией)
     clients_stmt = (
@@ -2065,7 +2094,7 @@ async def get_loyalty_points(
     # Их баллы
     client_ids = [c.id for c in clients]
     if not client_ids:
-        return []
+        return {"items": [], "total": 0}
 
     points_result = await db.execute(
         select(LoyaltyPoints).where(LoyaltyPoints.client_id.in_(client_ids))
@@ -2148,10 +2177,17 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
     )
     appointment = result.scalar_one_or_none()
     if not appointment:
+        print(f"[DEBUG][_auto_apply_discount] Appointment #{appointment_id} not found, skipping.")
         return
 
     now = datetime.now(timezone.utc)
     tenant_id = appointment.tenant_id
+
+    print(f"[DEBUG][_auto_apply_discount] Appointment #{appointment_id}: "
+          f"service_id={appointment.service_id}, "
+          f"total_price={appointment.total_price}, "
+          f"client_id={appointment.client_id}, "
+          f"start_time={appointment.start_time}")
 
     # Загружаем активные правила скидок (непросроченные)
     rules_result = await db.execute(
@@ -2163,11 +2199,17 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
     )
     rules = rules_result.scalars().all()
 
+    print(f"[DEBUG][_auto_apply_discount] Found {len(rules)} active/valid rules for tenant_id={tenant_id}")
+
     best_discount = 0
     best_rule = None
 
     for rule in rules:
         conditions = rule.conditions or {}
+        print(f"[DEBUG][_auto_apply_discount] Checking rule id={rule.id}, name='{rule.name}', "
+              f"type={rule.type}, service_id={rule.service_id}, "
+              f"discount={rule.discount_percent}%, "
+              f"valid_until={rule.valid_until}")
 
         if rule.type == "happy_hours":
             # Скидка на часовой слот (например, 14:00–16:00)
@@ -2238,9 +2280,12 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
         elif rule.type == "service":
             # Скидка на конкретную услугу
             if rule.service_id and rule.service_id == appointment.service_id:
+                print(f"[DEBUG][_auto_apply_discount]  → service MATCH! rule.service_id={rule.service_id} == appointment.service_id={appointment.service_id}")
                 if rule.discount_percent > best_discount:
                     best_discount = rule.discount_percent
                     best_rule = rule
+            else:
+                print(f"[DEBUG][_auto_apply_discount]  → service MISMATCH: rule.service_id={rule.service_id} vs appointment.service_id={appointment.service_id}")
 
         elif rule.type == "client":
             # Персональная скидка для клиента
@@ -2288,6 +2333,12 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
         )
         db.add(cd)
         await db.commit()
+        print(f"[DEBUG][_auto_apply_discount] ✓ Applied discount rule #{best_rule.id} '{best_rule.name}': "
+              f"{best_discount}% → {effective_discount} руб. "
+              f"Price: {original_price} → {appointment.total_price}")
+    else:
+        print(f"[DEBUG][_auto_apply_discount] ✗ No applicable discount found "
+              f"(best_rule={best_rule}, best_discount={best_discount})")
 
 
 # ========== AWARD LOYALTY POINTS ON COMPLETION ==========
@@ -3814,11 +3865,19 @@ async def refund_payment(
 # =============================================================================
 
 def _parse_date_str(value: str | None):
-    """Convert 'YYYY-MM-DD' string to datetime or None."""
+    """Convert 'YYYY-MM-DD' string to timezone-aware datetime (end of day UTC) or None.
+
+    Ensures the discount remains valid for the entire specified day regardless
+    of the server's local timezone offset.
+    """
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value)
+        dt = datetime.fromisoformat(value)
+        if dt.tzinfo is None:
+            # Treat as a date-only → end of day UTC so the discount lasts the full day
+            dt = dt.replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+        return dt
     except (ValueError, TypeError):
         return None
 

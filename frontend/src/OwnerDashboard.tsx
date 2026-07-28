@@ -398,6 +398,11 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [clientModal, setClientModal] = useState(false);
   const [clientDetail, setClientDetail] = useState<any>(null);
   const [clientLoading, setClientLoading] = useState(false);
+  const [clientPoints, setClientPoints] = useState<{
+    balance: number;
+    total_earned: number;
+    total_spent: number;
+  } | null>(null);
 
   // Financier chat state
   const [financierMessages, setFinancierMessages] = useState<{role: 'user' | 'ai'; text: string}[]>([]);
@@ -1058,9 +1063,16 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const openClientDetail = async (clientId: number) => {
     setClientLoading(true);
     setClientModal(true);
+    setClientPoints(null);
     try {
-      const data = await apiFetch(`/api/users/${clientId}`);
+      const [data, pointsData] = await Promise.all([
+        apiFetch<any>(`/api/users/${clientId}`),
+        apiFetch<{items: {balance: number; total_earned: number; total_spent: number}[]}>(`/api/loyalty/points?client_id=${clientId}`),
+      ]);
       setClientDetail(data);
+      if (pointsData.items && pointsData.items.length > 0) {
+        setClientPoints(pointsData.items[0]);
+      }
     } catch {
       message.error('Ошибка загрузки данных клиента');
       setClientModal(false);
@@ -2636,7 +2648,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       <Modal
         title={<Text className="text-white">📋 Карточка клиента</Text>}
         open={clientModal}
-        onCancel={() => { setClientModal(false); setClientDetail(null); }}
+        onCancel={() => { setClientModal(false); setClientDetail(null); setClientPoints(null); }}
         footer={null}
         width={520}
         className="modal-command"
@@ -2676,6 +2688,35 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                   </Card>
                 </Col>
               </Row>
+
+              {/* Баллы лояльности */}
+              <Card size="small" className="card-luxury" style={{ marginTop: '8px' }}>
+                <Text className="title-gold text-14 d-block mb-8">🏅 Баллы лояльности</Text>
+                {clientPoints ? (
+                  <Row gutter={[12, 12]}>
+                    <Col span={8}>
+                      <div className="text-center">
+                        <Text className="text-gold-bold text-24">{clientPoints.balance}</Text>
+                        <Text className="text-titanium d-block text-11">Баллы</Text>
+                      </div>
+                    </Col>
+                    <Col span={8}>
+                      <div className="text-center">
+                        <Text className="text-white-bold text-24">{clientPoints.total_earned}</Text>
+                        <Text className="text-titanium d-block text-11">Заработано</Text>
+                      </div>
+                    </Col>
+                    <Col span={8}>
+                      <div className="text-center">
+                        <Text className="text-white-bold text-24">{clientPoints.total_spent}</Text>
+                        <Text className="text-titanium d-block text-11">Потрачено</Text>
+                      </div>
+                    </Col>
+                  </Row>
+                ) : (
+                  <Text className="text-titanium text-12">Нет данных о баллах</Text>
+                )}
+              </Card>
 
               {clientDetail.last_visit && (
                 <Text className="text-small text-center d-block">
