@@ -1744,7 +1744,26 @@ async def get_heatmap(
     )
     boxes = boxes_result.scalars().all()
 
-    return HeatmapResponse(cells=cells, boxes=[BoxOut.model_validate(b) for b in boxes])
+    # Загружаем привязки услуг для всех боксов (как в /api/boxes)
+    box_ids = [b.id for b in boxes]
+    box_services_map: dict[int, list[int]] = {}
+    if box_ids:
+        bs_result = await db.execute(
+            select(BoxService).where(
+                BoxService.box_id.in_(box_ids),
+                BoxService.tenant_id == tenant_id,
+            )
+        )
+        for bs in bs_result.scalars().all():
+            box_services_map.setdefault(bs.box_id, []).append(bs.service_id)
+
+    out = []
+    for b in boxes:
+        bo = BoxOut.model_validate(b)
+        bo.service_ids = box_services_map.get(b.id, [])
+        out.append(bo)
+
+    return HeatmapResponse(cells=cells, boxes=out)
 
 
 @app.get("/api/analytics/funnel", response_model=FunnelResponse)

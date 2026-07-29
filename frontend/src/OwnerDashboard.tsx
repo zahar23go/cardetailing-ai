@@ -151,6 +151,7 @@ interface BoxItem {
   color?: string | null;
   sort_order: number;
   is_active: boolean;
+  service_ids: number[];
 }
 
 interface FunnelStage {
@@ -408,6 +409,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [financierMessages, setFinancierMessages] = useState<{role: 'user' | 'ai'; text: string}[]>([]);
   const [financierInput, setFinancierInput] = useState('');
   const [financierLoading, setFinancierLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true);
 
   // Expenses state
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -488,8 +490,9 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     fetchExpenses();
     fetchPL();
     fetchRevenueChart();
-    fetchHeatmap();
     fetchBoxes();
+    fetchBoxesFull();
+    fetchHeatmap();
     fetchFunnel();
     fetchRFM();
     fetchDiscounts();
@@ -603,7 +606,6 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       }
       const data = await apiFetch<{cells: HeatmapCell[]; boxes: BoxItem[]}>(path);
       setHeatmapData(data.cells);
-      if (data.boxes) setBoxes(data.boxes);
     } catch { /* ignore */ }
     setHeatmapLoading(false);
   };
@@ -611,7 +613,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const fetchBoxes = async () => {
     try {
       const data = await apiFetch<any[]>('/api/boxes');
-      setBoxes(data.map((b: any) => ({ id: b.id, name: b.name, color: b.color, sort_order: b.sort_order, is_active: b.is_active })));
+      setBoxes(data.map((b: any) => ({ id: b.id, name: b.name, color: b.color, sort_order: b.sort_order, is_active: b.is_active, service_ids: b.service_ids || [] })));
     } catch { /* ignore */ }
   };
 
@@ -677,6 +679,8 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
   const openEditBoxModal = (box: any) => {
     setEditingBox(box);
+    // Инициализируем услуги из данных бокса (приходят с API)
+    setBoxEditServices(prev => ({ ...prev, [box.id]: box.service_ids || [] }));
     setEditBoxModalOpen(true);
   };
 
@@ -696,6 +700,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       message.success('✅ Бокс обновлён');
       setEditBoxModalOpen(false);
       setEditingBox(null);
+      fetchBoxes();
       fetchBoxesFull();
       fetchHeatmap(selectedBoxId);
     } catch (e: any) {
@@ -1081,9 +1086,15 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   };
 
   /* ---------- Financier AI ---------- */
+  const handleNewDialog = () => {
+    setFinancierMessages([]);
+    setShowSuggestions(true);
+  };
+
   const handleFinancierQuestion = async () => {
     const question = financierInput.trim();
     if (!question) return;
+    setShowSuggestions(false);
     setFinancierMessages(prev => [...prev, { role: 'user', text: question }]);
     setFinancierInput('');
     setFinancierLoading(true);
@@ -1647,7 +1658,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                 display: 'flex', flexDirection: 'column', gap: '12px',
                 padding: '4px',
               }}>
-                {financierMessages.length === 0 ? (
+                {showSuggestions ? (
                   <div className="text-center" style={{ marginTop: '80px' }}>
                     <BulbOutlined className="text-gold" style={{ fontSize: '40px', opacity: 0.5 }} />
                     <Text className="text-titanium d-block text-14" style={{ marginTop: '12px' }}>
@@ -1707,6 +1718,20 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
               {/* Input area */}
               <div className="flex-space-between" style={{ gap: '8px' }}>
+                <Button
+                  icon={<PlusOutlined />}
+                  onClick={handleNewDialog}
+                  style={{
+                    backgroundColor: '#232A33',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#C8A977',
+                    borderRadius: '20px',
+                    height: '46px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Новый диалог
+                </Button>
                 <Input.TextArea
                   className="input-luxury"
                   placeholder="Спросите AI-финансиста..."
@@ -2108,8 +2133,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                           }}
                         >
                           {boxes.filter(b => b.is_active !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map((b) => {
-                            const boxFull = boxesFull.find((bf: any) => bf.id === b.id);
-                            const boxServiceNames = (boxFull?.service_ids || [])
+                            const boxServiceNames = (b.service_ids || [])
                               .map((sid: number) => services.find(s => s.id === sid)?.name)
                               .filter(Boolean)
                               .join(', ');
