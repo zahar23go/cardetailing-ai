@@ -1,6 +1,8 @@
 /* ============================================
-   THEME — Цвета и переменные (Глава 13.2)
+   THEME — Цвета и переменные
    ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Montserrat:wght@400;700&display=swap');
 
 :root {
   /* Основные цвета */
@@ -8,39 +10,43 @@
   --color-carbon: #13161A;
   --color-elevated: #1A1E23;
   --color-divider: #232A33;
-  
-  /* Текст */
   --color-white: #FFFFFF;
   --color-titanium: #AAB2BF;
-  
-  /* Акцент */
   --color-gold: #C8A977;
   --color-gold-hover: #D5B98D;
   --color-gold-shadow: rgba(200, 169, 119, 0.15);
-  
-  /* Статусы */
   --color-success: #0F5D46;
   --color-warning: #B76A29;
-  
-  /* Скругления (уменьшены) */
   --radius-card: 24px;
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
   --radius-xs: 6px;
-  
-  /* Тени */
   --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(200, 169, 119, 0.03);
   --shadow-gold: 0 20px 40px rgba(200, 169, 119, 0.15);
   --shadow-gold-hover: 0 20px 50px rgba(200, 169, 119, 0.25);
-  
-  /* Шрифты */
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  
-  /* Отступы (уменьшены) */
+  --font-family: 'Manrope', 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 12px;
   --spacing-lg: 16px;
   --spacing-xl: 24px;
+
+  /* Совместимость со старыми nd-* токенами */
+  --nd-bg: #0B0D10;
+  --nd-surface: #13161A;
+  --nd-elevated: #1A1E23;
+  --nd-sidebar: #0B0D10;
+  --nd-border: #232A33;
+  --nd-primary: #C8A977;
+  --nd-primary-hover: #D5B98D;
+  --nd-secondary: #A8844F;
+  --nd-secondary-hover: #C8A977;
+  --nd-success: #27AE60;
+  --nd-warning: #B76A29;
+  --nd-danger: #E74C3C;
+  --nd-text: #FFFFFF;
+  --nd-muted: #AAB2BF;
+  --font-header: 'Manrope', sans-serif;
+  --font-body: 'Manrope', sans-serif;
 }

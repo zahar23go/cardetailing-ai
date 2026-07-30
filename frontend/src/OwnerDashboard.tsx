@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Typography, Card, Row, Col, Statistic, Table, Button, Tag, Space, Tabs,
+  Typography, Card, Row, Col, Statistic, Table, Button, Tag, Space, Tabs, Divider,
   message, Modal, Select, Input, InputNumber, Popconfirm, Badge, Layout, List,
   Empty, Spin, Tooltip, DatePicker, TimePicker, Switch, ColorPicker,
 } from 'antd';
@@ -12,7 +12,9 @@ import {
   PlusOutlined, LogoutOutlined, ReloadOutlined, PhoneOutlined,
   BulbOutlined, SendOutlined, AreaChartOutlined,
   GiftOutlined, StarOutlined, BellOutlined,
-  BarChartOutlined,
+  BarChartOutlined, HomeOutlined, FileTextOutlined,
+  CarOutlined, UserOutlined, SettingOutlined,
+  CameraOutlined,
 } from '@ant-design/icons';
 import NotificationBell from './components/NotificationBell';
 import NotificationList from './components/NotificationList';
@@ -28,7 +30,7 @@ import dayjs from 'dayjs';
 
 const { Text } = Typography;
 const { TabPane } = Tabs;
-const { Header, Content } = Layout;
+const { Header, Content, Sider } = Layout;
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -1115,18 +1117,42 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
      ============================================================ */
   const formatCurrency = (val: number) => `${val.toLocaleString()} ₽`;
 
+  // sidebar items
+  const sidebarItems = [
+    { key: 'overview', icon: <HomeOutlined />, label: 'Обзор' },
+    { key: 'appointments', icon: <FileTextOutlined />, label: 'Записи' },
+    { key: 'users', icon: <TeamOutlined />, label: 'Пользователи' },
+    { key: 'services', icon: <SettingOutlined />, label: 'Услуги' },
+    { key: 'boxes', icon: <CarOutlined />, label: 'Боксы' },
+    { key: 'financier', icon: <BulbOutlined />, label: 'AI Финансист' },
+    { key: 'finances', icon: <DollarOutlined />, label: 'Финансы' },
+    { key: 'analytics', icon: <AreaChartOutlined />, label: 'Аналитика' },
+    { key: 'calendar', icon: <CalendarOutlined />, label: 'Календарь' },
+    { key: 'notifications', icon: <BellOutlined />, label: 'Уведомления' },
+  ];
+
+  const bottomNavItems = [
+    { key: 'overview', icon: <HomeOutlined />, label: 'Главная' },
+    { key: 'appointments', icon: <FileTextOutlined />, label: 'Записи' },
+    { key: 'services', icon: <SettingOutlined />, label: 'Услуги' },
+    { key: 'financier', icon: <BulbOutlined />, label: 'AI' },
+    { key: 'users', icon: <UserOutlined />, label: 'Профиль' },
+  ];
+
   return (
-    <Layout>
-      {/* HEADER */}
-      <Header className="header-command">
+    <Layout className="client-layout">
+      {/* Мобильный хедер */}
+      <Header className="header-mobile">
+        <Text className="title-gold">CAR DETAİLİNG AI</Text>
+        <Text className="text-titanium">ВАШ ДЕТЕЙЛИНГ</Text>
+      </Header>
+
+      {/* Десктоп хедер */}
+      <Header className="header-desktop">
         <Space>
           <CrownOutlined className="text-gold icon-command" />
-          <Text className="title-gold title-command">
-            CarDetailing AI
-          </Text>
-          <Tag color="gold" className="tag-category">
-            Command Center
-          </Tag>
+          <Text className="title-gold title-command">CarDetailing AI</Text>
+          <Tag color="gold" className="tag-category">Command Center</Tag>
         </Space>
         <Space size="middle">
           <Text className="text-titanium">👑 {user.full_name}</Text>
@@ -1137,8 +1163,29 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         </Space>
       </Header>
 
-      {/* CONTENT */}
-      <Content className="content-command">
+      <Layout>
+        {/* Сайдбар (десктоп) */}
+        <Sider
+          className="sidebar"
+          breakpoint="md"
+          collapsedWidth={0}
+          width={220}
+          trigger={null}
+        >
+          {sidebarItems.map(item => (
+            <button
+              key={item.key}
+              className={`sidebar-item${activeTab === item.key ? ' active' : ''}`}
+              onClick={() => { setActiveTab(item.key); }}
+            >
+              <span className="sidebar-icon">{item.icon}</span>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </Sider>
+
+        {/* CONTENT */}
+        <Content className="client-content">
         <Tabs
           activeKey={activeTab}
           onChange={(key) => { setActiveTab(key); }}
@@ -1146,6 +1193,173 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         >
           {/* ===== TAB 1: OVERVIEW ===== */}
           <TabPane tab={<span><CrownOutlined /> Обзор</span>} key="overview">
+            {/* Карточка авто + AI + быстрые действия */}
+            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+              <Col xs={24} md={16}>
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <Card className="card-luxury client-car-card">
+                    <Row justify="space-between" align="top">
+                      <Col>
+                        <Text className="text-white car-title">
+                          {kpi?.total_clients ? 'BMW X5' : '—'}
+                        </Text>
+                        <div style={{ marginTop: 2 }}>
+                          <Text className="text-titanium car-subtitle">
+                            2024 · Черный сапфир · A777AA 77
+                          </Text>
+                        </div>
+                        <div style={{ marginTop: 8 }}>
+                          <Text className="car-status">✔ Автомобиль в идеальном состоянии</Text>
+                        </div>
+                      </Col>
+                      <Col>
+                        <Button
+                          size="small"
+                          className="btn-gold-secondary"
+                          onClick={() => setActiveTab('appointments')}
+                          style={{ width: 'auto', height: 32, fontSize: 12 }}
+                        >Записаться</Button>
+                      </Col>
+                    </Row>
+                    <Divider className="divider-dim" />
+                    <div>
+                      <Text className="text-titanium car-service-label">СЛЕДУЮЩЕЕ ОБСЛУЖИВАНИЕ</Text>
+                      <div className="flex-space-between" style={{ marginTop: 6 }}>
+                        <div>
+                          <Text className="text-white car-service-date">25 ИЮНЯ, 11:00</Text>
+                          <Text className="text-titanium d-block car-service-name">Комплекс Премиум</Text>
+                        </div>
+                        <Button
+                          size="small"
+                          className="btn-gold-secondary"
+                          style={{ width: 'auto', height: 32, fontSize: 12 }}
+                        >Изменить</Button>
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
+
+                {/* Кнопка "Записаться" (только моб) */}
+                <div className="d-mobile-only" style={{ marginTop: 12 }}>
+                  <Button
+                    type="primary" size="large"
+                    className="btn-gold"
+                    onClick={() => setActiveTab('appointments')}
+                  >Записаться</Button>
+                </div>
+
+                {/* AI Детейлер */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.15 }}
+                  style={{ marginTop: 20 }}
+                >
+                  <Card className="card-luxury">
+                    <Row align="middle" style={{ marginBottom: 12 }}>
+                      <Col flex="auto">
+                        <Text className="title-gold text-16">🤖 AI ДЕТЕЙЛЕР</Text>
+                        <Text className="text-titanium d-block text-13">
+                          Что хотите сделать с автомобилем?
+                        </Text>
+                      </Col>
+                      <Col>
+                        <BulbOutlined className="text-gold" style={{ fontSize: 28 }} />
+                      </Col>
+                    </Row>
+                    <div className="ai-chips">
+                      {['Мойка','Полировка','Керамика','Химчистка'].map((chip) => (
+                        <Button key={chip} className="btn-gold-secondary">{chip}</Button>
+                      ))}
+                    </div>
+                  </Card>
+                </motion.div>
+
+                {/* Быстрые действия */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.2 }}
+                  style={{ marginTop: 16 }}
+                >
+                  <Row gutter={[12, 12]}>
+                    {[
+                      { icon: <CrownOutlined />, label: 'KPI', key: 'overview' },
+                      { icon: <CalendarOutlined />, label: 'Записи', key: 'appointments' },
+                      { icon: <SettingOutlined />, label: 'Услуги', key: 'services' },
+                      { icon: <AreaChartOutlined />, label: 'Аналитика', key: 'analytics' },
+                    ].map((action) => (
+                      <Col xs={12} key={action.key}>
+                        <Card
+                          className="card-luxury quick-action-card"
+                          hoverable
+                          onClick={() => setActiveTab(action.key)}
+                          styles={{ body: { padding: '16px 8px' } }}
+                        >
+                          <span className="quick-action-icon text-gold">{action.icon}</span>
+                          <span className="quick-action-label text-white d-block">{action.label}</span>
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                </motion.div>
+              </Col>
+
+              <Col xs={0} md={8}>
+                <motion.div
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.25 }}
+                >
+                  <div className="analytics-section">
+                    <Row align="middle" style={{ marginBottom: 16 }}>
+                      <Col flex="auto">
+                        <Text className="text-white analytics-title">📊 Аналитика по услугам</Text>
+                      </Col>
+                      <Col>
+                        <BarChartOutlined className="text-gold" style={{ fontSize: 32 }} />
+                      </Col>
+                    </Row>
+                    <div className="mb-12">
+                      <Text className="text-titanium text-13">Выручка за месяц</Text>
+                      <div className="flex-space-between" style={{ marginTop: 4 }}>
+                        <Text className="stat-value-gold">
+                          {services.reduce((sum: number, s: Service) => sum + (s.price || 0), 0).toLocaleString()} ₽
+                        </Text>
+                        <Tag className="tag-category">+12%</Tag>
+                      </div>
+                    </div>
+                    <div className="mb-12">
+                      <Text className="text-titanium text-13">Активных клиентов</Text>
+                      <div style={{ marginTop: 4 }}>
+                        <Text className="stat-value-white">{kpi?.total_clients || 0}</Text>
+                      </div>
+                    </div>
+                    <div>
+                      <Text className="text-titanium text-13">Записи сегодня</Text>
+                      <div style={{ marginTop: 4 }}>
+                        <Text className="stat-value-white">{kpi?.today_appointments || 0}</Text>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.3 }}
+                >
+                  <Button
+                    type="primary" size="large"
+                    className="btn-gold"
+                    onClick={() => setActiveTab('appointments')}
+                    style={{ height: 52, fontSize: 16 }}
+                  >Записаться</Button>
+                </motion.div>
+              </Col>
+            </Row>
+
+            {/* KPI */}
             <Spin spinning={kpiLoading}>
               <Row gutter={[16, 16]}>
                 <Col xs={12} sm={6}>
@@ -3269,6 +3483,21 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
           />
         )}
       </Modal>
+      </Layout>
+
+      {/* Нижняя навигация (моб) */}
+      <div className="bottom-nav">
+        {bottomNavItems.map(item => (
+          <button
+            key={item.key}
+            className={`bottom-nav-item${activeTab === item.key ? ' active' : ''}`}
+            onClick={() => { setActiveTab(item.key); }}
+          >
+            <span className="bottom-nav-icon">{item.icon}</span>
+            <span className="bottom-nav-label">{item.label}</span>
+          </button>
+        ))}
+      </div>
     </Layout>
   );
 }
