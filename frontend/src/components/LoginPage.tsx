@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { motion } from 'framer-motion';
+import { useBrand } from '../design';
+import { GoldButton, GhostGoldButton, GoldField } from '../design/components/BrandControls';
 
 const orbPulse = keyframes`
   0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 8px rgba(212, 168, 75, 0.45)); }
@@ -22,9 +24,7 @@ const Shell = styled.div`
   justify-content: center;
   padding: 24px 14px;
   font-family: ${({ theme }) => theme.fonts.primary};
-  background:
-    radial-gradient(ellipse 70% 50% at 50% 20%, #2a2218 0%, transparent 55%),
-    #050505;
+  background: ${({ theme }) => theme.brand.gradients.pageAtmosphere};
 `;
 
 /* Корпус телефона */
@@ -32,16 +32,11 @@ const Phone = styled(motion.div)`
   position: relative;
   width: 100%;
   max-width: 390px;
-  border-radius: 48px;
+  border-radius: ${({ theme }) => theme.brand.radii.phone};
   padding: 11px;
   background: linear-gradient(145deg, #3a3a3c 0%, #1c1c1e 40%, #0a0a0a 100%);
-  box-shadow:
-    0 40px 90px rgba(0, 0, 0, 0.75),
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: ${({ theme }) => theme.brand.shadows.phone};
 
-  /* тонкие «кнопки» справа — без левого хрома */
   &::after {
     content: '';
     position: absolute;
@@ -136,16 +131,13 @@ const Brand = styled.header`
 
   h1 {
     margin: 0;
-    font-family: 'Cinzel', serif;
+    font-family: ${({ theme }) => theme.fonts.display};
     font-size: 12.5px;
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     white-space: nowrap;
-    background: linear-gradient(180deg, #f5e6c0 0%, #d4a84b 50%, #a67c2d 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: ${({ theme }) => theme.brand.colors.accent.solid};
   }
 
   .orb {
@@ -234,39 +226,6 @@ const FormPad = styled(motion.div)`
   flex: 1;
 `;
 
-const Field = styled.label`
-  display: block;
-  margin-bottom: 12px;
-
-  span {
-    display: block;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: #d4a84b;
-    margin-bottom: 7px;
-  }
-
-  input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 14px 15px;
-    border-radius: 14px;
-    border: 1px solid rgba(212, 168, 75, 0.22);
-    background: #121214;
-    color: #fff;
-    font-size: 15px;
-    font-family: inherit;
-    outline: none;
-
-    &:focus {
-      border-color: #d4a84b;
-      box-shadow: 0 0 0 3px rgba(212, 168, 75, 0.16);
-    }
-  }
-`;
-
 const PasswordWrap = styled.div`
   position: relative;
 
@@ -281,52 +240,12 @@ const PasswordWrap = styled.div`
     transform: translateY(-50%);
     border: none;
     background: transparent;
-    color: #d4a84b;
+    color: ${({ theme }) => theme.brand.colors.accent.solid};
     cursor: pointer;
     font-size: 12px;
     font-weight: 700;
     font-family: inherit;
   }
-`;
-
-const Submit = styled(motion.button)`
-  width: 100%;
-  margin-top: 6px;
-  border: none;
-  border-radius: 16px;
-  padding: 16px;
-  font-family: 'Cinzel', serif;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #1a1408;
-  cursor: pointer;
-  background: linear-gradient(
-    180deg,
-    #f0d9a0 0%,
-    #e0bc5a 30%,
-    #d4a84b 55%,
-    #b8892e 80%,
-    #8f6a22 100%
-  );
-  box-shadow:
-    0 14px 32px rgba(184, 137, 46, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
-`;
-
-const RegisterBtn = styled.button`
-  width: 100%;
-  margin-top: 11px;
-  border: 1px solid rgba(212, 168, 75, 0.4);
-  background: transparent;
-  color: #e0bc5a;
-  border-radius: 16px;
-  padding: 13px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
 `;
 
 const HomeBar = styled.div`
@@ -370,6 +289,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
+  const { brand } = useBrand();
   const [phone, setPhone] = useState('+79999999999');
   const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
@@ -395,19 +315,19 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
           <Brand>
             <div className="left">
               <span className="mark">
-                <img src="/images/header-car-logo.png?v=5" alt="" />
+                <img src={`${brand.assets.logoCar}?v=5`} alt="" />
               </span>
               <h1>CAR DETAILING AI</h1>
             </div>
             <div className="orb">
-              <img src="/images/ai-orb.png?v=2" alt="" />
+              <img src={`${brand.assets.aiOrb}?v=2`} alt="" />
             </div>
           </Brand>
 
           <Hairline />
 
           <Hero>
-            <img className="car" src="/images/login-car.png?v=14" alt="BMW X5" />
+            <img className="car" src={`${brand.assets.heroCar}?v=14`} alt="BMW X5" />
             <div className="vignette" />
             <div className="shine" />
           </Hero>
@@ -417,7 +337,7 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.12, duration: 0.4 }}
           >
-            <Field>
+            <GoldField $theme={brand}>
               <span>Телефон</span>
               <input
                 type="tel"
@@ -425,9 +345,9 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+7 (999) 999-99-99"
               />
-            </Field>
+            </GoldField>
 
-            <Field>
+            <GoldField $theme={brand}>
               <span>Пароль</span>
               <PasswordWrap>
                 <input
@@ -440,15 +360,26 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
                   {showPassword ? 'Скрыть' : 'Показать'}
                 </button>
               </PasswordWrap>
-            </Field>
+            </GoldField>
 
-            <Submit type="button" whileTap={{ scale: 0.975 }} onClick={() => onLogin?.(phone, password)}>
+            <GoldButton
+              $theme={brand}
+              type="button"
+              style={{ marginTop: 6 }}
+              whileTap={{ scale: 0.975 }}
+              onClick={() => onLogin?.(phone, password)}
+            >
               Войти
-            </Submit>
+            </GoldButton>
 
-            <RegisterBtn type="button" onClick={() => onRegister?.()}>
+            <GhostGoldButton
+              $theme={brand}
+              type="button"
+              style={{ marginTop: 11 }}
+              onClick={() => onRegister?.()}
+            >
               Зарегистрироваться
-            </RegisterBtn>
+            </GhostGoldButton>
           </FormPad>
 
           <HomeBar />

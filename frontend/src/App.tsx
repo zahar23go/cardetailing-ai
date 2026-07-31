@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import LoginPage from './components/LoginPage';
 import MainPage from './components/MainPage';
+import BrandingPage from './components/BrandingPage';
 import OwnerDashboard from './OwnerDashboard';
 import MasterDashboard from './MasterDashboard';
 
@@ -80,6 +81,7 @@ function App() {
 
   return (
     <Routes>
+      <Route path="/branding" element={<BrandingPage />} />
       <Route
         path="/main"
         element={

@@ -49,4 +49,13 @@
   --nd-muted: #AAB2BF;
   --font-header: 'Manrope', sans-serif;
   --font-body: 'Manrope', sans-serif;
+  --font-display: 'Cinzel', 'Times New Roman', serif;
+
+  /* Brand controls (перезаписываются BrandProvider) */
+  --brand-gold-button-bg: linear-gradient(180deg, #C49A3C 0%, #E0BC5A 32%, #D4A84B 55%, #B8892E 82%, #8F6A22 100%);
+  --brand-gold-button-color: #FFFFFF;
+  --brand-gold-button-shadow: 0 16px 36px rgba(184, 137, 46, 0.55);
+  --brand-input-bg: #121214;
+  --brand-input-border: rgba(212, 168, 75, 0.35);
+  --brand-label: #D4A84B;
 }

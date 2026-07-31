@@ -18,15 +18,15 @@
 
 /* --- КНОПКИ (Buttons) --- */
 .btn-gold {
-  background-color: var(--color-gold);
+  background: var(--brand-gold-button-bg, var(--color-gold));
   border: none;
   border-radius: var(--radius-lg);
-  color: var(--color-graphite);
+  color: var(--brand-gold-button-color, var(--color-graphite));
   font-weight: 600;
   font-size: 16px;
   height: 48px;
   padding: 0 24px;
-  box-shadow: var(--shadow-gold);
+  box-shadow: var(--brand-gold-button-shadow, var(--shadow-gold));
   transition: all 0.3s ease;
   cursor: pointer;
   width: 100%;
@@ -34,7 +34,7 @@
 }
 
 .btn-gold:hover {
-  background-color: var(--color-gold-hover);
+  filter: brightness(1.06);
   box-shadow: var(--shadow-gold-hover);
   transform: translateY(-1px);
 }

@@ -2,6 +2,7 @@
 import styled, { keyframes } from 'styled-components';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useBrand } from '../design';
 
 /* ========== АНИМАЦИИ ========== */
 const orbPulse = keyframes`
@@ -825,6 +826,7 @@ export interface MainPageProps {
 
 export default function MainPage({ userName = 'Алексей' }: MainPageProps) {
   const navigate = useNavigate();
+  const { brand } = useBrand();
   const [carIndex, setCarIndex] = useState(0);
   const [activeService, setActiveService] = useState<string | null>(null);
   const [activeNav, setActiveNav] = useState('home');
@@ -833,7 +835,7 @@ export default function MainPage({ userName = 'Алексей' }: MainPageProps)
 
   const go = (tab: string) => {
     setActiveNav(tab);
-    if (tab === 'profile') navigate('/');
+    if (tab === 'profile') navigate('/branding');
   };
 
   return (
@@ -841,7 +843,7 @@ export default function MainPage({ userName = 'Алексей' }: MainPageProps)
       <Phone>
         <Header>
           <Brand>
-            <img className="logo" src="/images/header-car-logo.png?v=5" alt="" />
+            <img className="logo" src={`${brand.assets.logoCar}?v=5`} alt="" />
             <div className="name">CAR DETAILING AI</div>
           </Brand>
           <HeaderActions>
@@ -849,8 +851,8 @@ export default function MainPage({ userName = 'Алексей' }: MainPageProps)
               <IconBell />
               <span className="dot" />
             </BellBtn>
-            <OrbBtn type="button" aria-label="AI Детейлер">
-              <img src="/images/ai-orb.png?v=2" alt="" />
+            <OrbBtn type="button" aria-label="Брендинг" onClick={() => navigate('/branding')}>
+              <img src={`${brand.assets.aiOrb}?v=2`} alt="" />
             </OrbBtn>
           </HeaderActions>
         </Header>

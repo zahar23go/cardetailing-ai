@@ -1,0 +1,24 @@
+---
+description: Design system — два сохранённых luxury-дизайна и именованные бренд-компоненты
+globs: frontend/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Brand / Design System
+
+В проекте зафиксированы **два дизайна** для кастомизации под бренд:
+
+1. **`goldMetal`** — референс `/design-refs/gold-metal.png` (металл, тёмный текст на кнопке)
+2. **`goldGlow`** — референс `/design-refs/gold-glow.png` (свечение, белый текст на кнопке)
+
+## Обязательно
+
+- Стили кнопок/полей/цветов/шрифтов/скруглений брать из `frontend/src/design` (`getBrandTheme`, `GoldButton`, `GhostGoldButton`, `GoldField`).
+- Не дублировать золотые градиенты хардкодом на страницах.
+- Выбор пресета: `ACTIVE_BRAND_THEME` или `localStorage.brandTheme`.
+- `SilverButton` / тема `silver` — зарезервированы под следующий бренд.
+- Документация: `frontend/src/design/DESIGN_SYSTEM.md`.
+
+## Цель босса
+
+Единый стиль на всех страницах → ручная настройка на релизе через файл темы → позже страница брендинга для каждого клиента.
