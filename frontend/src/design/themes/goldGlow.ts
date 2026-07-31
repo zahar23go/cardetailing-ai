@@ -12,41 +12,38 @@ export const goldGlowTheme: BrandTheme = {
 
   colors: {
     bg: {
-      page: '#050505',
+      page: '#1A1D23',
       phone: '#000000',
-      input: '#121214',
-      elevated: '#141312',
+      input: '#282C34',
+      elevated: '#282C34',
     },
     text: {
-      primary: '#FFFFFF',
-      secondary: '#AAB2BF',
-      onAccent: '#FFFFFF',
-      label: '#D4A84B',
+      primary: '#F0F2F5',
+      secondary: '#9BA3B5',
+      onAccent: '#1A1D23',
+      label: '#D4AF37',
     },
     accent: {
-      solid: '#D4A84B',
-      soft: '#E0BC5A',
-      muted: 'rgba(212, 168, 75, 0.15)',
-      border: 'rgba(212, 168, 75, 0.4)',
+      solid: '#D4AF37',
+      soft: '#E5C04A',
+      muted: 'rgba(212, 175, 55, 0.18)',
+      border: 'rgba(212, 175, 55, 0.45)',
     },
     danger: '#E74C3C',
     success: '#0F5D46',
   },
 
   gradients: {
-    goldButton:
-      'linear-gradient(180deg, #C49A3C 0%, #E0BC5A 32%, #D4A84B 55%, #B8892E 82%, #8F6A22 100%)',
+    goldButton: '#D4AF37',
     hairline:
-      'linear-gradient(90deg, transparent, rgba(212,168,75,0.35) 30%, rgba(240,217,160,0.55) 50%, rgba(212,168,75,0.35) 70%, transparent)',
-    pageAtmosphere:
-      'radial-gradient(ellipse 80% 55% at 50% 18%, #2a2218 0%, transparent 55%), linear-gradient(180deg, #0c0b0a 0%, #050505 45%, #000 100%)',
+      'linear-gradient(90deg, transparent, rgba(212,175,55,0.35) 30%, rgba(229,192,74,0.55) 50%, rgba(212,175,55,0.35) 70%, transparent)',
+    pageAtmosphere: '#1A1D23',
   },
 
   shadows: {
-    goldButton:
-      '0 16px 36px rgba(184, 137, 46, 0.55), 0 0 0 1px rgba(240, 217, 160, 0.25), inset 0 1px 0 rgba(255,255,255,0.45)',
-    phone: '0 30px 80px rgba(0,0,0,0.85), 0 0 0 1px rgba(212,168,75,0.08)',
-    inputFocus: '0 0 0 3px rgba(212, 168, 75, 0.18), 0 8px 24px rgba(0,0,0,0.35)',
+    goldButton: '0 8px 24px rgba(212, 175, 55, 0.4)',
+    phone: '0 30px 80px rgba(0,0,0,0.85), 0 0 0 1px rgba(212,175,55,0.08)',
+    inputFocus: '0 0 0 3px rgba(212, 175, 55, 0.18), 0 8px 24px rgba(0,0,0,0.35)',
   },
 
   fonts: {

@@ -585,8 +585,8 @@
 
 /* --- Боковое меню (десктоп) --- */
 .sidebar {
-  background-color: var(--color-carbon) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background-color: var(--color-sidebar, #15181E) !important;
+  border-right: 1px solid var(--color-divider, #3B4049);
 }
 
 .sidebar .ant-layout-sider-children {
@@ -2200,15 +2200,27 @@
 .mob-nav-text {
   font-size: 11px;
 }
-/* ========== ADMIN COMMAND CENTER (gold) ========== */
+/* ========== ADMIN COMMAND CENTER (graphite hierarchy) ========== */
 .admin-layout {
-  background: radial-gradient(ellipse at 20% 0%, #1a1610 0%, #0a0a0a 45%, #000 100%) !important;
+  background: var(--color-graphite, #1A1D23) !important;
   min-height: 100vh;
+  color: var(--color-white, #F0F2F5);
+}
+
+.admin-layout .ant-layout,
+.admin-layout .admin-body-layout {
+  background: var(--color-graphite, #1A1D23) !important;
+}
+
+.admin-layout .ant-layout-content,
+.admin-content.client-content {
+  background: var(--color-graphite, #1A1D23) !important;
+  color: var(--color-white, #F0F2F5);
 }
 
 .admin-header.header-desktop {
-  background: rgba(10, 10, 12, 0.92) !important;
-  border-bottom: 1px solid rgba(212, 168, 75, 0.18);
+  background: var(--color-header, #1E2128) !important;
+  border-bottom: 1px solid var(--color-divider, #3B4049);
   backdrop-filter: blur(10px);
 }
 
@@ -2261,35 +2273,33 @@
   height: auto !important;
   padding: 6px 14px !important;
   border-radius: 999px !important;
-  border: 1px solid rgba(212, 168, 75, 0.45) !important;
-  background: transparent !important;
-  color: #f0d9a0 !important;
+  border: 1px solid var(--color-divider, #E2E5EB) !important;
+  background: var(--btn-secondary-bg, #E8EAED) !important;
+  color: var(--btn-secondary-text, #1A1D23) !important;
   font-weight: 600 !important;
   letter-spacing: 0.03em;
-  box-shadow: inset 0 0 0 1px rgba(166, 124, 45, 0.15);
+  box-shadow: none;
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .admin-header-btn.ant-btn:hover {
-  background: rgba(212, 168, 75, 0.12) !important;
-  border-color: rgba(240, 217, 160, 0.7) !important;
-  color: #fff1c8 !important;
-  box-shadow: 0 0 12px rgba(212, 168, 75, 0.2);
+  background: var(--btn-secondary-hover, #D8DCE3) !important;
+  border-color: var(--btn-secondary-hover, #D8DCE3) !important;
+  color: var(--btn-secondary-text, #1A1D23) !important;
+  box-shadow: none;
 }
 
 .admin-header-btn-logout.ant-btn {
-  background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 55%, #a67c2d 100%) !important;
-  border-color: rgba(240, 217, 160, 0.85) !important;
-  color: #1a1610 !important;
-  box-shadow:
-    0 0 0 1px rgba(166, 124, 45, 0.35),
-    0 4px 12px rgba(212, 168, 75, 0.22);
+  background: var(--color-gold, #D4AF37) !important;
+  border-color: var(--color-gold, #D4AF37) !important;
+  color: #1A1D23 !important;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.28);
 }
 
 .admin-header-btn-logout.ant-btn:hover {
   filter: brightness(1.06);
-  color: #1a1610 !important;
-  background: linear-gradient(180deg, #f5e2b0 0%, #dbb255 55%, #b38835 100%) !important;
+  color: #1A1D23 !important;
+  background: var(--color-gold-hover, #E5C04A) !important;
 }
 
 .admin-header-btn-logout.ant-btn .anticon {
@@ -2302,17 +2312,17 @@
   gap: 8px;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(212, 168, 75, 0.45);
-  background: linear-gradient(180deg, rgba(40, 34, 22, 0.95), rgba(18, 16, 12, 0.98));
-  color: #f0d9a0;
+  border: 1px solid var(--color-gold, #D4AF37);
+  background: var(--btn-secondary-bg, #E8EAED);
+  color: var(--color-gold, #D4AF37);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  box-shadow: inset 0 0 0 1px rgba(166, 124, 45, 0.18);
+  box-shadow: none;
 }
 
 .admin-header-user .anticon {
-  color: var(--color-gold, #d4a84b);
+  color: var(--color-gold, #D4AF37);
   font-size: 14px;
 }
 
@@ -2553,13 +2563,13 @@
 }
 
 .admin-sidebar.sidebar {
-  background: rgba(12, 12, 14, 0.95) !important;
-  border-right: 1px solid rgba(212, 168, 75, 0.12) !important;
+  background: var(--color-sidebar, #15181E) !important;
+  border-right: 1px solid var(--color-divider, #3B4049) !important;
 }
 
 .admin-content.client-content {
   padding: 20px 22px 96px;
-  background: transparent;
+  background: var(--color-graphite, #1A1D23) !important;
 }
 
 .admin-tabs > .ant-tabs-nav {
@@ -2567,19 +2577,19 @@
 }
 
 .admin-tabs > .ant-tabs-nav::before {
-  border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+  border-bottom-color: var(--color-divider, #3B4049) !important;
 }
 
 .admin-tabs .ant-tabs-tab {
-  color: var(--color-titanium, #aab2bf) !important;
+  color: var(--color-titanium, #9BA3B5) !important;
 }
 
 .admin-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: var(--color-gold, #d4a84b) !important;
+  color: var(--color-gold, #D4AF37) !important;
 }
 
 .admin-tabs .ant-tabs-ink-bar {
-  background: var(--color-gold, #d4a84b) !important;
+  background: var(--color-gold, #D4AF37) !important;
 }
 
 @media (min-width: 768px) {
@@ -2592,7 +2602,7 @@
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--color-gold, #d4a84b);
+  color: var(--color-gold, #D4AF37);
   margin-bottom: 6px;
 }
 
@@ -2622,35 +2632,33 @@
 
 .admin-overview-hero .ant-btn.btn-gold-secondary,
 .admin-layout .ant-btn.btn-gold-secondary {
-  background: rgba(18, 16, 12, 0.92) !important;
-  border: 1px solid rgba(212, 168, 75, 0.5) !important;
-  color: #f0d9a0 !important;
-  font-weight: 600 !important;
-  box-shadow: inset 0 0 0 1px rgba(166, 124, 45, 0.18);
+  background: var(--btn-secondary-bg, #E8EAED) !important;
+  border: 1px solid var(--color-divider, #E2E5EB) !important;
+  color: var(--btn-secondary-text, #1A1D23) !important;
+  box-shadow: none !important;
 }
 
 .admin-overview-hero .ant-btn.btn-gold-secondary:hover,
 .admin-layout .ant-btn.btn-gold-secondary:hover {
-  background: rgba(212, 168, 75, 0.14) !important;
-  border-color: rgba(240, 217, 160, 0.75) !important;
-  color: #fff1c8 !important;
+  background: var(--btn-secondary-hover, #D8DCE3) !important;
+  border-color: var(--btn-secondary-hover, #D8DCE3) !important;
+  color: var(--btn-secondary-text, #1A1D23) !important;
 }
 
 .admin-overview-hero .ant-btn.btn-gold,
 .admin-layout .ant-btn.btn-gold {
-  background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 55%, #a67c2d 100%) !important;
-  border: 1px solid rgba(240, 217, 160, 0.85) !important;
-  color: #1a1610 !important;
-  font-weight: 700 !important;
-  box-shadow:
-    0 0 0 1px rgba(166, 124, 45, 0.35),
-    0 4px 14px rgba(212, 168, 75, 0.22) !important;
+  background: #D4AF37 !important;
+  border: 1px solid #D4AF37 !important;
+  color: #1A1D23 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 8px 24px rgba(212, 175, 55, 0.28) !important;
 }
 
 .admin-overview-hero .ant-btn.btn-gold:hover,
 .admin-layout .ant-btn.btn-gold:hover {
-  filter: brightness(1.06);
-  color: #1a1610 !important;
+  background: #E5C04A !important;
+  border-color: #E5C04A !important;
+  color: #1A1D23 !important;
 }
 
 .admin-overview-hero h2,
@@ -2659,11 +2667,9 @@
   margin: 0;
   font-family: var(--font-display, Cinzel, Georgia, serif);
   letter-spacing: 0.04em;
-  background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 50%, #a67c2d 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  color: var(--color-gold, #D4AF37);
+  background: none;
+  -webkit-text-fill-color: unset;
 }
 
 .admin-overview-hero h2 {
@@ -2678,13 +2684,11 @@
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #1a1610;
-  background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 55%, #a67c2d 100%);
-  border: 1px solid rgba(240, 217, 160, 0.85);
+  color: #1A1D23;
+  background: #D4AF37;
+  border: 1px solid #D4AF37;
   border-radius: 999px;
-  box-shadow:
-    0 0 0 1px rgba(166, 124, 45, 0.35),
-    0 4px 14px rgba(212, 168, 75, 0.22);
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
 }
 
 .admin-section-head {
@@ -2696,10 +2700,11 @@
 }
 
 .admin-kpi-card {
-  background: linear-gradient(160deg, rgba(26, 24, 20, 0.95), rgba(14, 14, 16, 0.98)) !important;
-  border: 1px solid rgba(212, 168, 75, 0.16) !important;
-  border-radius: 16px !important;
+  background: var(--color-carbon, #282C34) !important;
+  border: 1px solid var(--color-divider, #3B4049) !important;
+  border-radius: 12px !important;
   min-height: 112px;
+  box-shadow: var(--shadow-card, 0 6px 32px rgba(0, 0, 0, 0.5));
 }
 
 .admin-kpi-card .ant-card-body {
@@ -2707,21 +2712,21 @@
 }
 
 .admin-kpi-icon {
-  color: var(--color-gold, #d4a84b);
+  color: var(--color-gold, #D4AF37);
   font-size: 18px;
   margin-bottom: 8px;
 }
 
 .admin-kpi-label {
-  font-size: 12px;
-  color: var(--color-titanium, #aab2bf);
+  font-size: 13px;
+  color: var(--color-titanium, #9BA3B5);
   margin-bottom: 4px;
 }
 
 .admin-kpi-value {
-  font-size: 24px;
+  font-size: 32px;
   font-weight: 700;
-  color: #fff;
+  color: var(--color-gold, #D4AF37);
   line-height: 1.15;
   word-break: break-word;
 }
@@ -2731,7 +2736,7 @@
 }
 
 .admin-kpi-card.tone-warn .admin-kpi-value {
-  color: #e0bc5a;
+  color: var(--color-gold, #D4AF37);
 }
 
 .admin-kpi-card.tone-danger .admin-kpi-value {
@@ -2739,14 +2744,15 @@
 }
 
 .admin-panel-card {
-  background: rgba(18, 18, 20, 0.92) !important;
-  border: 1px solid rgba(212, 168, 75, 0.14) !important;
-  border-radius: 18px !important;
+  background: var(--color-carbon, #282C34) !important;
+  border: 1px solid var(--color-divider, #3B4049) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-card, 0 6px 32px rgba(0, 0, 0, 0.5));
 }
 
 .admin-panel-card .ant-card-head {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  color: var(--color-gold, #d4a84b);
+  border-bottom: 1px solid var(--color-divider, #3B4049);
+  color: var(--color-gold, #D4AF37);
   min-height: 48px;
 }
 
@@ -2755,6 +2761,7 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   font-family: var(--font-display, Cinzel, Georgia, serif);
+  color: var(--color-gold, #D4AF37);
 }
 
 .admin-layout .ant-modal-title .text-gold-bold,
@@ -2872,54 +2879,65 @@
 
 .admin-attention-item {
   cursor: pointer;
-  border-block-end-color: rgba(255, 255, 255, 0.06) !important;
+  border-block-end-color: var(--color-divider, #3B4049) !important;
+  color: var(--color-white, #F0F2F5);
+  border-left: 4px solid transparent;
+  padding-left: 12px !important;
 }
 
 .admin-attention-item:hover {
-  background: rgba(212, 168, 75, 0.06);
+  background: rgba(212, 175, 55, 0.08);
+  border-left-color: var(--color-gold, #D4AF37);
+}
+
+.admin-panel-card.card-important {
+  background: var(--color-card-important, #2F3540) !important;
+  border: 1px solid var(--color-gold, #D4AF37) !important;
+  border-left: 4px solid var(--color-gold, #D4AF37) !important;
 }
 
 .admin-layout .card-kpi,
 .admin-layout .card-luxury,
 .admin-layout .card-appointment {
-  background: rgba(18, 18, 20, 0.92) !important;
-  border-color: rgba(212, 168, 75, 0.14) !important;
-  border-radius: 16px !important;
+  background: var(--color-carbon, #282C34) !important;
+  border-color: var(--color-divider, #3B4049) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-card, 0 6px 32px rgba(0, 0, 0, 0.5));
 }
 
 .admin-layout .ant-statistic-content {
-  color: #fff;
+  color: var(--color-gold, #D4AF37);
 }
 
 .admin-layout .ant-table,
 .admin-layout .ant-table-thead > tr > th {
-  background: transparent !important;
-  color: var(--color-gold, #d4a84b) !important;
-  border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+  background: var(--color-carbon, #282C34) !important;
+  color: var(--color-gold, #D4AF37) !important;
+  border-bottom-color: var(--color-divider, #3B4049) !important;
 }
 
 .admin-layout .ant-table-thead > tr > th .ant-typography,
 .admin-layout .table-header-cell .ant-typography {
-  color: var(--color-gold, #d4a84b) !important;
+  color: var(--color-gold, #D4AF37) !important;
 }
 
 .admin-layout .toolbar-row .text-gold {
-  color: var(--color-gold, #d4a84b) !important;
+  color: var(--color-gold, #D4AF37) !important;
   font-weight: 600;
 }
 
 .admin-layout .ant-table-tbody > tr > td {
-  border-bottom-color: rgba(255, 255, 255, 0.05) !important;
-  color: #fff;
+  border-bottom-color: var(--color-divider, #3B4049) !important;
+  color: var(--color-white, #F0F2F5);
 }
 
 .admin-layout .ant-empty-description {
-  color: var(--color-titanium, #aab2bf);
+  color: var(--color-titanium, #9BA3B5);
 }
 
 /* --- КАЛЕНДАРЬ ЗАГРУЗКИ --- */
 .workload-calendar {
-  color: #fff;
+  color: var(--color-white, #F0F2F5);
 }
 
 .workload-calendar-head {
@@ -3316,6 +3334,110 @@
   gap: 8px;
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--color-divider, #3B4049);
 }
+
+/* ========== GRAPHITE HIERARCHY — Command Center overrides ========== */
+.admin-layout .ant-typography {
+  color: var(--color-white, #F0F2F5);
+}
+
+.admin-layout .ant-typography.ant-typography-secondary,
+.admin-layout .text-muted,
+.admin-layout .ant-form-item-label > label {
+  color: var(--color-titanium, #9BA3B5) !important;
+}
+
+.admin-layout .ant-card,
+.admin-layout .ant-list,
+.admin-layout .ant-table-wrapper,
+.admin-layout .ant-table-container,
+.admin-layout .ant-picker-calendar,
+.admin-layout .ant-collapse,
+.admin-layout .ant-collapse-content,
+.admin-layout .ant-collapse-item {
+  background: var(--color-carbon, #282C34) !important;
+  border-color: var(--color-divider, #3B4049) !important;
+}
+
+.admin-layout .ant-card {
+  box-shadow: var(--shadow-card, 0 6px 32px rgba(0, 0, 0, 0.5));
+  border-radius: 12px !important;
+}
+
+.admin-layout .ant-list-item,
+.admin-layout .ant-collapse-header,
+.admin-layout .ant-divider {
+  border-color: var(--color-divider, #3B4049) !important;
+  color: var(--color-white, #F0F2F5);
+}
+
+.admin-layout .ant-tag {
+  border-color: var(--color-divider, #3B4049);
+}
+
+.admin-layout .ant-input,
+.admin-layout .ant-input-affix-wrapper,
+.admin-layout .ant-select-selector,
+.admin-layout .ant-picker {
+  background: var(--color-elevated, #282C34) !important;
+  border-color: var(--color-divider, #3B4049) !important;
+  color: var(--color-white, #F0F2F5) !important;
+}
+
+.admin-layout .ant-statistic-title {
+  color: var(--color-titanium, #9BA3B5) !important;
+}
+
+.admin-layout .ant-pagination .ant-pagination-item a,
+.admin-layout .ant-pagination-prev .ant-pagination-item-link,
+.admin-layout .ant-pagination-next .ant-pagination-item-link {
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.admin-layout .ant-pagination-item-active {
+  border-color: var(--color-gold, #D4AF37) !important;
+  background: rgba(212, 175, 55, 0.12) !important;
+}
+
+.admin-layout .ant-pagination-item-active a {
+  color: var(--color-gold, #D4AF37) !important;
+}
+
+.admin-header-crown {
+  color: var(--color-gold, #D4AF37) !important;
+  filter: none;
+}
+
+.admin-header-title.ant-typography {
+  background: none !important;
+  color: var(--color-gold, #D4AF37) !important;
+  -webkit-text-fill-color: var(--color-gold, #D4AF37) !important;
+}
+
+.admin-header-btn.ant-btn {
+  border: 1px solid var(--color-divider, #E2E5EB) !important;
+  background: var(--btn-secondary-bg, #E8EAED) !important;
+  color: var(--btn-secondary-text, #1A1D23) !important;
+}
+
+.admin-header-btn.ant-btn:hover {
+  background: var(--btn-secondary-hover, #D8DCE3) !important;
+  border-color: var(--btn-secondary-hover, #D8DCE3) !important;
+  color: var(--btn-secondary-text, #1A1D23) !important;
+}
+
+.admin-header-btn-logout.ant-btn {
+  border-color: var(--color-gold, #D4AF37) !important;
+  background: var(--color-gold, #D4AF37) !important;
+  color: #1A1D23 !important;
+}
+
+.sidebar-item.active {
+  color: var(--color-gold, #D4AF37);
+  border-right: 2px solid var(--color-gold, #D4AF37);
+  background-color: rgba(212, 175, 55, 0.12);
+}
+
+
 

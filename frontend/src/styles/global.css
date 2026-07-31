@@ -16,6 +16,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html,
+body,
+#root {
+  background-color: var(--color-graphite);
+  min-height: 100%;
+}
+
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -40,9 +47,9 @@ body {
 .ant-tabs-tab { color: var(--color-titanium) !important; font-weight: 500 !important; }
 .ant-tabs-tab-active { color: var(--color-gold) !important; }
 .ant-tabs-ink-bar { background-color: var(--color-gold) !important; }
-.ant-card { background-color: var(--color-carbon) !important; border-color: rgba(255,255,255,0.06) !important; border-radius: var(--radius-card) !important; }
+.ant-card { background-color: var(--color-carbon) !important; border-color: var(--color-divider) !important; border-radius: var(--radius-card) !important; box-shadow: var(--shadow-card); }
 .ant-btn-primary { background-color: var(--color-gold) !important; border-color: var(--color-gold) !important; color: var(--color-graphite) !important; box-shadow: var(--shadow-gold) !important; }
-.ant-btn-primary:hover { background-color: var(--color-gold-hover) !important; border-color: var(--color-gold-hover) !important; box-shadow: var(--shadow-gold-hover) !important; }
+.ant-btn-primary:hover { background-color: var(--color-gold-hover) !important; border-color: var(--color-gold-hover) !important; box-shadow: var(--shadow-gold-hover) !important; color: var(--color-graphite) !important; }
 .ant-select-dropdown { background-color: var(--color-carbon) !important; border: 1px solid rgba(255,255,255,0.06) !important; border-radius: var(--radius-md) !important; padding: 4px !important; }
 .ant-select-dropdown .ant-select-item { color: var(--color-titanium) !important; border-radius: var(--radius-xs) !important; }
 .ant-select-dropdown .ant-select-item-option-active { background-color: rgba(200,169,119,0.15) !important; }

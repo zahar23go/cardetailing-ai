@@ -4,11 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { useBrand } from '../design/BrandProvider';
 import { GoldButton, GhostGoldButton, GoldField } from '../design/components/BrandControls';
 import type { BrandThemeId } from '../design/tokens';
+import type { SurfaceMode } from '../design/surface';
 
 const Shell = styled.div`
   min-height: 100vh;
   min-height: 100dvh;
-  background: ${({ theme }) => theme.brand.gradients.pageAtmosphere};
+  background: ${({ theme }) => theme.colors.bg.primary};
   color: ${({ theme }) => theme.colors.text.primary};
   font-family: ${({ theme }) => theme.fonts.primary};
   padding: 24px 16px 48px;
@@ -106,10 +107,76 @@ const Card = styled.button<{ $active?: boolean }>`
   }
 `;
 
+const ModeCard = styled.button<{ $active?: boolean; $mode: SurfaceMode }>`
+  text-align: left;
+  border: 2px solid
+    ${({ theme, $active }) =>
+      $active ? theme.brand.colors.accent.solid : theme.colors.border.primary};
+  background: ${({ theme }) => theme.colors.bg.elevated};
+  border-radius: ${({ theme }) => theme.radii.lg};
+  padding: 16px;
+  cursor: pointer;
+  color: inherit;
+  box-shadow: ${({ $active, theme }) =>
+    $active ? `0 0 0 3px ${theme.brand.colors.accent.muted}` : theme.surface.shadowCard};
+
+  .swatch {
+    height: 72px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    border: 1px solid ${({ theme }) => theme.colors.border.primary};
+    background: ${({ $mode }) =>
+      $mode === 'light'
+        ? 'linear-gradient(90deg, #0B0D10 28%, #FFFFFF 28%), #FFFFFF'
+        : 'linear-gradient(135deg, #1A1D23 40%, #282C34 40%), #282C34'};
+    position: relative;
+    overflow: hidden;
+  }
+
+  .swatch::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 36px;
+    height: 20px;
+    border-radius: 6px;
+    background: #d4af37;
+  }
+
+  .name {
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 13px;
+    color: ${({ theme }) => theme.brand.colors.accent.solid};
+  }
+
+  .desc {
+    margin-top: 6px;
+    font-size: 13px;
+    color: ${({ theme }) => theme.colors.text.secondary};
+    line-height: 1.4;
+  }
+
+  .badge {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: ${({ $mode }) => ($mode === 'light' ? '#1A1D23' : '#F0F2F5')};
+    background: ${({ $mode }) => ($mode === 'light' ? '#D4AF37' : '#3B4049')};
+    padding: 4px 8px;
+    border-radius: 999px;
+  }
+`;
+
 const Panel = styled.section`
   border: 1px solid ${({ theme }) => theme.brand.colors.accent.border};
   border-radius: ${({ theme }) => theme.radii.lg};
-  background: ${({ theme }) => theme.brand.colors.bg.phone};
+  background: ${({ theme }) => theme.colors.bg.elevated};
   padding: 20px;
   margin-bottom: 20px;
 
@@ -162,7 +229,7 @@ const Note = styled.p`
 
 export default function BrandingPage() {
   const navigate = useNavigate();
-  const { brand, brandId, setBrandId, themes } = useBrand();
+  const { brand, brandId, setBrandId, themes, surfaceMode, setSurfaceMode, surfaces } = useBrand();
   const [draftAccent, setDraftAccent] = useState(brand.colors.accent.solid);
   const [draftRadius, setDraftRadius] = useState(brand.radii.md);
   const [draftFont, setDraftFont] = useState(brand.fonts.ui);
@@ -203,12 +270,12 @@ export default function BrandingPage() {
   }, [brand, draftAccent, draftRadius, draftFont]);
 
   const saveManual = () => {
-    // На релизе ручные правки пишутся в localStorage как overrides
     const overrides = {
       accentSolid: draftAccent,
       radiusMd: draftRadius,
       fontUi: draftFont,
       baseTheme: brandId,
+      surfaceMode,
     };
     localStorage.setItem('brandOverrides', JSON.stringify(overrides));
     document.documentElement.style.setProperty('--color-gold', draftAccent);
@@ -224,7 +291,7 @@ export default function BrandingPage() {
         <Top>
           <div>
             <h1>Брендинг клиента</h1>
-            <p>Выбор пресета + ручная настройка токенов. Единый стиль применяется ко всему приложению.</p>
+            <p>Режим интерфейса + пресет акцента. Стиль применяется ко всему приложению.</p>
           </div>
           <Back
             type="button"
@@ -236,6 +303,32 @@ export default function BrandingPage() {
             ← Назад
           </Back>
         </Top>
+
+        <Panel>
+          <h2>Режим интерфейса</h2>
+          <Note>
+            Основной — белый контент с тёмными шапкой, меню и карточками (как на скрине). Второй — полный тёмный графит.
+          </Note>
+          <Grid>
+            {(Object.keys(surfaces) as SurfaceMode[]).map((mode) => {
+              const s = surfaces[mode];
+              return (
+                <ModeCard
+                  key={mode}
+                  type="button"
+                  $mode={mode}
+                  $active={surfaceMode === mode}
+                  onClick={() => setSurfaceMode(mode)}
+                >
+                  <div className="swatch" />
+                  <div className="name">{s.label}</div>
+                  <div className="desc">{s.description}</div>
+                  <span className="badge">{mode === 'light' ? 'Основной' : 'Второй'}</span>
+                </ModeCard>
+              );
+            })}
+          </Grid>
+        </Panel>
 
         <Panel>
           <h2>Пресеты дизайна</h2>

@@ -5,26 +5,32 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Montserrat:wght@400;700&display=swap');
 
 :root {
-  /* Основные цвета */
-  --color-graphite: #0B0D10;
-  --color-carbon: #13161A;
-  --color-elevated: #1A1E23;
-  --color-divider: #232A33;
-  --color-white: #FFFFFF;
-  --color-titanium: #AAB2BF;
-  --color-gold: #C8A977;
-  --color-gold-hover: #D5B98D;
-  --color-gold-shadow: rgba(200, 169, 119, 0.15);
+  /* Основной режим: белый контент + тёмные chrome/карточки */
+  --color-graphite: #FFFFFF;
+  --color-carbon: #161B22;
+  --color-elevated: #161B22;
+  --color-sidebar: #0B0D10;
+  --color-header: #0B0D10;
+  --color-card-important: #1A1D23;
+  --color-divider: #2D333B;
+  --color-white: #F0F2F5;
+  --color-titanium: #9BA3B5;
+  --color-gold: #D4AF37;
+  --color-gold-hover: #E5C04A;
+  --color-gold-shadow: rgba(212, 175, 55, 0.18);
   --color-success: #0F5D46;
   --color-warning: #B76A29;
-  --radius-card: 24px;
+  --btn-secondary-bg: #121214;
+  --btn-secondary-hover: #1C1C20;
+  --btn-secondary-text: #F0D9A0;
+  --radius-card: 12px;
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
   --radius-xs: 6px;
-  --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(200, 169, 119, 0.03);
-  --shadow-gold: 0 20px 40px rgba(200, 169, 119, 0.15);
-  --shadow-gold-hover: 0 20px 50px rgba(200, 169, 119, 0.25);
+  --shadow-card: 0 8px 28px rgba(0, 0, 0, 0.22);
+  --shadow-gold: 0 20px 40px rgba(212, 175, 55, 0.15);
+  --shadow-gold-hover: 0 20px 50px rgba(212, 175, 55, 0.25);
   --font-family: 'Manrope', 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -33,29 +39,29 @@
   --spacing-xl: 24px;
 
   /* Совместимость со старыми nd-* токенами */
-  --nd-bg: #0B0D10;
-  --nd-surface: #13161A;
-  --nd-elevated: #1A1E23;
+  --nd-bg: #FFFFFF;
+  --nd-surface: #161B22;
+  --nd-elevated: #161B22;
   --nd-sidebar: #0B0D10;
-  --nd-border: #232A33;
-  --nd-primary: #C8A977;
-  --nd-primary-hover: #D5B98D;
+  --nd-border: #2D333B;
+  --nd-primary: #D4AF37;
+  --nd-primary-hover: #E5C04A;
   --nd-secondary: #A8844F;
-  --nd-secondary-hover: #C8A977;
+  --nd-secondary-hover: #D4AF37;
   --nd-success: #27AE60;
   --nd-warning: #B76A29;
   --nd-danger: #E74C3C;
-  --nd-text: #FFFFFF;
-  --nd-muted: #AAB2BF;
+  --nd-text: #F0F2F5;
+  --nd-muted: #9BA3B5;
   --font-header: 'Manrope', sans-serif;
   --font-body: 'Manrope', sans-serif;
   --font-display: 'Cinzel', 'Times New Roman', serif;
 
   /* Brand controls (перезаписываются BrandProvider) */
-  --brand-gold-button-bg: linear-gradient(180deg, #C49A3C 0%, #E0BC5A 32%, #D4A84B 55%, #B8892E 82%, #8F6A22 100%);
-  --brand-gold-button-color: #FFFFFF;
-  --brand-gold-button-shadow: 0 16px 36px rgba(184, 137, 46, 0.55);
-  --brand-input-bg: #121214;
-  --brand-input-border: rgba(212, 168, 75, 0.35);
-  --brand-label: #D4A84B;
+  --brand-gold-button-bg: #D4AF37;
+  --brand-gold-button-color: #1A1D23;
+  --brand-gold-button-shadow: 0 8px 24px rgba(212, 175, 55, 0.35);
+  --brand-input-bg: #161B22;
+  --brand-input-border: #2D333B;
+  --brand-label: #D4AF37;
 }

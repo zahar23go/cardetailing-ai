@@ -1,13 +1,35 @@
 import type { BrandTheme } from './tokens';
+import type { SurfaceMode, SurfacePalette } from './surface';
+import { getSurfaceMode, surfacePalettes } from './surface';
 
-/** Пробрасывает токены бренда в CSS-переменные — единый стиль для Ant Design и старых .css */
-export function applyBrandCssVars(brand: BrandTheme, root: HTMLElement = document.documentElement) {
+/** Пробрасывает токены бренда + режим поверхности в CSS-переменные */
+export function applyBrandCssVars(
+  brand: BrandTheme,
+  surfaceMode?: SurfaceMode,
+  root: HTMLElement = document.documentElement,
+) {
+  const mode = getSurfaceMode(surfaceMode);
+  const surface = surfacePalettes[mode];
   const c = brand.colors;
-  root.style.setProperty('--color-graphite', c.bg.page);
-  root.style.setProperty('--color-carbon', c.bg.elevated);
-  root.style.setProperty('--color-elevated', c.bg.input);
-  root.style.setProperty('--color-white', c.text.primary);
-  root.style.setProperty('--color-titanium', c.text.secondary);
+
+  root.setAttribute('data-surface', mode);
+
+  // Поверхность (фон / карточки / текст)
+  root.style.setProperty('--color-graphite', surface.page);
+  root.style.setProperty('--color-carbon', surface.card);
+  root.style.setProperty('--color-elevated', surface.elevated);
+  root.style.setProperty('--color-white', surface.textPrimary);
+  root.style.setProperty('--color-titanium', surface.textSecondary);
+  root.style.setProperty('--color-divider', surface.divider);
+  root.style.setProperty('--color-sidebar', surface.sidebar);
+  root.style.setProperty('--color-header', surface.header);
+  root.style.setProperty('--color-card-important', surface.cardImportant);
+  root.style.setProperty('--shadow-card', surface.shadowCard);
+  root.style.setProperty('--btn-secondary-bg', surface.btnSecondaryBg);
+  root.style.setProperty('--btn-secondary-hover', surface.btnSecondaryHover);
+  root.style.setProperty('--btn-secondary-text', surface.btnSecondaryText);
+
+  // Акцент бренда (золото и т.п. — общее для обоих режимов)
   root.style.setProperty('--color-gold', c.accent.solid);
   root.style.setProperty('--color-gold-hover', c.accent.soft);
   root.style.setProperty('--color-gold-shadow', c.accent.muted);
@@ -15,8 +37,8 @@ export function applyBrandCssVars(brand: BrandTheme, root: HTMLElement = documen
   root.style.setProperty('--brand-gold-button-bg', brand.gradients.goldButton);
   root.style.setProperty('--brand-gold-button-color', c.text.onAccent);
   root.style.setProperty('--brand-gold-button-shadow', brand.shadows.goldButton);
-  root.style.setProperty('--brand-input-bg', c.bg.input);
-  root.style.setProperty('--brand-input-border', c.accent.border);
+  root.style.setProperty('--brand-input-bg', surface.elevated);
+  root.style.setProperty('--brand-input-border', surface.divider);
   root.style.setProperty('--brand-label', c.text.label);
   root.style.setProperty('--radius-md', brand.radii.md);
   root.style.setProperty('--radius-lg', brand.radii.lg);
@@ -27,34 +49,39 @@ export function applyBrandCssVars(brand: BrandTheme, root: HTMLElement = documen
   root.style.setProperty('--font-body', brand.fonts.ui);
 
   // legacy nd-*
-  root.style.setProperty('--nd-bg', c.bg.page);
-  root.style.setProperty('--nd-surface', c.bg.elevated);
-  root.style.setProperty('--nd-elevated', c.bg.input);
+  root.style.setProperty('--nd-bg', surface.page);
+  root.style.setProperty('--nd-surface', surface.card);
+  root.style.setProperty('--nd-elevated', surface.elevated);
+  root.style.setProperty('--nd-sidebar', surface.sidebar);
+  root.style.setProperty('--nd-border', surface.divider);
   root.style.setProperty('--nd-primary', c.accent.solid);
   root.style.setProperty('--nd-primary-hover', c.accent.soft);
-  root.style.setProperty('--nd-text', c.text.primary);
-  root.style.setProperty('--nd-muted', c.text.secondary);
+  root.style.setProperty('--nd-text', surface.textPrimary);
+  root.style.setProperty('--nd-muted', surface.textSecondary);
   root.style.setProperty('--nd-danger', c.danger);
 }
 
-export function buildStyledTheme(brand: BrandTheme) {
+export function buildStyledTheme(brand: BrandTheme, surfaceMode?: SurfaceMode) {
+  const mode = getSurfaceMode(surfaceMode);
+  const surface: SurfacePalette = surfacePalettes[mode];
+
   return {
     colors: {
       bg: {
-        primary: brand.colors.bg.page,
-        secondary: brand.colors.bg.elevated,
-        tertiary: brand.colors.bg.input,
-        card: 'rgba(26, 30, 35, 0.72)',
-        elevated: brand.colors.bg.elevated,
+        primary: surface.page,
+        secondary: surface.card,
+        tertiary: surface.elevated,
+        card: surface.card,
+        elevated: surface.elevated,
       },
       text: {
-        primary: brand.colors.text.primary,
-        secondary: brand.colors.text.secondary,
+        primary: surface.textPrimary,
+        secondary: surface.textSecondary,
         tertiary: '#6B7280',
       },
       border: {
-        primary: 'rgba(255, 255, 255, 0.08)',
-        secondary: 'rgba(255, 255, 255, 0.05)',
+        primary: surface.divider,
+        secondary: surface.divider,
         gold: brand.colors.accent.border,
       },
       accent: {
@@ -80,6 +107,8 @@ export function buildStyledTheme(brand: BrandTheme) {
       bottomNavHeight: '84px',
       maxMobileWidth: '430px',
     },
+    surfaceMode: mode,
+    surface,
     brand,
   } as const;
 }

@@ -1378,7 +1378,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         </Space>
       </Header>
 
-      <Layout>
+      <Layout className="admin-body-layout">
         {/* Сайдбар (десктоп) */}
         <Sider
           className="sidebar admin-sidebar"
@@ -1452,7 +1452,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
               <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                 <Col span={24}>
                   <Card
-                    className="admin-panel-card"
+                    className="admin-panel-card card-important"
                     bordered={false}
                     title={<span className="admin-panel-title">Требуют внимания</span>}
                     extra={<Badge count={kpi?.pending_appointments || pendingList.length} style={{ backgroundColor: brand.colors.accent.solid }} />}

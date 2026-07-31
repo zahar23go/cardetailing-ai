@@ -1,4 +1,5 @@
 export type { BrandTheme, BrandThemeId } from './tokens';
+export type { SurfaceMode, SurfacePalette } from './surface';
 export {
   brandThemes,
   getBrandTheme,
@@ -9,6 +10,13 @@ export {
   storeBrandId,
   readStoredBrandId,
 } from './themes';
+export {
+  surfacePalettes,
+  getSurfaceMode,
+  storeSurfaceMode,
+  readStoredSurfaceMode,
+  DEFAULT_SURFACE_MODE,
+} from './surface';
 export {
   GoldButton,
   GhostGoldButton,
