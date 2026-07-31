@@ -100,6 +100,7 @@ class ServiceCreate(BaseModel):
     price: float = Field(default=0, ge=0)
     duration: int = Field(default=60, ge=1)
     material_cost: float = Field(default=0, ge=0)
+    cost_price: float = Field(default=0, ge=0, description="Себестоимость")
 
 
 class ServiceUpdate(BaseModel):
@@ -109,6 +110,7 @@ class ServiceUpdate(BaseModel):
     price: Optional[float] = Field(None, ge=0)
     duration: Optional[int] = Field(None, ge=1)
     material_cost: Optional[float] = Field(None, ge=0)
+    cost_price: Optional[float] = Field(None, ge=0)
     is_active: Optional[bool] = None
 
 
@@ -120,6 +122,8 @@ class ServiceOut(BaseModel):
     price: float
     duration: int
     material_cost: float
+    cost_price: float = 0
+    margin_percent: float = 0
     is_active: bool
     created_at: Optional[datetime] = None
 
@@ -340,7 +344,12 @@ class FinancierResponse(BaseModel):
 class ExpenseCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     amount: float = Field(..., ge=0)
-    category: str = Field(default="other", description="rent, salary, utilities, marketing, supplies, other")
+    category: str = Field(default="other")
+    subcategory: Optional[str] = None
+    payment_status: str = Field(default="paid")
+    period_type: str = Field(default="monthly")
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None
     expense_date: Optional[str] = None
     notes: Optional[str] = None
 
@@ -349,6 +358,11 @@ class ExpenseUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     amount: Optional[float] = Field(None, ge=0)
     category: Optional[str] = None
+    subcategory: Optional[str] = None
+    payment_status: Optional[str] = None
+    period_type: Optional[str] = None
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None
     expense_date: Optional[str] = None
     notes: Optional[str] = None
 
@@ -358,11 +372,58 @@ class ExpenseOut(BaseModel):
     name: str
     amount: float
     category: str
+    subcategory: Optional[str] = None
+    payment_status: str = "paid"
+    period_type: str = "monthly"
+    period_start: Optional[datetime] = None
+    period_end: Optional[datetime] = None
     expense_date: Optional[datetime] = None
     notes: Optional[str] = None
     created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class ExpenseCategoryItem(BaseModel):
+    key: str
+    label: str
+    subcategories: list[str] = []
+
+
+class ExpenseCategoryBreakdown(BaseModel):
+    category: str
+    label: str
+    amount: float = 0
+    share_percent: float = 0
+    count: int = 0
+
+
+class ExpenseMonthPoint(BaseModel):
+    month: str
+    label: str
+    total: float = 0
+    by_category: dict[str, float] = {}
+
+
+class ExpenseInsight(BaseModel):
+    type: str  # anomaly | tip | break_even | forecast
+    severity: str = "info"  # info | warn | critical
+    title: str
+    message: str
+
+
+class ExpenseAnalyticsResponse(BaseModel):
+    total: float = 0
+    paid_total: float = 0
+    unpaid_total: float = 0
+    overdue_total: float = 0
+    by_category: list[ExpenseCategoryBreakdown] = []
+    by_month: list[ExpenseMonthPoint] = []
+    insights: list[ExpenseInsight] = []
+    break_even_revenue: float = 0
+    forecast_profit: float = 0
+    revenue_month: float = 0
 
 
 class ServiceMargin(BaseModel):
@@ -590,6 +651,99 @@ class DiscountAnalyticsResponse(BaseModel):
     total_discount_amount: float = 0
     unique_clients_affected: int = 0
     top_rules: list[DiscountAnalyticsTopRule] = []
+
+
+class DiscountSuggestion(BaseModel):
+    key: str
+    name: str
+    hour_start: str
+    hour_end: str
+    weekdays: list[int]
+    weekday_label: str
+    discount_percent: int
+    avg_load: float
+    reason: str
+
+
+class DiscountRuleAdvice(BaseModel):
+    rule_id: int | None = None
+    rule_name: str
+    action: str  # create | increase | decrease | disable | keep
+    message: str
+    suggested_percent: int | None = None
+
+
+class DiscountRoiItem(BaseModel):
+    rule_id: int
+    rule_name: str
+    times_used: int = 0
+    discount_cost: float = 0
+    estimated_extra_revenue: float = 0
+    roi_percent: float = 0
+    verdict: str
+
+
+class DiscountBeforeAfterPoint(BaseModel):
+    rule_id: int
+    rule_name: str
+    label: str
+    before_avg: float = 0
+    after_avg: float = 0
+
+
+class DiscountIntelligenceResponse(BaseModel):
+    period_days: int = 60
+    cells: list[HeatmapCell] = []
+    suggestions: list[DiscountSuggestion] = []
+    recommendations: list[DiscountRuleAdvice] = []
+    roi: list[DiscountRoiItem] = []
+    before_after: list[DiscountBeforeAfterPoint] = []
+
+
+class ServiceDiscountRecOut(BaseModel):
+    id: int
+    service_id: int
+    service_name: str
+    price: float = 0
+    cost_price: float = 0
+    bookings_30d: int = 0
+    bookings_prev_30d: int = 0
+    popularity_index: float = 0
+    margin_raw: float = 0
+    margin_index: float = 0
+    priority: float = 0
+    suggested_percent: int = 0
+    adjusted_percent: Optional[int] = None
+    scenario: str = "priority"
+    reason: str = ""
+    status: str = "pending"
+    discount_rule_id: Optional[int] = None
+    computed_at: Optional[datetime] = None
+    decided_at: Optional[datetime] = None
+
+
+class ServiceDiscountRecDecision(BaseModel):
+    action: str = Field(..., description="approve | reject | adjust")
+    adjusted_percent: Optional[int] = Field(None, ge=1, le=50)
+
+
+class ServiceDiscountRecAnalyticsPoint(BaseModel):
+    service_id: int
+    service_name: str
+    before_bookings: int = 0
+    after_bookings: int = 0
+    bookings_growth_percent: float = 0
+    before_revenue: float = 0
+    after_revenue: float = 0
+    revenue_delta: float = 0
+
+
+class ServiceDiscountRecsResponse(BaseModel):
+    last_computed_at: Optional[datetime] = None
+    next_refresh_at: Optional[datetime] = None
+    auto_refreshed: bool = False
+    items: list[ServiceDiscountRecOut] = []
+    analytics: list[ServiceDiscountRecAnalyticsPoint] = []
 
 
 class LoyaltyPointsOut(BaseModel):

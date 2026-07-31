@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   Typography, Card, Row, Col, Statistic, Table, Button, Tag, Space, Tabs, Divider,
   message, Modal, Select, Input, InputNumber, Popconfirm, Badge, Layout, List,
@@ -14,7 +15,8 @@ import {
   GiftOutlined, StarOutlined, BellOutlined,
   BarChartOutlined, HomeOutlined, FileTextOutlined,
   CarOutlined, UserOutlined, SettingOutlined,
-  CameraOutlined,
+  CameraOutlined, CheckCircleOutlined, SearchOutlined,
+  PlayCircleOutlined, CloseCircleOutlined,
 } from '@ant-design/icons';
 import NotificationBell from './components/NotificationBell';
 import NotificationList from './components/NotificationList';
@@ -22,11 +24,18 @@ import NotificationSettings from './components/NotificationSettings';
 import MasterCalendar from './components/MasterCalendar';
 import ReportManager from './components/ReportManager';
 import ServiceAnalytics from './components/ServiceAnalytics';
+import DiscountIntelligence from './components/DiscountIntelligence';
+import ServiceDiscountRecs from './components/ServiceDiscountRecs';
+import ExpensesModule from './components/ExpensesModule';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, FunnelChart, Funnel, LabelList,
 } from 'recharts';
 import dayjs from 'dayjs';
+import 'dayjs/locale/ru';
+import { useBrand } from './design';
+
+dayjs.locale('ru');
 
 const { Text } = Typography;
 const { TabPane } = Tabs;
@@ -53,6 +62,8 @@ interface Service {
   price: number;
   duration: number;
   material_cost?: number;
+  cost_price?: number;
+  margin_percent?: number;
   is_active?: boolean;
 }
 
@@ -70,9 +81,11 @@ interface Appointment {
   client_notes: string | null;
   master_brief: string | null;
   service_name: string | null;
+  created_at?: string;
+  updated_at?: string;
   client?: { id: number; full_name: string; phone: string };
   master?: { id: number; full_name: string };
-  car?: { id: number; make: string; model: string; license_plate: string };
+  car?: { id: number; make: string; model: string; license_plate: string; vin?: string };
   service?: { id: number; name: string; price: number };
 }
 
@@ -284,6 +297,19 @@ const STATUS_LABELS: Record<string, string> = {
   no_show: 'Не явился',
 };
 
+const APPT_ACTIVE_STATUSES = ['pending', 'confirmed', 'in_progress'];
+const APPT_FETCH_LIMIT = 500;
+const APPT_LIST_PAGE_SIZE = 10;
+
+function formatStatusAge(appt: Appointment): string {
+  const from = appt.updated_at || appt.created_at || appt.start_time;
+  const mins = Math.max(0, dayjs().diff(dayjs(from), 'minute'));
+  if (mins < 60) return `${mins} мин`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} ч`;
+  return `${Math.floor(hours / 24)} д`;
+}
+
 const COLOR_MAP: Record<string, string> = {
   'красный': '#FF6B6B',
   'синий': '#4DABF7',
@@ -358,6 +384,8 @@ interface OwnerDashboardProps {
 }
 
 export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) {
+  const navigate = useNavigate();
+  const { brand } = useBrand();
   const [activeTab, setActiveTab] = useState('overview');
 
   const [kpi, setKpi] = useState<KpiData | null>(null);
@@ -367,6 +395,13 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [apptsLoading, setApptsLoading] = useState(false);
   const [apptsTotal, setApptsTotal] = useState(0);
   const [apptsPage, setApptsPage] = useState(1);
+  const [apptStatusFilter, setApptStatusFilter] = useState<string>('all');
+  const [apptMasterFilter, setApptMasterFilter] = useState<number | 'all'>('all');
+  const [apptPeriodFilter, setApptPeriodFilter] = useState<string>('all');
+  const [apptCustomRange, setApptCustomRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+  const [apptSearchClient, setApptSearchClient] = useState('');
+  const [apptSearchCar, setApptSearchCar] = useState('');
+  const [apptSort, setApptSort] = useState<string>('active_first');
 
   const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(false);
@@ -383,7 +418,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const [serviceModal, setServiceModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [serviceForm, setServiceForm] = useState({
-    name: '', description: '', category: '', price: 0, duration: 60, material_cost: 0,
+    name: '', description: '', category: '', price: 0, duration: 60, material_cost: 0, cost_price: 0,
   });
   const [serviceSaving, setServiceSaving] = useState(false);
 
@@ -512,14 +547,15 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
   const PAGE_SIZE = 20;
 
-  const fetchAppointments = async (page = apptsPage) => {
+  const fetchAppointments = async (_page = 1) => {
     setApptsLoading(true);
     try {
-      const skip = (page - 1) * PAGE_SIZE;
-      const data = await apiFetch<{items: Appointment[]; total: number}>(`/api/appointments?skip=${skip}&limit=${PAGE_SIZE}`);
+      const data = await apiFetch<{ items: Appointment[]; total: number }>(
+        `/api/appointments?skip=0&limit=${APPT_FETCH_LIMIT}`,
+      );
       setAppointments(data.items);
       setApptsTotal(data.total);
-      setApptsPage(page);
+      setApptsPage(1);
     } catch { message.error('Ошибка загрузки записей'); }
     setApptsLoading(false);
   };
@@ -602,12 +638,13 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
   const fetchHeatmap = async (boxId?: number) => {
     setHeatmapLoading(true);
     try {
-      let path = '/api/analytics/heatmap';
+      let path = '/api/analytics/heatmap?days=60';
       if (boxId !== undefined) {
-        path += `?box_id=${boxId}`;
+        path += `&box_id=${boxId}`;
       }
       const data = await apiFetch<{cells: HeatmapCell[]; boxes: BoxItem[]}>(path);
       setHeatmapData(data.cells);
+      if (data.boxes) setBoxes(data.boxes);
     } catch { /* ignore */ }
     setHeatmapLoading(false);
   };
@@ -894,6 +931,32 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     }
   };
 
+  const createDiscountFromSuggestion = async (s: {
+    name: string;
+    hour_start: string;
+    hour_end: string;
+    weekdays: number[];
+    discount_percent: number;
+  }) => {
+    await apiFetch('/api/discounts', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: s.name,
+        type: 'happy_hours',
+        conditions: {
+          hour_start: s.hour_start,
+          hour_end: s.hour_end,
+          weekdays: s.weekdays,
+        },
+        discount_percent: s.discount_percent,
+        slot_start: s.hour_start,
+        slot_end: s.hour_end,
+        is_active: true,
+      }),
+    });
+    fetchDiscounts();
+  };
+
   const DISCOUNT_TYPE_LABELS: Record<string, string> = {
     happy_hours: 'Happy Hours',
     service: 'На услугу',
@@ -956,10 +1019,11 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         price: service.price,
         duration: service.duration,
         material_cost: service.material_cost || 0,
+        cost_price: service.cost_price ?? service.material_cost ?? 0,
       });
     } else {
       setEditingService(null);
-      setServiceForm({ name: '', description: '', category: '', price: 0, duration: 60, material_cost: 0 });
+      setServiceForm({ name: '', description: '', category: '', price: 0, duration: 60, material_cost: 0, cost_price: 0 });
     }
     setServiceModal(true);
   };
@@ -1041,6 +1105,19 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     }
   };
 
+  const quickUpdateApptStatus = async (appt: Appointment, status: string) => {
+    try {
+      await apiFetch(`/api/appointments/${appt.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      });
+      message.success(`Статус: ${STATUS_LABELS[status] || status}`);
+      fetchAppointments();
+    } catch (e: any) {
+      message.error(e.message || 'Ошибка обновления статуса');
+    }
+  };
+
   /* ---------- User role ---------- */
   const openUserRoleModal = (u: User) => {
     setSelectedUser(u);
@@ -1117,47 +1194,185 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
      ============================================================ */
   const formatCurrency = (val: number) => `${val.toLocaleString()} ₽`;
 
+  const pendingList = useMemo(
+    () => appointments.filter((a) => a.status === 'pending' || a.status === 'confirmed').slice(0, 5),
+    [appointments],
+  );
+
+  const apptStats = useMemo(() => {
+    const weekStart = dayjs().startOf('week');
+    return {
+      total: apptsTotal || appointments.length,
+      in_progress: appointments.filter((a) => a.status === 'in_progress').length,
+      waiting: appointments.filter((a) => a.status === 'pending' || a.status === 'confirmed').length,
+      completed_week: appointments.filter(
+        (a) => a.status === 'completed' && !dayjs(a.start_time).isBefore(weekStart),
+      ).length,
+      cancelled: appointments.filter((a) => a.status === 'cancelled').length,
+    };
+  }, [appointments, apptsTotal]);
+
+  const filteredAppointments = useMemo(() => {
+    let list = [...appointments];
+
+    if (apptStatusFilter === 'active') {
+      list = list.filter((a) => APPT_ACTIVE_STATUSES.includes(a.status));
+    } else if (apptStatusFilter === 'completed') {
+      list = list.filter((a) => a.status === 'completed');
+    } else if (apptStatusFilter === 'cancelled') {
+      list = list.filter((a) => a.status === 'cancelled' || a.status === 'no_show');
+    } else if (apptStatusFilter !== 'all') {
+      list = list.filter((a) => a.status === apptStatusFilter);
+    }
+
+    if (apptMasterFilter !== 'all') {
+      list = list.filter((a) => a.master_id === apptMasterFilter);
+    }
+
+    if (apptPeriodFilter === 'today') {
+      list = list.filter((a) => dayjs(a.start_time).isSame(dayjs(), 'day'));
+    } else if (apptPeriodFilter === 'week') {
+      const start = dayjs().startOf('week');
+      const end = dayjs().endOf('week');
+      list = list.filter((a) => {
+        const t = dayjs(a.start_time);
+        return !t.isBefore(start) && !t.isAfter(end);
+      });
+    } else if (apptPeriodFilter === 'month') {
+      list = list.filter((a) => dayjs(a.start_time).isSame(dayjs(), 'month'));
+    } else if (apptPeriodFilter === 'custom' && apptCustomRange) {
+      const [from, to] = apptCustomRange;
+      list = list.filter((a) => {
+        const t = dayjs(a.start_time);
+        return !t.isBefore(from.startOf('day')) && !t.isAfter(to.endOf('day'));
+      });
+    }
+
+    const clientQ = apptSearchClient.trim().toLowerCase();
+    if (clientQ) {
+      list = list.filter((a) => {
+        const name = (a.client?.full_name || '').toLowerCase();
+        const phone = (a.client?.phone || '').toLowerCase();
+        return name.includes(clientQ) || phone.includes(clientQ);
+      });
+    }
+
+    const carQ = apptSearchCar.trim().toLowerCase();
+    if (carQ) {
+      list = list.filter((a) => {
+        const plate = (a.car?.license_plate || '').toLowerCase();
+        const make = (a.car?.make || '').toLowerCase();
+        const model = (a.car?.model || '').toLowerCase();
+        const vin = (a.car?.vin || '').toLowerCase();
+        return plate.includes(carQ) || make.includes(carQ) || model.includes(carQ) || vin.includes(carQ);
+      });
+    }
+
+    list.sort((a, b) => {
+      if (apptSort === 'date_asc') {
+        return dayjs(a.start_time).valueOf() - dayjs(b.start_time).valueOf();
+      }
+      if (apptSort === 'date_desc') {
+        return dayjs(b.start_time).valueOf() - dayjs(a.start_time).valueOf();
+      }
+      if (apptSort === 'master') {
+        const an = a.master?.full_name || 'яяя';
+        const bn = b.master?.full_name || 'яяя';
+        const cmp = an.localeCompare(bn, 'ru');
+        if (cmp !== 0) return cmp;
+        return dayjs(b.start_time).valueOf() - dayjs(a.start_time).valueOf();
+      }
+      // active_first (default)
+      const aActive = APPT_ACTIVE_STATUSES.includes(a.status) ? 0 : 1;
+      const bActive = APPT_ACTIVE_STATUSES.includes(b.status) ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      return dayjs(b.start_time).valueOf() - dayjs(a.start_time).valueOf();
+    });
+
+    return list;
+  }, [
+    appointments,
+    apptStatusFilter,
+    apptMasterFilter,
+    apptPeriodFilter,
+    apptCustomRange,
+    apptSearchClient,
+    apptSearchCar,
+    apptSort,
+  ]);
+
+  const pagedAppointments = useMemo(() => {
+    const start = (apptsPage - 1) * APPT_LIST_PAGE_SIZE;
+    return filteredAppointments.slice(start, start + APPT_LIST_PAGE_SIZE);
+  }, [filteredAppointments, apptsPage]);
+
+  const mastersForFilter = useMemo(
+    () => allUsers.filter((u) => u.role === 'master'),
+    [allUsers],
+  );
+
   // sidebar items
   const sidebarItems = [
     { key: 'overview', icon: <HomeOutlined />, label: 'Обзор' },
     { key: 'appointments', icon: <FileTextOutlined />, label: 'Записи' },
+    { key: 'calendar', icon: <CalendarOutlined />, label: 'Календарь' },
     { key: 'users', icon: <TeamOutlined />, label: 'Пользователи' },
     { key: 'services', icon: <SettingOutlined />, label: 'Услуги' },
-    { key: 'boxes', icon: <CarOutlined />, label: 'Боксы' },
     { key: 'financier', icon: <BulbOutlined />, label: 'AI Финансист' },
     { key: 'finances', icon: <DollarOutlined />, label: 'Финансы' },
     { key: 'analytics', icon: <AreaChartOutlined />, label: 'Аналитика' },
-    { key: 'calendar', icon: <CalendarOutlined />, label: 'Календарь' },
+    { key: 'discounts', icon: <GiftOutlined />, label: 'Скидки' },
+    { key: 'reports', icon: <BarChartOutlined />, label: 'Отчёты' },
     { key: 'notifications', icon: <BellOutlined />, label: 'Уведомления' },
   ];
 
   const bottomNavItems = [
-    { key: 'overview', icon: <HomeOutlined />, label: 'Главная' },
+    { key: 'overview', icon: <HomeOutlined />, label: 'Обзор' },
     { key: 'appointments', icon: <FileTextOutlined />, label: 'Записи' },
     { key: 'services', icon: <SettingOutlined />, label: 'Услуги' },
-    { key: 'financier', icon: <BulbOutlined />, label: 'AI' },
-    { key: 'users', icon: <UserOutlined />, label: 'Профиль' },
+    { key: 'finances', icon: <DollarOutlined />, label: 'Финансы' },
+    { key: 'users', icon: <TeamOutlined />, label: 'Люди' },
   ];
 
+  const refreshOverview = () => {
+    fetchKpi();
+    fetchAppointments(1);
+  };
+
   return (
-    <Layout className="client-layout">
+    <Layout className="admin-layout client-layout">
       {/* Мобильный хедер */}
-      <Header className="header-mobile">
-        <Text className="title-gold">CAR DETAİLİNG AI</Text>
-        <Text className="text-titanium">ВАШ ДЕТЕЙЛИНГ</Text>
+      <Header className="header-mobile admin-header-mobile">
+        <Text className="admin-header-title">CAR DETAILING AI</Text>
+        <span className="admin-header-badge">Command Center</span>
       </Header>
 
       {/* Десктоп хедер */}
-      <Header className="header-desktop">
-        <Space>
-          <CrownOutlined className="text-gold icon-command" />
-          <Text className="title-gold title-command">CarDetailing AI</Text>
-          <Tag color="gold" className="tag-category">Command Center</Tag>
+      <Header className="header-desktop admin-header">
+        <Space className="admin-header-brand" size="middle" align="center">
+          <CrownOutlined className="admin-header-crown" />
+          <Text className="admin-header-title">CarDetailing AI</Text>
+          <span className="admin-header-badge">Command Center</span>
         </Space>
-        <Space size="middle">
-          <Text className="text-titanium">👑 {user.full_name}</Text>
+        <Space size="middle" className="admin-header-actions" wrap>
+          <Button
+            type="text"
+            className="admin-header-btn"
+            onClick={() => navigate('/branding')}
+          >
+            Брендинг
+          </Button>
+          <span className="admin-header-user">
+            <CrownOutlined />
+            <span>{user.full_name}</span>
+          </span>
           <NotificationBell />
-          <Button type="text" icon={<LogoutOutlined />} onClick={onLogout} className="btn-logout">
+          <Button
+            type="text"
+            icon={<LogoutOutlined />}
+            onClick={onLogout}
+            className="admin-header-btn admin-header-btn-logout"
+          >
             Выйти
           </Button>
         </Space>
@@ -1166,10 +1381,10 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       <Layout>
         {/* Сайдбар (десктоп) */}
         <Sider
-          className="sidebar"
+          className="sidebar admin-sidebar"
           breakpoint="md"
           collapsedWidth={0}
-          width={220}
+          width={228}
           trigger={null}
         >
           {sidebarItems.map(item => (
@@ -1185,284 +1400,217 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
         </Sider>
 
         {/* CONTENT */}
-        <Content className="client-content">
+        <Content className="client-content admin-content">
         <Tabs
+          className="admin-tabs"
           activeKey={activeTab}
           onChange={(key) => { setActiveTab(key); }}
           size="large"
         >
-          {/* ===== TAB 1: OVERVIEW ===== */}
+          {/* ===== TAB 1: OVERVIEW (admin) ===== */}
           <TabPane tab={<span><CrownOutlined /> Обзор</span>} key="overview">
-            {/* Карточка авто + AI + быстрые действия */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-              <Col xs={24} md={16}>
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                  <Card className="card-luxury client-car-card">
-                    <Row justify="space-between" align="top">
-                      <Col>
-                        <Text className="text-white car-title">
-                          {kpi?.total_clients ? 'BMW X5' : '—'}
-                        </Text>
-                        <div style={{ marginTop: 2 }}>
-                          <Text className="text-titanium car-subtitle">
-                            2024 · Черный сапфир · A777AA 77
-                          </Text>
-                        </div>
-                        <div style={{ marginTop: 8 }}>
-                          <Text className="car-status">✔ Автомобиль в идеальном состоянии</Text>
-                        </div>
-                      </Col>
-                      <Col>
-                        <Button
-                          size="small"
-                          className="btn-gold-secondary"
-                          onClick={() => setActiveTab('appointments')}
-                          style={{ width: 'auto', height: 32, fontSize: 12 }}
-                        >Записаться</Button>
-                      </Col>
-                    </Row>
-                    <Divider className="divider-dim" />
-                    <div>
-                      <Text className="text-titanium car-service-label">СЛЕДУЮЩЕЕ ОБСЛУЖИВАНИЕ</Text>
-                      <div className="flex-space-between" style={{ marginTop: 6 }}>
-                        <div>
-                          <Text className="text-white car-service-date">25 ИЮНЯ, 11:00</Text>
-                          <Text className="text-titanium d-block car-service-name">Комплекс Премиум</Text>
-                        </div>
-                        <Button
-                          size="small"
-                          className="btn-gold-secondary"
-                          style={{ width: 'auto', height: 32, fontSize: 12 }}
-                        >Изменить</Button>
-                      </div>
-                    </div>
-                  </Card>
-                </motion.div>
-
-                {/* Кнопка "Записаться" (только моб) */}
-                <div className="d-mobile-only" style={{ marginTop: 12 }}>
-                  <Button
-                    type="primary" size="large"
-                    className="btn-gold"
-                    onClick={() => setActiveTab('appointments')}
-                  >Записаться</Button>
+            <div className="admin-overview">
+              <div className="admin-overview-hero">
+                <div>
+                  <div className="admin-overview-kicker">Обзор салона</div>
+                  <h2>Ключевые показатели</h2>
+                  <p className="admin-overview-date">{dayjs().format('D MMMM YYYY, dddd')} · все ключевые показатели в одном месте</p>
                 </div>
-
-                {/* AI Детейлер */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.15 }}
-                  style={{ marginTop: 20 }}
-                >
-                  <Card className="card-luxury">
-                    <Row align="middle" style={{ marginBottom: 12 }}>
-                      <Col flex="auto">
-                        <Text className="title-gold text-16">🤖 AI ДЕТЕЙЛЕР</Text>
-                        <Text className="text-titanium d-block text-13">
-                          Что хотите сделать с автомобилем?
-                        </Text>
-                      </Col>
-                      <Col>
-                        <BulbOutlined className="text-gold" style={{ fontSize: 28 }} />
-                      </Col>
-                    </Row>
-                    <div className="ai-chips">
-                      {['Мойка','Полировка','Керамика','Химчистка'].map((chip) => (
-                        <Button key={chip} className="btn-gold-secondary">{chip}</Button>
-                      ))}
-                    </div>
-                  </Card>
-                </motion.div>
-
-                {/* Быстрые действия */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.2 }}
-                  style={{ marginTop: 16 }}
-                >
-                  <Row gutter={[12, 12]}>
-                    {[
-                      { icon: <CrownOutlined />, label: 'KPI', key: 'overview' },
-                      { icon: <CalendarOutlined />, label: 'Записи', key: 'appointments' },
-                      { icon: <SettingOutlined />, label: 'Услуги', key: 'services' },
-                      { icon: <AreaChartOutlined />, label: 'Аналитика', key: 'analytics' },
-                    ].map((action) => (
-                      <Col xs={12} key={action.key}>
-                        <Card
-                          className="card-luxury quick-action-card"
-                          hoverable
-                          onClick={() => setActiveTab(action.key)}
-                          styles={{ body: { padding: '16px 8px' } }}
-                        >
-                          <span className="quick-action-icon text-gold">{action.icon}</span>
-                          <span className="quick-action-label text-white d-block">{action.label}</span>
-                        </Card>
-                      </Col>
-                    ))}
-                  </Row>
-                </motion.div>
-              </Col>
-
-              <Col xs={0} md={8}>
-                <motion.div
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.25 }}
-                >
-                  <div className="analytics-section">
-                    <Row align="middle" style={{ marginBottom: 16 }}>
-                      <Col flex="auto">
-                        <Text className="text-white analytics-title">📊 Аналитика по услугам</Text>
-                      </Col>
-                      <Col>
-                        <BarChartOutlined className="text-gold" style={{ fontSize: 32 }} />
-                      </Col>
-                    </Row>
-                    <div className="mb-12">
-                      <Text className="text-titanium text-13">Выручка за месяц</Text>
-                      <div className="flex-space-between" style={{ marginTop: 4 }}>
-                        <Text className="stat-value-gold">
-                          {services.reduce((sum: number, s: Service) => sum + (s.price || 0), 0).toLocaleString()} ₽
-                        </Text>
-                        <Tag className="tag-category">+12%</Tag>
-                      </div>
-                    </div>
-                    <div className="mb-12">
-                      <Text className="text-titanium text-13">Активных клиентов</Text>
-                      <div style={{ marginTop: 4 }}>
-                        <Text className="stat-value-white">{kpi?.total_clients || 0}</Text>
-                      </div>
-                    </div>
-                    <div>
-                      <Text className="text-titanium text-13">Записи сегодня</Text>
-                      <div style={{ marginTop: 4 }}>
-                        <Text className="stat-value-white">{kpi?.today_appointments || 0}</Text>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.3 }}
-                >
-                  <Button
-                    type="primary" size="large"
-                    className="btn-gold"
-                    onClick={() => setActiveTab('appointments')}
-                    style={{ height: 52, fontSize: 16 }}
-                  >Записаться</Button>
-                </motion.div>
-              </Col>
-            </Row>
-
-            {/* KPI */}
-            <Spin spinning={kpiLoading}>
-              <Row gutter={[16, 16]}>
-                <Col xs={12} sm={6}>
-                  <motion.div className="animate-fade-in-up">
-                    <Card className="card-kpi">
-                      <Statistic
-                        title={<Text className="text-titanium">Клиенты</Text>}
-                        value={kpi?.total_clients || 0}
-                        prefix={<TeamOutlined className="text-gold" />}
-                      />
-                    </Card>
-                  </motion.div>
-                </Col>
-                <Col xs={12} sm={6}>
-                  <motion.div className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-                    <Card className="card-kpi">
-                      <Statistic
-                        title={<Text className="text-titanium">Мастера</Text>}
-                        value={kpi?.total_masters || 0}
-                        prefix={<ToolOutlined className="text-gold" />}
-                      />
-                    </Card>
-                  </motion.div>
-                </Col>
-                <Col xs={12} sm={6}>
-                  <motion.div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-                    <Card className="card-kpi">
-                      <Statistic
-                        title={<Text className="text-titanium">Записи сегодня</Text>}
-                        value={kpi?.today_appointments || 0}
-                        prefix={<CalendarOutlined className="text-gold" />}
-                      />
-                    </Card>
-                  </motion.div>
-                </Col>
-                <Col xs={12} sm={6}>
-                  <motion.div className="animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
-                    <Card className="card-kpi">
-                      <Statistic
-                        title={<Text className="text-titanium">Ожидают</Text>}
-                        value={kpi?.pending_appointments || 0}
-                        prefix={<Badge status="processing" />}
-                        valueStyle={{ color: '#C8A977', fontSize: '28px', fontWeight: 700 }}
-                      />
-                    </Card>
-                  </motion.div>
-                </Col>
-              </Row>
-              <Row gutter={[16, 16]} className="mt-4">
-                <Col xs={24} sm={12}>
-                  <motion.div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                    <Card className="card-kpi">
-                      <Statistic
-                        title={<Text className="text-titanium">Выручка сегодня</Text>}
-                        value={kpi?.today_revenue || 0}
-                        prefix={<DollarOutlined className="icon-revenue-green" />}
-                        suffix={<Text className="text-titanium">₽</Text>}
-                        valueStyle={{ color: '#4ECB71', fontSize: '32px', fontWeight: 700 }}
-                      />
-                    </Card>
-                  </motion.div>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <motion.div className="animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
-                    <Card className="card-kpi">
-                      <Statistic
-                        title={<Text className="text-titanium">Выручка за месяц</Text>}
-                        value={kpi?.month_revenue || 0}
-                        prefix={<DollarOutlined className="text-gold" />}
-                        suffix={<Text className="text-titanium">₽</Text>}
-                        valueStyle={{ color: '#C8A977', fontSize: '32px', fontWeight: 700 }}
-                      />
-                    </Card>
-                  </motion.div>
-                </Col>
-              </Row>
-              <Row className="mt-4">
-                <Col span={24}>
-                  <Button icon={<ReloadOutlined />} onClick={fetchKpi} type="text" className="btn-logout">
+                <Space wrap>
+                  <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={refreshOverview}>
                     Обновить
                   </Button>
+                  <Button type="primary" className="btn-gold" onClick={() => setActiveTab('appointments')}>
+                    К записям
+                  </Button>
+                </Space>
+              </div>
+
+              <Spin spinning={kpiLoading}>
+                <Row gutter={[14, 14]} className="admin-kpi-row">
+                  {[
+                    { label: 'Клиенты', value: kpi?.total_clients || 0, icon: <TeamOutlined />, tone: 'gold' },
+                    { label: 'Мастера', value: kpi?.total_masters || 0, icon: <ToolOutlined />, tone: 'gold' },
+                    { label: 'Записи сегодня', value: kpi?.today_appointments || 0, icon: <CalendarOutlined />, tone: 'gold' },
+                    { label: 'Ожидают', value: kpi?.pending_appointments || 0, icon: <ClockCircleOutlined />, tone: 'warn' },
+                    { label: 'Закрыто за месяц', value: kpi?.completed_month || 0, icon: <CheckCircleOutlined />, tone: 'gold' },
+                    { label: 'Услуг в каталоге', value: servicesTotal || allServices.length || 0, icon: <SettingOutlined />, tone: 'gold' },
+                  ].map((m) => (
+                    <Col xs={12} sm={8} lg={8} key={m.label}>
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                        <Card className={`admin-kpi-card tone-${m.tone}`} bordered={false}>
+                          <div className="admin-kpi-icon">{m.icon}</div>
+                          <div className="admin-kpi-label">{m.label}</div>
+                          <div className="admin-kpi-value">{m.value}</div>
+                        </Card>
+                      </motion.div>
+                    </Col>
+                  ))}
+                </Row>
+              </Spin>
+
+              <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+                <Col span={24}>
+                  <Card
+                    className="admin-panel-card"
+                    bordered={false}
+                    title={<span className="admin-panel-title">Требуют внимания</span>}
+                    extra={<Badge count={kpi?.pending_appointments || pendingList.length} style={{ backgroundColor: brand.colors.accent.solid }} />}
+                  >
+                    {pendingList.length === 0 ? (
+                      <Empty description={<span className="text-titanium">Очереди нет</span>} />
+                    ) : (
+                      <List
+                        dataSource={pendingList}
+                        renderItem={(item) => (
+                          <List.Item className="admin-attention-item" onClick={() => openApptStatusModal(item)}>
+                            <List.Item.Meta
+                              title={<span className="text-white">{item.service_name || `Запись #${item.id}`}</span>}
+                              description={
+                                <span className="text-titanium">
+                                  {dayjs(item.start_time).format('DD.MM HH:mm')}
+                                  {item.client ? ` · ${item.client.full_name}` : ''}
+                                </span>
+                              }
+                            />
+                            <Tag color={STATUS_COLORS[item.status]}>{STATUS_LABELS[item.status]}</Tag>
+                          </List.Item>
+                        )}
+                      />
+                    )}
+                  </Card>
                 </Col>
               </Row>
-            </Spin>
+            </div>
           </TabPane>
 
           {/* ===== TAB 2: APPOINTMENTS ===== */}
           <TabPane tab={<span><CalendarOutlined /> Записи</span>} key="appointments">
-            <Spin spinning={apptsLoading}>
-              <div className="toolbar-row">
-                <Text className="text-titanium">Всего: {apptsTotal}</Text>
-                <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchAppointments(apptsPage)} type="text" className="btn-logout" />
+            <div className="admin-section-head">
+              <div>
+                <div className="admin-overview-kicker">Операции</div>
+                <h3>Записи клиентов</h3>
               </div>
-              {appointments.length === 0 && !apptsLoading ? (
-                <Empty description={<Text className="text-titanium">Нет записей</Text>} />
+            </div>
+
+            <Row gutter={[12, 12]} className="appt-stats-row">
+              {[
+                { label: 'Всего записей', value: apptStats.total, tone: 'gold' },
+                { label: 'В работе', value: apptStats.in_progress, tone: 'ok' },
+                { label: 'Ожидают', value: apptStats.waiting, tone: 'warn' },
+                { label: 'Завершено за нед.', value: apptStats.completed_week, tone: 'gold' },
+                { label: 'Отменено', value: apptStats.cancelled, tone: 'danger' },
+              ].map((m) => (
+                <Col xs={12} sm={8} md={4} flex="1 1 140px" key={m.label}>
+                  <Card className={`admin-kpi-card tone-${m.tone} appt-stat-card`} bordered={false}>
+                    <div className="admin-kpi-label">{m.label}</div>
+                    <div className="admin-kpi-value">{m.value}</div>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+
+            <div className="appt-filters">
+              <div className="appt-filters-search">
+                <Input
+                  allowClear
+                  prefix={<SearchOutlined />}
+                  placeholder="Клиент: фамилия или телефон"
+                  value={apptSearchClient}
+                  onChange={(e) => { setApptSearchClient(e.target.value); setApptsPage(1); }}
+                  className="input-luxury"
+                />
+                <Input
+                  allowClear
+                  prefix={<CarOutlined />}
+                  placeholder="Авто: номер, марка, модель"
+                  value={apptSearchCar}
+                  onChange={(e) => { setApptSearchCar(e.target.value); setApptsPage(1); }}
+                  className="input-luxury"
+                />
+              </div>
+              <div className="appt-filters-controls">
+                <Select
+                  value={apptStatusFilter}
+                  onChange={(v) => { setApptStatusFilter(v); setApptsPage(1); }}
+                  className="appt-filter-select"
+                  style={{ minWidth: 150 }}
+                >
+                  <Option value="all">Все статусы</Option>
+                  <Option value="active">Активные</Option>
+                  <Option value="in_progress">В работе</Option>
+                  <Option value="pending">Ожидают</Option>
+                  <Option value="completed">Завершённые</Option>
+                  <Option value="cancelled">Отменённые</Option>
+                </Select>
+                <Select
+                  value={apptMasterFilter}
+                  onChange={(v) => { setApptMasterFilter(v); setApptsPage(1); }}
+                  className="appt-filter-select"
+                  style={{ minWidth: 170 }}
+                >
+                  <Option value="all">Все мастера</Option>
+                  {mastersForFilter.map((m) => (
+                    <Option key={m.id} value={m.id}>{m.full_name}</Option>
+                  ))}
+                </Select>
+                <Select
+                  value={apptPeriodFilter}
+                  onChange={(v) => { setApptPeriodFilter(v); setApptsPage(1); }}
+                  className="appt-filter-select"
+                  style={{ minWidth: 150 }}
+                >
+                  <Option value="all">Весь период</Option>
+                  <Option value="today">Сегодня</Option>
+                  <Option value="week">Неделя</Option>
+                  <Option value="month">Месяц</Option>
+                  <Option value="custom">Произвольный</Option>
+                </Select>
+                {apptPeriodFilter === 'custom' && (
+                  <DatePicker.RangePicker
+                    value={apptCustomRange}
+                    onChange={(v) => {
+                      setApptCustomRange(v as [dayjs.Dayjs, dayjs.Dayjs] | null);
+                      setApptsPage(1);
+                    }}
+                    className="appt-range-picker"
+                    format="DD.MM.YYYY"
+                  />
+                )}
+                <Select
+                  value={apptSort}
+                  onChange={(v) => { setApptSort(v); setApptsPage(1); }}
+                  className="appt-filter-select"
+                  style={{ minWidth: 180 }}
+                >
+                  <Option value="active_first">Сначала актуальные</Option>
+                  <Option value="date_desc">Сначала новые</Option>
+                  <Option value="date_asc">Сначала старые</Option>
+                  <Option value="master">По мастеру</Option>
+                </Select>
+                <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={() => fetchAppointments()}>
+                  Обновить
+                </Button>
+              </div>
+            </div>
+
+            <Spin spinning={apptsLoading}>
+              <div className="toolbar-row appt-list-meta">
+                <Text className="text-gold">
+                  Показано {pagedAppointments.length} из {filteredAppointments.length}
+                  {apptsTotal > appointments.length ? ` (загружено ${appointments.length} из ${apptsTotal})` : ''}
+                </Text>
+              </div>
+              {filteredAppointments.length === 0 && !apptsLoading ? (
+                <Empty description={<Text className="text-titanium">Нет записей по фильтрам</Text>} />
               ) : (
                 <List
-                  dataSource={appointments}
+                  dataSource={pagedAppointments}
                   pagination={{
                     current: apptsPage,
-                    pageSize: PAGE_SIZE,
-                    total: apptsTotal,
-                    onChange: (page) => fetchAppointments(page),
+                    pageSize: APPT_LIST_PAGE_SIZE,
+                    total: filteredAppointments.length,
+                    onChange: (page) => setApptsPage(page),
                     showSizeChanger: false,
                     size: 'small',
                   }}
@@ -1472,45 +1620,85 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <Card
-                        size="small"
-                        className="card-appointment"
-                        onClick={() => openApptStatusModal(item)}
-                        hoverable
-                      >
-                        <Row justify="space-between" align="middle">
-                          <Col xs={14}>
-                            <Space direction="vertical" size={2}>
-                              <Space>
-                                <Text className="text-white-bold">
-                                  {item.service_name || `Услуга #${item.service_id}`}
-                                </Text>
-                                <Tag color={STATUS_COLORS[item.status]} className="tag-status">
-                                  {STATUS_LABELS[item.status]}
-                                </Tag>
-                              </Space>
-                              <Text className="text-small">
-                                <ClockCircleOutlined /> {dayjs(item.start_time).format('DD.MM.YYYY HH:mm')}
-                                {item.client && <> · 👤 {item.client.full_name}</>}
+                      <Card size="small" className="card-appointment appt-card-rich" hoverable>
+                        <div className="appt-card-main" onClick={() => openApptStatusModal(item)}>
+                          <div className="appt-card-left">
+                            <div className="appt-card-top">
+                              <Text className="text-white-bold">
+                                {item.service_name || `Услуга #${item.service_id}`}
                               </Text>
-                              {item.car && (
-                                <Text className="text-small">
-                                  🚗 {item.car.make} {item.car.model} {item.car.license_plate ? `(${item.car.license_plate})` : ''}
-                                </Text>
-                              )}
-                            </Space>
-                          </Col>
-                          <Col xs={10} className="text-right">
-                            <Text className="text-gold-bold text-16">
-                              {formatCurrency(item.total_price)}
-                            </Text>
-                            {item.master && (
-                              <div>
-                                <Text className="text-small">🔧 {item.master.full_name}</Text>
-                              </div>
-                            )}
-                          </Col>
-                        </Row>
+                              <Tag color={STATUS_COLORS[item.status]} className="tag-status">
+                                {STATUS_LABELS[item.status]}
+                              </Tag>
+                              <span className="appt-status-age">
+                                <ClockCircleOutlined /> {formatStatusAge(item)}
+                              </span>
+                            </div>
+                            <div className="appt-card-meta">
+                              <span>
+                                <ClockCircleOutlined /> {dayjs(item.start_time).format('DD.MM.YYYY HH:mm')}
+                              </span>
+                              <span>
+                                <UserOutlined /> {item.client?.full_name || 'Клиент'}
+                                {item.client?.phone ? ` · ${item.client.phone}` : ''}
+                              </span>
+                              <span>
+                                <CarOutlined />{' '}
+                                {item.car
+                                  ? `${item.car.make} ${item.car.model}${item.car.license_plate ? ` · ${item.car.license_plate}` : ''}`
+                                  : 'Авто не указано'}
+                              </span>
+                              <span>
+                                <ToolOutlined /> {item.master?.full_name || 'Мастер не назначен'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="appt-card-price">
+                            <Text className="text-gold-bold text-16">{formatCurrency(item.total_price)}</Text>
+                          </div>
+                        </div>
+                        <div className="appt-card-actions" onClick={(e) => e.stopPropagation()}>
+                          {(item.status === 'pending' || item.status === 'confirmed') && (
+                            <Button
+                              size="small"
+                              className="btn-gold-secondary"
+                              icon={<PlayCircleOutlined />}
+                              onClick={() => quickUpdateApptStatus(item, 'in_progress')}
+                            >
+                              В работу
+                            </Button>
+                          )}
+                          {item.status === 'in_progress' && (
+                            <Button
+                              size="small"
+                              className="btn-gold"
+                              icon={<CheckCircleOutlined />}
+                              onClick={() => quickUpdateApptStatus(item, 'completed')}
+                            >
+                              Завершить
+                            </Button>
+                          )}
+                          {APPT_ACTIVE_STATUSES.includes(item.status) && (
+                            <Popconfirm
+                              title="Отменить запись?"
+                              okText="Да"
+                              cancelText="Нет"
+                              onConfirm={() => quickUpdateApptStatus(item, 'cancelled')}
+                            >
+                              <Button size="small" danger icon={<CloseCircleOutlined />}>
+                                Отменить
+                              </Button>
+                            </Popconfirm>
+                          )}
+                          <Button
+                            size="small"
+                            className="btn-action-gold"
+                            icon={<EditOutlined />}
+                            onClick={() => openApptStatusModal(item)}
+                          >
+                            Редактировать
+                          </Button>
+                        </div>
                       </Card>
                     </motion.div>
                   )}
@@ -1521,6 +1709,12 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
           {/* ===== TAB 3: SERVICES ===== */}
           <TabPane tab={<span><ToolOutlined /> Услуги</span>} key="services">
+            <div className="admin-section-head">
+              <div>
+                <div className="admin-overview-kicker">Каталог</div>
+                <h3>Услуги детейлинга</h3>
+              </div>
+            </div>
             <Spin spinning={servicesLoading}>
               <div className="toolbar-right">
                 <Button
@@ -1544,7 +1738,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                   }}
                   columns={[
                     {
-                      title: <Text className="text-titanium">Название</Text>,
+                      title: <Text className="text-gold">Название</Text>,
                       dataIndex: 'name',
                       key: 'name',
                       render: (val, record) => (
@@ -1559,22 +1753,46 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                       ),
                     },
                     {
-                      title: <Text className="text-titanium">Цена</Text>,
+                      title: <Text className="text-gold">Цена</Text>,
                       dataIndex: 'price',
                       key: 'price',
                       render: (val) => <Text className="text-gold-bold">{formatCurrency(val)}</Text>,
                     },
                     {
-                      title: <Text className="text-titanium">Длит.</Text>,
+                      title: <Text className="text-gold">Длит.</Text>,
                       dataIndex: 'duration',
                       key: 'duration',
                       render: (val) => <Text className="text-titanium">~{val} мин</Text>,
                     },
                     {
-                      title: <Text className="text-titanium">Материалы</Text>,
+                      title: <Text className="text-gold">Материалы</Text>,
                       dataIndex: 'material_cost',
                       key: 'material_cost',
                       render: (val) => <Text className="text-titanium">{val ? formatCurrency(val) : '—'}</Text>,
+                    },
+                    {
+                      title: <Text className="text-gold">Себестоимость</Text>,
+                      dataIndex: 'cost_price',
+                      key: 'cost_price',
+                      render: (val, record) => (
+                        <Text className="text-titanium">
+                          {formatCurrency(val ?? record.material_cost ?? 0)}
+                        </Text>
+                      ),
+                    },
+                    {
+                      title: <Text className="text-gold">Маржа</Text>,
+                      key: 'margin',
+                      render: (_, record) => {
+                        const price = Number(record.price) || 0;
+                        const cost = Number(record.cost_price ?? record.material_cost) || 0;
+                        const m = price > 0 ? ((price - cost) / price) * 100 : 0;
+                        return (
+                          <Text className="text-gold-bold">
+                            {(record.margin_percent ?? m).toFixed(0)}%
+                          </Text>
+                        );
+                      },
                     },
                     {
                       title: '',
@@ -1630,8 +1848,15 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
           {/* ===== TAB 4: USERS ===== */}
           <TabPane tab={<span><TeamOutlined /> Пользователи</span>} key="users">
+            <div className="admin-section-head">
+              <div>
+                <div className="admin-overview-kicker">Команда и клиенты</div>
+                <h3>Пользователи</h3>
+              </div>
+            </div>
             {/* Role tabs */}
             <Tabs activeKey={userRoleTab} onChange={setUserRoleTab}
+              className="admin-inner-tabs"
               tabBarStyle={{ borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}
               size="small"
             >
@@ -1670,19 +1895,19 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                       pagination={{ pageSize: 20, size: 'small' }}
                       columns={[
                         {
-                          title: <Text className="text-titanium">Имя</Text>,
+                          title: <Text className="text-gold">Имя</Text>,
                           dataIndex: 'full_name',
                           key: 'full_name',
                           render: (val) => <Text className="text-white text-medium">{val}</Text>,
                         },
                         {
-                          title: <Text className="text-titanium">Телефон</Text>,
+                          title: <Text className="text-gold">Телефон</Text>,
                           dataIndex: 'phone',
                           key: 'phone',
                           render: (val) => <Text className="text-titanium"><PhoneOutlined /> {val}</Text>,
                         },
                         {
-                          title: <Text className="text-titanium">Сегмент</Text>,
+                          title: <Text className="text-gold">Сегмент</Text>,
                           dataIndex: 'segment',
                           key: 'segment',
                           width: 120,
@@ -1693,21 +1918,21 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                           },
                         },
                         {
-                          title: <Text className="text-titanium">Визиты</Text>,
+                          title: <Text className="text-gold">Визиты</Text>,
                           dataIndex: 'frequency',
                           key: 'frequency',
                           width: 70,
                           render: (val) => <Text className="text-white text-13">{val}</Text>,
                         },
                         {
-                          title: <Text className="text-titanium">Сумма</Text>,
+                          title: <Text className="text-gold">Сумма</Text>,
                           dataIndex: 'monetary',
                           key: 'monetary',
                           width: 100,
                           render: (val) => <Text className="text-gold-bold text-13">{val.toLocaleString()} ₽</Text>,
                         },
                         {
-                          title: <Text className="text-titanium">Дата рег.</Text>,
+                          title: <Text className="text-gold">Дата рег.</Text>,
                           dataIndex: 'created_at',
                           key: 'created_at',
                           render: (val) => <Text className="text-titanium">{val ? dayjs(val).format('DD.MM.YYYY') : '—'}</Text>,
@@ -1754,26 +1979,26 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                       pagination={{ pageSize: 20, size: 'small' }}
                       columns={[
                         {
-                          title: <Text className="text-titanium">Имя</Text>,
+                          title: <Text className="text-gold">Имя</Text>,
                           dataIndex: 'full_name',
                           key: 'full_name',
                           render: (val) => <Text className="text-white text-medium">{val}</Text>,
                         },
                         {
-                          title: <Text className="text-titanium">Телефон</Text>,
+                          title: <Text className="text-gold">Телефон</Text>,
                           dataIndex: 'phone',
                           key: 'phone',
                           render: (val) => <Text className="text-titanium"><PhoneOutlined /> {val}</Text>,
                         },
                         {
-                          title: <Text className="text-titanium">Роль</Text>,
+                          title: <Text className="text-gold">Роль</Text>,
                           dataIndex: 'role',
                           key: 'role',
                           width: 140,
                           render: (val: string) => <Tag color="cyan" className="tag-status">{ROLE_LABELS[val] || val}</Tag>,
                         },
                         {
-                          title: <Text className="text-titanium">Дата рег.</Text>,
+                          title: <Text className="text-gold">Дата рег.</Text>,
                           dataIndex: 'created_at',
                           key: 'created_at',
                           render: (val) => <Text className="text-titanium">{val ? dayjs(val).format('DD.MM.YYYY') : '—'}</Text>,
@@ -1800,26 +2025,26 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                       pagination={{ pageSize: 20, size: 'small' }}
                       columns={[
                         {
-                          title: <Text className="text-titanium">Имя</Text>,
+                          title: <Text className="text-gold">Имя</Text>,
                           dataIndex: 'full_name',
                           key: 'full_name',
                           render: (val) => <Text className="text-white text-medium">{val}</Text>,
                         },
                         {
-                          title: <Text className="text-titanium">Телефон</Text>,
+                          title: <Text className="text-gold">Телефон</Text>,
                           dataIndex: 'phone',
                           key: 'phone',
                           render: (val) => <Text className="text-titanium"><PhoneOutlined /> {val}</Text>,
                         },
                         {
-                          title: <Text className="text-titanium">Роль</Text>,
+                          title: <Text className="text-gold">Роль</Text>,
                           dataIndex: 'role',
                           key: 'role',
                           width: 160,
                           render: (val: string) => <Tag color="gold" className="tag-status">{ROLE_LABELS[val] || val}</Tag>,
                         },
                         {
-                          title: <Text className="text-titanium">Дата рег.</Text>,
+                          title: <Text className="text-gold">Дата рег.</Text>,
                           dataIndex: 'created_at',
                           key: 'created_at',
                           render: (val) => <Text className="text-titanium">{val ? dayjs(val).format('DD.MM.YYYY') : '—'}</Text>,
@@ -1855,7 +2080,13 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
           {/* ===== TAB 5: AI FINANCIER ===== */}
           <TabPane tab={<span><BulbOutlined /> AI Финансист</span>} key="financier">
-            <Card className="card-luxury">
+            <div className="admin-section-head">
+              <div>
+                <div className="admin-overview-kicker">AI</div>
+                <h3>Финансовый консультант</h3>
+              </div>
+            </div>
+            <Card className="card-luxury admin-panel-card">
               <div className="flex-space-between" style={{ marginBottom: '16px' }}>
                 <div>
                   <Text className="title-gold" style={{ fontSize: '18px', fontWeight: 700 }}>AI Финансист</Text>
@@ -1973,6 +2204,12 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
           {/* ===== TAB 6: FINANCES (P&L) ===== */}
           <TabPane tab={<span><DollarOutlined /> Финансы</span>} key="finances">
+            <div className="admin-section-head">
+              <div>
+                <div className="admin-overview-kicker">P&amp;L</div>
+                <h3>Финансы салона</h3>
+              </div>
+            </div>
             <Spin spinning={plLoading || expensesLoading}>
               {/* P&L Summary Cards */}
               {plReport && (
@@ -2102,55 +2339,21 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                 </>
               )}
 
-              {/* Expenses */}
-              <Card className="card-luxury">
-                <div className="flex-space-between mb-12">
-                  <Text className="title-gold text-16">Постоянные расходы</Text>
-                  <Button size="small" icon={<PlusOutlined />} className="btn-action-gold" onClick={() => setExpenseModal(true)}>Добавить</Button>
-                </div>
-                {expenses.length === 0 ? (
-                  <Text className="text-titanium text-13">Нет расходов за месяц</Text>
-                ) : (
-                  <Table
-                    dataSource={expenses}
-                    rowKey="id"
-                    pagination={{
-                      current: expensesPage,
-                      pageSize: PAGE_SIZE,
-                      total: expensesTotal,
-                      onChange: (page) => fetchExpenses(page),
-                      showSizeChanger: false,
-                    }}
-                    size="small"
-                    columns={[
-                      { title: <Text className="text-titanium text-12">Название</Text>, dataIndex: 'name', key: 'name',
-                        render: v => <Text className="text-white text-13">{v}</Text> },
-                      { title: <Text className="text-titanium text-12">Категория</Text>, dataIndex: 'category', key: 'cat', width: 110,
-                        render: v => <Tag className="tag-category">{v}</Tag> },
-                      { title: <Text className="text-titanium text-12">Сумма</Text>, dataIndex: 'amount', key: 'amount', width: 110,
-                        render: v => <Text className="text-gold-bold text-13">{v.toLocaleString()} ₽</Text> },
-                      { title: <Text className="text-titanium text-12">Дата</Text>, dataIndex: 'expense_date', key: 'date', width: 100,
-                        render: v => <Text className="text-titanium text-13">{v ? dayjs(v).format('DD.MM') : '—'}</Text> },
-                      { title: '', key: 'actions', width: 50,
-                        render: (_, r) => (
-                          <Popconfirm title={`Удалить «${r.name}»?`} onConfirm={() => handleDeleteExpense(r.id, r.name)} okText="Да" cancelText="Нет">
-                            <Button size="small" icon={<DeleteOutlined />} className="btn-action-danger" />
-                          </Popconfirm>
-                        ),
-                      },
-                    ]}
-                    components={{
-                      header: { cell: (p: any) => <th {...p} className="table-header-cell" /> },
-                      body: { row: (p: any) => <tr {...p} className="table-body-row" />, cell: (p: any) => <td {...p} className="table-body-cell" /> },
-                    }}
-                  />
-                )}
-              </Card>
+              {/* Expenses accounting module */}
+              <div style={{ marginTop: 16 }}>
+                <ExpensesModule />
+              </div>
             </Spin>
           </TabPane>
 
           {/* ===== TAB 7: ANALYTICS CHARTS ===== */}
           <TabPane tab={<span><AreaChartOutlined /> Аналитика</span>} key="analytics">
+            <div className="admin-section-head">
+              <div>
+                <div className="admin-overview-kicker">Метрики</div>
+                <h3>Аналитика</h3>
+              </div>
+            </div>
             <Spin spinning={revenueLoading || heatmapLoading || funnelLoading}>
               <Row gutter={[16, 16]}>
                 {/* Revenue Area Chart with Period Selector */}
@@ -2388,8 +2591,8 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                     {heatmapData.length > 0 ? (
                       <>
                         <div className="flex-space-between" style={{ marginBottom: 8, paddingLeft: 40 }}>
-                          {[9,10,11,12,13,14,15,16,17,18,19,20].map(h => (
-                            <Text key={h} className="text-titanium text-11" style={{ width: '8.33%', textAlign: 'center' }}>{h}:00</Text>
+                          {[8,9,10,11,12,13,14,15,16,17,18,19,20,21,22].map(h => (
+                            <Text key={h} className="text-titanium text-11" style={{ width: '6.66%', textAlign: 'center' }}>{h}:00</Text>
                           ))}
                         </div>
                         {[0,1,2,3,4,5,6].map(day => {
@@ -2400,7 +2603,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                           return (
                             <div key={day} className="flex-space-between" style={{ marginBottom: 4 }}>
                               <Text className="text-titanium text-11" style={{ width: 36 }}>{dayNames[day]}</Text>
-                              {[9,10,11,12,13,14,15,16,17,18,19,20].map(hour => {
+                              {[8,9,10,11,12,13,14,15,16,17,18,19,20,21,22].map(hour => {
                                 const cell = heatmapData.find(c => c.day === day && c.hour === hour);
                                 const count = cell?.count || 0;
                                 const intensity = count / maxCount;
@@ -2414,7 +2617,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                                     key={`${day}-${hour}`}
                                     className="text-center"
                                     style={{
-                                      width: '8.33%', height: 32, backgroundColor: bgColor,
+                                      width: '6.66%', height: 32, backgroundColor: bgColor,
                                       borderRadius: 4, display: 'flex', alignItems: 'center',
                                       justifyContent: 'center', cursor: 'pointer',
                                       ...(selectedBoxId && count > 0 ? {
@@ -2448,10 +2651,23 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
           {/* ===== TAB 8: DISCOUNTS & LOYALTY ===== */}
           <TabPane tab={<span><GiftOutlined /> Скидки</span>} key="discounts">
+            <div className="admin-section-head">
+              <div>
+                <div className="admin-overview-kicker">Лояльность</div>
+                <h3>Скидки и бонусы</h3>
+              </div>
+            </div>
+
+            <DiscountIntelligence onCreateSuggestion={createDiscountFromSuggestion} />
+
+            <div style={{ marginTop: 16, marginBottom: 16 }}>
+              <ServiceDiscountRecs />
+            </div>
+
             <Spin spinning={discountsLoading || loyaltyLoading}>
-              <div className="toolbar-right mb-12">
+              <div className="toolbar-right mb-12" style={{ marginTop: 16 }}>
                 <Button type="primary" icon={<PlusOutlined />} className="btn-gold" style={{ width: 'auto' }}
-                  onClick={() => openDiscountModal()}>Создать правило</Button>
+                  onClick={() => openDiscountModal()}>Создать правило вручную</Button>
               </div>
 
 
@@ -2685,7 +2901,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
       {/* ===== SERVICE MODAL ===== */}
       <Modal
-        title={<Text className="text-white">{editingService ? '✏️ Редактировать услугу' : '➕ Новая услуга'}</Text>}
+        title={<Text className="text-gold-bold">{editingService ? '✏️ Редактировать услугу' : '➕ Новая услуга'}</Text>}
         open={serviceModal}
         onCancel={() => setServiceModal(false)}
         footer={null}
@@ -2754,6 +2970,25 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
               onChange={(e) => setServiceForm(prev => ({ ...prev, material_cost: Number(e.target.value) }))}
             />
           </div>
+          <div>
+            <span className="label-field">Себестоимость (₽)</span>
+            <Input
+              size="large"
+              type="number"
+              className="input-luxury"
+              value={serviceForm.cost_price}
+              onChange={(e) => setServiceForm(prev => ({ ...prev, cost_price: Number(e.target.value) }))}
+            />
+            {serviceForm.price > 0 && (
+              <Text className="text-gold text-13 d-block" style={{ marginTop: 6 }}>
+                Маржа:{' '}
+                {(
+                  ((serviceForm.price - (serviceForm.cost_price || 0)) / serviceForm.price) * 100
+                ).toFixed(1)}
+                %
+              </Text>
+            )}
+          </div>
           <Button
             type="primary"
             size="large"
@@ -2766,7 +3001,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
       {/* ===== APPOINTMENT STATUS MODAL ===== */}
       <Modal
-        title={<Text className="text-white">📅 Управление записью</Text>}
+        title={<Text className="text-gold-bold">📅 Управление записью</Text>}
         open={apptStatusModal}
         onCancel={() => setApptStatusModal(false)}
         footer={null}
@@ -2845,7 +3080,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
       {/* ===== USER ROLE MODAL ===== */}
       <Modal
-        title={<Text className="text-white">👤 Изменить роль</Text>}
+        title={<Text className="text-gold-bold">👤 Изменить роль</Text>}
         open={userRoleModal}
         onCancel={() => setUserRoleModal(false)}
         footer={null}
@@ -2884,7 +3119,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
       {/* ===== CLIENT DETAIL MODAL ===== */}
       <Modal
-        title={<Text className="text-white">📋 Карточка клиента</Text>}
+        title={<Text className="text-gold-bold">📋 Карточка клиента</Text>}
         open={clientModal}
         onCancel={() => { setClientModal(false); setClientDetail(null); setClientPoints(null); }}
         footer={null}
@@ -2968,7 +3203,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
       {/* ===== EXPENSE MODAL ===== */}
       <Modal
-        title={<Text className="text-white">➕ Добавить расход</Text>}
+        title={<Text className="text-gold-bold">➕ Добавить расход</Text>}
         open={expenseModal}
         onCancel={() => { setExpenseModal(false); setExpenseForm({ name: '', amount: 0, category: 'other', notes: '' }); }}
         footer={null}
@@ -3013,7 +3248,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
       {/* ===== DISCOUNT MODAL ===== */}
       <Modal
-        title={<Text className="text-white">{editingDiscount ? '✏️ Редактировать правило скидки' : '➕ Новое правило скидки'}</Text>}
+        title={<Text className="text-gold-bold">{editingDiscount ? '✏️ Редактировать правило скидки' : '➕ Новое правило скидки'}</Text>}
         open={discountModal}
         onCancel={() => { setDiscountModal(false); setEditingDiscount(null); }}
         footer={null}
@@ -3195,7 +3430,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
       {/* ===== BOX SETTINGS MODAL ===== */}
       <Modal
-        title={<Text className="text-white">⚙️ Настройка боксов</Text>}
+        title={<Text className="text-gold-bold">⚙️ Настройка боксов</Text>}
         open={boxSettingsModal}
         onCancel={() => { setBoxSettingsModal(false); setNewBoxName(''); setNewBoxColor(''); }}
         footer={null}
@@ -3372,7 +3607,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
       {/* ===== EDIT BOX MODAL ===== */}
       <Modal
-        title={<Text className="text-white">✏️ Редактировать бокс</Text>}
+        title={<Text className="text-gold-bold">✏️ Редактировать бокс</Text>}
         open={editBoxModalOpen}
         onCancel={() => { setEditBoxModalOpen(false); setEditingBox(null); }}
         footer={null}
@@ -3444,7 +3679,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
       {/* ===== HEATMAP SLOT DETAIL MODAL ===== */}
       <Modal
-        title={<Text className="text-white">📅 {heatmapSlotLabel}</Text>}
+        title={<Text className="text-gold-bold">📅 {heatmapSlotLabel}</Text>}
         open={heatmapModalOpen}
         onCancel={() => setHeatmapModalOpen(false)}
         footer={null}

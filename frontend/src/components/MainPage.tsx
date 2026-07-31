@@ -207,8 +207,8 @@ const Brand = styled.div`
   min-width: 0;
 
   .logo {
-    width: 48px;
-    height: 22px;
+    width: 52px;
+    height: 24px;
     object-fit: contain;
     display: block;
     flex-shrink: 0;
@@ -824,7 +824,7 @@ export interface MainPageProps {
   onLogout?: () => void;
 }
 
-export default function MainPage({ userName = 'Алексей' }: MainPageProps) {
+export default function MainPage({ userName = 'Алексей', onLogout }: MainPageProps) {
   const navigate = useNavigate();
   const { brand } = useBrand();
   const [carIndex, setCarIndex] = useState(0);
@@ -835,7 +835,8 @@ export default function MainPage({ userName = 'Алексей' }: MainPageProps)
 
   const go = (tab: string) => {
     setActiveNav(tab);
-    if (tab === 'profile') navigate('/branding');
+    // Профиль / выход из тупика — хаб «Смотреть концепцию»
+    if (tab === 'profile') navigate('/concept');
   };
 
   return (
@@ -843,7 +844,7 @@ export default function MainPage({ userName = 'Алексей' }: MainPageProps)
       <Phone>
         <Header>
           <Brand>
-            <img className="logo" src={`${brand.assets.logoCar}?v=5`} alt="" />
+            <img className="logo" src={`${brand.assets.logoCar}?v=21`} alt="" />
             <div className="name">CAR DETAILING AI</div>
           </Brand>
           <HeaderActions>
@@ -851,7 +852,11 @@ export default function MainPage({ userName = 'Алексей' }: MainPageProps)
               <IconBell />
               <span className="dot" />
             </BellBtn>
-            <OrbBtn type="button" aria-label="Брендинг" onClick={() => navigate('/branding')}>
+            <OrbBtn
+              type="button"
+              aria-label="Смотреть концепцию"
+              onClick={() => navigate('/concept')}
+            >
               <img src={`${brand.assets.aiOrb}?v=2`} alt="" />
             </OrbBtn>
           </HeaderActions>

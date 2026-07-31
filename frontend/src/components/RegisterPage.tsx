@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { getBrandTheme, GoldButton, GhostGoldButton, GoldField } from '../design';
 
 const orbPulse = keyframes`
@@ -8,14 +9,6 @@ const orbPulse = keyframes`
   50% { transform: scale(1.05); filter: brightness(1.1) drop-shadow(0 0 14px rgba(224, 188, 90, 0.65)); }
 `;
 
-const shine = keyframes`
-  0% { transform: translateX(-130%) skewX(-16deg); opacity: 0; }
-  20% { opacity: 0.45; }
-  45% { opacity: 0; }
-  100% { transform: translateX(230%) skewX(-16deg); opacity: 0; }
-`;
-
-/* Бренд + формы с шаблона Gold Metal (другой пресет) */
 const brand = getBrandTheme('goldMetal');
 
 const Shell = styled.div`
@@ -37,17 +30,6 @@ const Phone = styled(motion.div)`
   padding: 11px;
   background: linear-gradient(145deg, #3a3a3c 0%, #1c1c1e 40%, #0a0a0a 100%);
   box-shadow: ${brand.shadows.phone};
-
-  &::after {
-    content: '';
-    position: absolute;
-    right: -2px;
-    top: 140px;
-    width: 3px;
-    height: 64px;
-    border-radius: 2px 0 0 2px;
-    background: linear-gradient(180deg, #555 0%, #2a2a2a 100%);
-  }
 `;
 
 const Screen = styled.div`
@@ -58,7 +40,6 @@ const Screen = styled.div`
   min-height: 720px;
   display: flex;
   flex-direction: column;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 `;
 
 const MainStack = styled.div`
@@ -71,20 +52,17 @@ const MainStack = styled.div`
   padding: 8px 0 4px;
 `;
 
-/* Формула бренда как на главном экране */
 const Brand = styled.header`
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   padding: 0 16px 10px;
-  z-index: 3;
 
   .left {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-width: 0;
   }
 
   .mark {
@@ -92,7 +70,6 @@ const Brand = styled.header`
     height: 24px;
     display: flex;
     align-items: center;
-    flex-shrink: 0;
     filter: drop-shadow(0 0 6px rgba(212, 168, 75, 0.45));
 
     img {
@@ -109,9 +86,7 @@ const Brand = styled.header`
     font-size: 13px;
     font-weight: 800;
     letter-spacing: 0.05em;
-    line-height: 1.1;
     text-transform: uppercase;
-    white-space: nowrap;
     background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 50%, #a67c2d 100%);
     -webkit-background-clip: text;
     background-clip: text;
@@ -121,89 +96,55 @@ const Brand = styled.header`
   .orb {
     width: 40px;
     height: 40px;
-    flex-shrink: 0;
     animation: ${orbPulse} 4.2s ease-in-out infinite;
     filter: drop-shadow(0 0 10px rgba(212, 168, 75, 0.55));
-
     img {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      display: block;
     }
+  }
+`;
+
+const TitleBlock = styled.div`
+  padding: 4px 18px 12px;
+
+  h2 {
+    margin: 0;
+    font-family: ${brand.fonts.ui};
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 50%, #a67c2d 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  p {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: ${brand.colors.text.secondary};
+    line-height: 1.4;
   }
 `;
 
 const Hairline = styled.div`
   height: 1px;
-  margin: 0;
   background: ${brand.gradients.hairline};
 `;
 
-const Hero = styled.div`
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  background: #0a0a0a;
-  margin: 0;
-
-  img.car {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center 45%;
-    display: block;
-    transform: scale(1.02);
-  }
-
-  .vignette {
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, transparent 18%),
-      linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, 0.88) 100%);
-  }
-
-  .shine {
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-
-    &::after {
-      content: '';
-      position: absolute;
-      top: -10%;
-      left: 0;
-      width: 35%;
-      height: 120%;
-      background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 240, 200, 0.08) 48%,
-        rgba(255, 255, 255, 0.12) 50%,
-        rgba(255, 240, 200, 0.08) 52%,
-        transparent
-      );
-      animation: ${shine} 8s ease-in-out 1s infinite;
-    }
-  }
-`;
-
 const FormPad = styled(motion.div)`
-  padding: 12px 18px 0;
+  padding: 14px 18px 0;
   flex: 0 0 auto;
 `;
 
 const PasswordWrap = styled.div`
   position: relative;
-
   input {
     padding-right: 88px;
   }
-
   button {
     position: absolute;
     right: 12px;
@@ -219,6 +160,12 @@ const PasswordWrap = styled.div`
   }
 `;
 
+const ErrorText = styled.div`
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #e74c3c;
+`;
+
 const HomeBar = styled.div`
   width: 128px;
   height: 5px;
@@ -228,21 +175,69 @@ const HomeBar = styled.div`
   flex-shrink: 0;
 `;
 
-interface LoginPageProps {
-  onLogin?: (phone: string, password: string) => void;
-  onRegister?: () => void;
-  onDemo?: () => void;
+interface RegisterPageProps {
+  onRegistered?: (token: string, user: { id: number; phone: string; full_name: string; role: string }) => void;
 }
 
-export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
-  const [phone, setPhone] = useState('+79999999999');
-  const [password, setPassword] = useState('admin123');
+export default function RegisterPage({ onRegistered }: RegisterPageProps) {
+  const navigate = useNavigate();
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('+7');
+  const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    setError('');
+    if (!fullName.trim()) {
+      setError('Укажите имя');
+      return;
+    }
+    if (!phone.trim() || phone.trim().length < 10) {
+      setError('Укажите корректный телефон');
+      return;
+    }
+    if (password.length < 4) {
+      setError('Пароль не короче 4 символов');
+      return;
+    }
+    if (password !== password2) {
+      setError('Пароли не совпадают');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: phone.trim(),
+          password,
+          full_name: fullName.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(typeof data.detail === 'string' ? data.detail : 'Не удалось зарегистрироваться');
+        return;
+      }
+      localStorage.setItem('token', data.token);
+      onRegistered?.(data.token, data.user);
+      navigate('/concept');
+    } catch {
+      setError('Нет связи с сервером. Проверьте, что backend запущен.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Shell>
       <Phone
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 110, damping: 18 }}
       >
@@ -262,17 +257,26 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
 
             <Hairline />
 
-            <Hero>
-              <img className="car" src={`${brand.assets.heroCar}?v=14`} alt="BMW X5" />
-              <div className="vignette" />
-              <div className="shine" />
-            </Hero>
+            <TitleBlock>
+              <h2>Регистрация</h2>
+              <p>Создайте аккаунт клиента — телефон и пароль для входа в приложение.</p>
+            </TitleBlock>
 
             <FormPad
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12, duration: 0.4 }}
+              transition={{ delay: 0.1, duration: 0.35 }}
             >
+              <GoldField $theme={brand}>
+                <span>Имя</span>
+                <input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Как к вам обращаться"
+                  autoComplete="name"
+                />
+              </GoldField>
+
               <GoldField $theme={brand}>
                 <span>Телефон</span>
                 <input
@@ -280,6 +284,7 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+7 (999) 999-99-99"
+                  autoComplete="tel"
                 />
               </GoldField>
 
@@ -290,7 +295,8 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="Минимум 4 символа"
+                    autoComplete="new-password"
                   />
                   <button type="button" onClick={() => setShowPassword((v) => !v)}>
                     {showPassword ? 'Скрыть' : 'Показать'}
@@ -298,23 +304,36 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
                 </PasswordWrap>
               </GoldField>
 
+              <GoldField $theme={brand}>
+                <span>Повтор пароля</span>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password2}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  placeholder="Повторите пароль"
+                  autoComplete="new-password"
+                />
+              </GoldField>
+
+              {error ? <ErrorText>{error}</ErrorText> : null}
+
               <GoldButton
                 $theme={brand}
                 type="button"
-                style={{ marginTop: 6 }}
                 whileTap={{ scale: 0.975 }}
-                onClick={() => onLogin?.(phone, password)}
+                onClick={submit}
+                disabled={loading}
               >
-                Войти
+                {loading ? 'Создание…' : 'Создать аккаунт'}
               </GoldButton>
 
               <GhostGoldButton
                 $theme={brand}
                 type="button"
                 style={{ marginTop: 11 }}
-                onClick={() => onRegister?.()}
+                onClick={() => navigate('/')}
               >
-                Зарегистрироваться
+                Уже есть аккаунт — Войти
               </GhostGoldButton>
             </FormPad>
           </MainStack>

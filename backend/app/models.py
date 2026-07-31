@@ -12,6 +12,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Integer,
     Numeric,
@@ -191,6 +192,7 @@ class Service(Base):
     price = Column(Numeric(10, 2), nullable=False, default=0)
     duration = Column(Integer, nullable=False, comment="Duration in minutes")
     material_cost = Column(Numeric(10, 2), nullable=False, default=0)
+    cost_price = Column(Numeric(10, 2), nullable=False, default=0, comment="Себестоимость услуги")
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(
         DateTime(timezone=True),
@@ -363,8 +365,23 @@ class Expense(Base):
         String(50),
         nullable=False,
         default="other",
-        comment="rent, salary, utilities, marketing, supplies, other",
+        comment="rent, salary, utilities, marketing, supplies, equipment, taxes, insurance, software, transport, other",
     )
+    subcategory = Column(String(100), nullable=True)
+    payment_status = Column(
+        String(30),
+        nullable=False,
+        default="paid",
+        comment="paid, unpaid, overdue, partial",
+    )
+    period_type = Column(
+        String(30),
+        nullable=False,
+        default="monthly",
+        comment="monthly, quarterly, yearly, one_time",
+    )
+    period_start = Column(DateTime(timezone=True), nullable=True)
+    period_end = Column(DateTime(timezone=True), nullable=True)
     expense_date = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -374,6 +391,12 @@ class Expense(Base):
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
+        nullable=False,
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
     )
 
@@ -766,3 +789,43 @@ class Payment(Base):
 
     def __repr__(self) -> str:
         return f"<Payment(id={self.id}, appt={self.appointment_id}, {self.amount} руб, {self.status})>"
+
+
+class ServiceDiscountRecommendation(Base):
+    """Еженедельные рекомендации скидок по услугам (маржа × популярность)."""
+    __tablename__ = "service_discount_recommendations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    service_id = Column(
+        Integer, ForeignKey("services.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    period_days = Column(Integer, nullable=False, default=30)
+    bookings_30d = Column(Integer, nullable=False, default=0)
+    bookings_prev_30d = Column(Integer, nullable=False, default=0)
+    popularity_index = Column(Float, nullable=False, default=0)
+    margin_raw = Column(Float, nullable=False, default=0)
+    margin_index = Column(Float, nullable=False, default=0)
+    priority = Column(Float, nullable=False, default=0)
+    suggested_percent = Column(Integer, nullable=False, default=0)
+    scenario = Column(String(50), nullable=False, default="priority")
+    reason = Column(Text, nullable=False, default="")
+    status = Column(String(30), nullable=False, default="pending", index=True)
+    adjusted_percent = Column(Integer, nullable=True)
+    discount_rule_id = Column(
+        Integer, ForeignKey("discount_rules.id", ondelete="SET NULL"), nullable=True,
+    )
+    computed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
+    )
+
+    service = relationship("Service")
+    discount_rule = relationship("DiscountRule")

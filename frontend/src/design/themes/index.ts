@@ -9,8 +9,8 @@ export const brandThemes: Record<BrandThemeId, BrandTheme> = {
   silver: silverTheme,
 };
 
-/** Дефолт для разработки */
-export const ACTIVE_BRAND_THEME: BrandThemeId = 'goldGlow';
+/** Дефолт для разработки — эталон входа (металл + тёмный текст на кнопке) */
+export const ACTIVE_BRAND_THEME: BrandThemeId = 'goldMetal';
 
 const STORAGE_KEY = 'brandTheme';
 

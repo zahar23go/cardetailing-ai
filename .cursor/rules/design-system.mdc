@@ -1,24 +1,21 @@
 ---
-description: Design system — два сохранённых luxury-дизайна и именованные бренд-компоненты
+description: Design system — эталон luxury gold + логотип спорткара; именованные бренд-компоненты
 globs: frontend/src/**/*.{ts,tsx}
-alwaysApply: false
+alwaysApply: true
 ---
 
-# Brand / Design System
+# Brand / Design System (запомнить)
 
-В проекте зафиксированы **два дизайна** для кастомизации под бренд:
+## Эталонный стиль (не ломать без запроса)
 
-1. **`goldMetal`** — референс `/design-refs/gold-metal.png` (металл, тёмный текст на кнопке)
-2. **`goldGlow`** — референс `/design-refs/gold-glow.png` (свечение, белый текст на кнопке)
+1. **Логотип** — золотой контур спорткара в профиль: `/images/logo-formula-sport.png` (`brand.assets.logoCar`). Не подменять фото-седаном или произвольным SVG.
+2. **Название** — `CAR DETAILING AI`, uppercase, золотой градиент текста как на главной/логине.
+3. **Вход/регистрация** — phone UI, пресет **`goldMetal`**, контент по центру, **без** статус-бара 9:41/Wi‑Fi/батарея, без кнопки «Смотреть концепцию».
+4. Компоненты: `GoldButton`, `GhostGoldButton`, `GoldField` из `frontend/src/design`.
+5. Два пресета кастомизации: `goldMetal` + `goldGlow` (+ `silver` зарезервирован). Страница: `/branding`.
 
 ## Обязательно
 
-- Стили кнопок/полей/цветов/шрифтов/скруглений брать из `frontend/src/design` (`getBrandTheme`, `GoldButton`, `GhostGoldButton`, `GoldField`).
-- Не дублировать золотые градиенты хардкодом на страницах.
-- Выбор пресета: `ACTIVE_BRAND_THEME` или `localStorage.brandTheme`.
-- `SilverButton` / тема `silver` — зарезервированы под следующий бренд.
+- Цвета / шрифты / скругления / градиенты — только из темы (`getBrandTheme` / `useBrand`).
+- Не хардкодить золотые кнопки и поля на страницах.
 - Документация: `frontend/src/design/DESIGN_SYSTEM.md`.
-
-## Цель босса
-
-Единый стиль на всех страницах → ручная настройка на релизе через файл темы → позже страница брендинга для каждого клиента.

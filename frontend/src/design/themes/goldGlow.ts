@@ -63,7 +63,7 @@ export const goldGlowTheme: BrandTheme = {
   },
 
   assets: {
-    logoCar: '/images/header-car-logo.png',
+    logoCar: '/images/logo-formula-sport.png',
     heroCar: '/images/login-car.png',
     aiOrb: '/images/ai-orb.png',
   },

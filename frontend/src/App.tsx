@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import LoginPage from './components/LoginPage';
+import RegisterPage from './components/RegisterPage';
 import MainPage from './components/MainPage';
 import BrandingPage from './components/BrandingPage';
+import ConceptPage from './components/ConceptPage';
 import OwnerDashboard from './OwnerDashboard';
 import MasterDashboard from './MasterDashboard';
 
@@ -43,6 +45,15 @@ function App() {
     }
   };
 
+  /** После входа/регистрации — хаб «Смотреть концепцию», не тупиковый /main */
+  const goAfterAuth = (role?: string) => {
+    if (role === 'admin' || role === 'super_admin' || role === 'master') {
+      navigate('/');
+      return;
+    }
+    navigate('/concept');
+  };
+
   const handleLogin = async (phone: string, password: string) => {
     if (!phone.trim()) { message.warning('Введите телефон'); return; }
     if (!password.trim()) { message.warning('Введите пароль'); return; }
@@ -58,13 +69,22 @@ function App() {
         setUser(data.user);
         setIsAuthenticated(true);
         message.success(`👋 Добро пожаловать, ${data.user.full_name}!`);
-        navigate('/main');
+        goAfterAuth(data.user?.role);
       } else {
         message.error(data.detail || '❌ Неверный телефон или пароль');
       }
     } catch {
       message.error('❌ Ошибка соединения с сервером');
     }
+  };
+
+  const handleRegistered = (_token: string, newUser: { id: number; phone: string; full_name: string; role: string }) => {
+    setUser({
+      ...newUser,
+      role: (newUser.role as User['role']) || 'client',
+    });
+    setIsAuthenticated(true);
+    message.success(`Аккаунт создан. Добро пожаловать, ${newUser.full_name}!`);
   };
 
   const handleLogout = () => {
@@ -75,13 +95,19 @@ function App() {
     navigate('/');
   };
 
-  const openDemoHome = () => {
-    navigate('/main');
-  };
-
   return (
     <Routes>
       <Route path="/branding" element={<BrandingPage />} />
+      <Route path="/register" element={<RegisterPage onRegistered={handleRegistered} />} />
+      <Route
+        path="/concept"
+        element={
+          <ConceptPage
+            isAuthenticated={isAuthenticated}
+            onLogout={handleLogout}
+          />
+        }
+      />
       <Route
         path="/main"
         element={
@@ -96,7 +122,7 @@ function App() {
         element={
           isAuthenticated && user ? (
             user.role === 'client' ? (
-              <MainPage userName={user.full_name?.split(' ')[0]} onLogout={handleLogout} />
+              <Navigate to="/concept" replace />
             ) :
             user.role === 'admin' || user.role === 'super_admin' ? (
               <OwnerDashboard user={user} onLogout={handleLogout} />
@@ -106,15 +132,13 @@ function App() {
             ) : (
               <LoginPage
                 onLogin={handleLogin}
-                onRegister={() => message.info('Регистрация')}
-                onDemo={openDemoHome}
+                onRegister={() => navigate('/register')}
               />
             )
           ) : (
             <LoginPage
               onLogin={handleLogin}
-              onRegister={() => message.info('Регистрация')}
-              onDemo={openDemoHome}
+              onRegister={() => navigate('/register')}
             />
           )
         }

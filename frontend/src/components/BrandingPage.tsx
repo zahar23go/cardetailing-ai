@@ -43,13 +43,21 @@ const Top = styled.div`
 `;
 
 const Back = styled.button`
+  flex-shrink: 0;
   border: 1px solid ${({ theme }) => theme.brand.colors.accent.border};
-  background: transparent;
-  color: ${({ theme }) => theme.brand.colors.accent.soft};
+  background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 55%, #a67c2d 100%);
+  color: #1a1610;
   border-radius: ${({ theme }) => theme.radii.md};
-  padding: 10px 14px;
+  padding: 10px 18px;
   cursor: pointer;
   font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 4px 14px rgba(212, 168, 75, 0.25);
+
+  &:hover {
+    filter: brightness(1.05);
+  }
 `;
 
 const Grid = styled.div`
@@ -218,8 +226,14 @@ export default function BrandingPage() {
             <h1>Брендинг клиента</h1>
             <p>Выбор пресета + ручная настройка токенов. Единый стиль применяется ко всему приложению.</p>
           </div>
-          <Back type="button" onClick={() => navigate(-1)}>
-            Назад
+          <Back
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) navigate(-1);
+              else navigate('/');
+            }}
+          >
+            ← Назад
           </Back>
         </Top>
 
