@@ -190,8 +190,8 @@ class TestHeatmapBoxes:
         data = resp.json()
         assert "cells" in data
         assert "boxes" in data
-        # Должна быть сетка 7×12 = 84 клетки
-        assert len(data["cells"]) == 84
+        # Сетка 7×15 (дни × часы 8–22) = 105 клеток
+        assert len(data["cells"]) == 105
         assert isinstance(data["boxes"], list)
 
     # ------------------------------------------------------------------
@@ -217,7 +217,7 @@ class TestHeatmapBoxes:
         resp = await client.get(f"/api/analytics/heatmap?box_id={box['id']}", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["cells"]) == 84
+        assert len(data["cells"]) == 105
         # Все count = 0 (записей не было)
         assert all(c["count"] == 0 for c in data["cells"])
 
@@ -233,7 +233,7 @@ class TestHeatmapBoxes:
         resp = await client.get("/api/analytics/heatmap?box_id=99999", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["cells"]) == 84
+        assert len(data["cells"]) == 105
         assert all(c["count"] == 0 for c in data["cells"])
 
 
