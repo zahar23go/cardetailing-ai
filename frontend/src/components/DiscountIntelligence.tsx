@@ -221,8 +221,8 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
         <Card className="admin-panel-card" bordered={false} style={{ marginBottom: 16 }}>
           <Text className="admin-panel-title">Тепловая карта загрузки</Text>
           <p className="discount-intel-hint">
-            Дни × часы за последние {data?.period_days || periodDays} дней. Чем ярче золото — тем выше загрузка.
-            Тёмные ячейки = простой → сюда скидки.
+            Дни × часы за последние {data?.period_days || periodDays} дней. Чем ярче золото — тем выше загрузка
+            (пик, без скидок). Тёмные ячейки = простой → сюда Happy Hours.
           </p>
           {!data?.cells?.length ? (
             <Empty description={<span className="text-titanium">Нет данных за период</span>} />
@@ -266,7 +266,8 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
             </Text>
           </div>
           <p className="discount-intel-hint">
-            % зависит от загрузки: 0 ≈ 20–25%, 1–2 ≈ 10–15%, пик ≈ без скидки. Пн–Пт и Сб считаются отдельно.
+            Скидка считается относительно пика на теплокарте: яркие часы (11–12, пик) — без Happy Hours;
+            тёмные (простой: обед, вечер 18–20) — скидка 15–25%. Пн–Пт, Сб и Вс считаются отдельно.
           </p>
           {!data?.suggestions?.length ? (
             <Empty description={<span className="text-titanium">Нет слотов для скидок — загрузка равномерная</span>} />

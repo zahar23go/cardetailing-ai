@@ -687,14 +687,22 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
      RENDER: Notifications
      ============================================================ */
   const renderNotifications = () => (
-    <Tabs size="small" tabBarStyle={{ borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 16 }}>
-      <TabPane tab="📋 Список" key="list">
-        <NotificationList title="Мои уведомления" />
-      </TabPane>
-      <TabPane tab="⚙️ Настройки" key="settings">
-        <NotificationSettings />
-      </TabPane>
-    </Tabs>
+    <Tabs
+      className="notifications-tabs"
+      size="large"
+      items={[
+        {
+          key: 'list',
+          label: <span><BellOutlined /> Список уведомлений</span>,
+          children: <NotificationList title="Мои уведомления" />,
+        },
+        {
+          key: 'settings',
+          label: <span>Настройки</span>,
+          children: <NotificationSettings />,
+        },
+      ]}
+    />
   );
 
   /* ============================================================

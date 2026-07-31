@@ -1170,9 +1170,9 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     setShowSuggestions(true);
   };
 
-  const handleFinancierQuestion = async () => {
-    const question = financierInput.trim();
-    if (!question) return;
+  const handleFinancierQuestion = async (preset?: string) => {
+    const question = (preset ?? financierInput).trim();
+    if (!question || financierLoading) return;
     setShowSuggestions(false);
     setFinancierMessages(prev => [...prev, { role: 'user', text: question }]);
     setFinancierInput('');
@@ -1212,11 +1212,87 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     };
   }, [appointments, apptsTotal]);
 
+  const applyApptWidgetFilter = (key: string) => {
+    setApptsPage(1);
+    if (key === 'total') {
+      setApptStatusFilter('all');
+      setApptPeriodFilter('all');
+      return;
+    }
+    if (key === 'in_progress') {
+      setApptStatusFilter('in_progress');
+      setApptPeriodFilter('all');
+      return;
+    }
+    if (key === 'waiting') {
+      setApptStatusFilter('waiting');
+      setApptPeriodFilter('all');
+      return;
+    }
+    if (key === 'completed_week') {
+      setApptStatusFilter('completed');
+      setApptPeriodFilter('week');
+      return;
+    }
+    if (key === 'cancelled') {
+      setApptStatusFilter('cancelled');
+      setApptPeriodFilter('all');
+    }
+  };
+
+  const clearApptFilters = () => {
+    setApptStatusFilter('all');
+    setApptMasterFilter('all');
+    setApptPeriodFilter('all');
+    setApptCustomRange(null);
+    setApptSearchClient('');
+    setApptSearchCar('');
+    setApptSort('active_first');
+    setApptsPage(1);
+  };
+
+  const toggleApptSort = (column: 'date' | 'client' | 'master' | 'status' | 'price') => {
+    setApptsPage(1);
+    if (column === 'date') {
+      setApptSort((prev) => (prev === 'date_desc' ? 'date_asc' : 'date_desc'));
+      return;
+    }
+    if (column === 'client') {
+      setApptSort((prev) => (prev === 'client_asc' ? 'client_desc' : 'client_asc'));
+      return;
+    }
+    if (column === 'master') {
+      setApptSort((prev) => (prev === 'master' ? 'master_desc' : 'master'));
+      return;
+    }
+    if (column === 'status') {
+      setApptSort((prev) => (prev === 'status_asc' ? 'status_desc' : 'status_asc'));
+      return;
+    }
+    setApptSort((prev) => (prev === 'price_desc' ? 'price_asc' : 'price_desc'));
+  };
+
+  const apptSortArrow = (column: 'date' | 'client' | 'master' | 'status' | 'price') => {
+    const map: Record<string, string[]> = {
+      date: ['date_desc', 'date_asc'],
+      client: ['client_asc', 'client_desc'],
+      master: ['master', 'master_desc'],
+      status: ['status_asc', 'status_desc'],
+      price: ['price_desc', 'price_asc'],
+    };
+    const keys = map[column];
+    if (!keys.includes(apptSort)) return '';
+    if (apptSort.endsWith('_asc') || apptSort === 'master') return ' ↑';
+    return ' ↓';
+  };
+
   const filteredAppointments = useMemo(() => {
     let list = [...appointments];
 
     if (apptStatusFilter === 'active') {
       list = list.filter((a) => APPT_ACTIVE_STATUSES.includes(a.status));
+    } else if (apptStatusFilter === 'waiting') {
+      list = list.filter((a) => a.status === 'pending' || a.status === 'confirmed');
     } else if (apptStatusFilter === 'completed') {
       list = list.filter((a) => a.status === 'completed');
     } else if (apptStatusFilter === 'cancelled') {
@@ -1268,6 +1344,12 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       });
     }
 
+    const statusRank = (s: string) => {
+      const order = ['in_progress', 'confirmed', 'pending', 'completed', 'cancelled', 'no_show'];
+      const i = order.indexOf(s);
+      return i === -1 ? 99 : i;
+    };
+
     list.sort((a, b) => {
       if (apptSort === 'date_asc') {
         return dayjs(a.start_time).valueOf() - dayjs(b.start_time).valueOf();
@@ -1275,11 +1357,28 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
       if (apptSort === 'date_desc') {
         return dayjs(b.start_time).valueOf() - dayjs(a.start_time).valueOf();
       }
-      if (apptSort === 'master') {
+      if (apptSort === 'master' || apptSort === 'master_desc') {
         const an = a.master?.full_name || 'яяя';
         const bn = b.master?.full_name || 'яяя';
         const cmp = an.localeCompare(bn, 'ru');
-        if (cmp !== 0) return cmp;
+        if (cmp !== 0) return apptSort === 'master_desc' ? -cmp : cmp;
+        return dayjs(b.start_time).valueOf() - dayjs(a.start_time).valueOf();
+      }
+      if (apptSort === 'client_asc' || apptSort === 'client_desc') {
+        const an = a.client?.full_name || 'яяя';
+        const bn = b.client?.full_name || 'яяя';
+        const cmp = an.localeCompare(bn, 'ru');
+        if (cmp !== 0) return apptSort === 'client_desc' ? -cmp : cmp;
+        return dayjs(b.start_time).valueOf() - dayjs(a.start_time).valueOf();
+      }
+      if (apptSort === 'status_asc' || apptSort === 'status_desc') {
+        const cmp = statusRank(a.status) - statusRank(b.status);
+        if (cmp !== 0) return apptSort === 'status_desc' ? -cmp : cmp;
+        return dayjs(b.start_time).valueOf() - dayjs(a.start_time).valueOf();
+      }
+      if (apptSort === 'price_asc' || apptSort === 'price_desc') {
+        const cmp = (a.total_price || 0) - (b.total_price || 0);
+        if (cmp !== 0) return apptSort === 'price_desc' ? -cmp : cmp;
         return dayjs(b.start_time).valueOf() - dayjs(a.start_time).valueOf();
       }
       // active_first (default)
@@ -1495,14 +1594,26 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
             <Row gutter={[12, 12]} className="appt-stats-row">
               {[
-                { label: 'Всего записей', value: apptStats.total, tone: 'gold' },
-                { label: 'В работе', value: apptStats.in_progress, tone: 'ok' },
-                { label: 'Ожидают', value: apptStats.waiting, tone: 'warn' },
-                { label: 'Завершено за нед.', value: apptStats.completed_week, tone: 'gold' },
-                { label: 'Отменено', value: apptStats.cancelled, tone: 'danger' },
+                { key: 'total', label: 'Всего записей', value: apptStats.total, tone: 'gold', active: apptStatusFilter === 'all' && apptPeriodFilter === 'all' },
+                { key: 'in_progress', label: 'В работе', value: apptStats.in_progress, tone: 'ok', active: apptStatusFilter === 'in_progress' },
+                { key: 'waiting', label: 'Ожидают', value: apptStats.waiting, tone: 'warn', active: apptStatusFilter === 'waiting' },
+                { key: 'completed_week', label: 'Завершено за нед.', value: apptStats.completed_week, tone: 'gold', active: apptStatusFilter === 'completed' && apptPeriodFilter === 'week' },
+                { key: 'cancelled', label: 'Отменено', value: apptStats.cancelled, tone: 'danger', active: apptStatusFilter === 'cancelled' },
               ].map((m) => (
-                <Col xs={12} sm={8} md={4} flex="1 1 140px" key={m.label}>
-                  <Card className={`admin-kpi-card tone-${m.tone} appt-stat-card`} bordered={false}>
+                <Col xs={12} sm={8} md={4} flex="1 1 140px" key={m.key}>
+                  <Card
+                    className={`admin-kpi-card tone-${m.tone} appt-stat-card${m.active ? ' is-active' : ''}`}
+                    bordered={false}
+                    onClick={() => applyApptWidgetFilter(m.key)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        applyApptWidgetFilter(m.key);
+                      }
+                    }}
+                  >
                     <div className="admin-kpi-label">{m.label}</div>
                     <div className="admin-kpi-value">{m.value}</div>
                   </Card>
@@ -1511,6 +1622,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
             </Row>
 
             <div className="appt-filters">
+              <div className="appt-filters-label">Фильтры</div>
               <div className="appt-filters-search">
                 <Input
                   allowClear
@@ -1538,8 +1650,10 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                 >
                   <Option value="all">Все статусы</Option>
                   <Option value="active">Активные</Option>
+                  <Option value="waiting">Ожидают</Option>
+                  <Option value="pending">Ожидание</Option>
+                  <Option value="confirmed">Подтверждена</Option>
                   <Option value="in_progress">В работе</Option>
-                  <Option value="pending">Ожидают</Option>
                   <Option value="completed">Завершённые</Option>
                   <Option value="cancelled">Отменённые</Option>
                 </Select>
@@ -1578,18 +1692,28 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                   />
                 )}
                 <Select
-                  value={apptSort}
+                  value={
+                    ['active_first', 'date_desc', 'date_asc', 'master', 'master_desc', 'client_asc', 'client_desc', 'status_asc', 'status_desc', 'price_desc', 'price_asc'].includes(apptSort)
+                      ? apptSort
+                      : 'active_first'
+                  }
                   onChange={(v) => { setApptSort(v); setApptsPage(1); }}
                   className="appt-filter-select"
                   style={{ minWidth: 180 }}
                 >
                   <Option value="active_first">Сначала актуальные</Option>
-                  <Option value="date_desc">Сначала новые</Option>
-                  <Option value="date_asc">Сначала старые</Option>
-                  <Option value="master">По мастеру</Option>
+                  <Option value="date_desc">Дата ↓</Option>
+                  <Option value="date_asc">Дата ↑</Option>
+                  <Option value="client_asc">Клиент А–Я</Option>
+                  <Option value="master">Мастер А–Я</Option>
+                  <Option value="status_asc">По статусу</Option>
+                  <Option value="price_desc">Цена ↓</Option>
                 </Select>
                 <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={() => fetchAppointments()}>
                   Обновить
+                </Button>
+                <Button className="btn-gold-secondary" onClick={clearApptFilters}>
+                  Сбросить
                 </Button>
               </div>
             </div>
@@ -1601,6 +1725,25 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                   {apptsTotal > appointments.length ? ` (загружено ${appointments.length} из ${apptsTotal})` : ''}
                 </Text>
               </div>
+
+              <div className="appt-sort-columns" role="row">
+                <button type="button" className="appt-sort-col" onClick={() => toggleApptSort('date')}>
+                  Дата{apptSortArrow('date')}
+                </button>
+                <button type="button" className="appt-sort-col" onClick={() => toggleApptSort('client')}>
+                  Клиент{apptSortArrow('client')}
+                </button>
+                <button type="button" className="appt-sort-col" onClick={() => toggleApptSort('master')}>
+                  Мастер{apptSortArrow('master')}
+                </button>
+                <button type="button" className="appt-sort-col" onClick={() => toggleApptSort('status')}>
+                  Статус{apptSortArrow('status')}
+                </button>
+                <button type="button" className="appt-sort-col appt-sort-col-price" onClick={() => toggleApptSort('price')}>
+                  Цена{apptSortArrow('price')}
+                </button>
+              </div>
+
               {filteredAppointments.length === 0 && !apptsLoading ? (
                 <Empty description={<Text className="text-titanium">Нет записей по фильтрам</Text>} />
               ) : (
@@ -1668,7 +1811,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                               В работу
                             </Button>
                           )}
-                          {item.status === 'in_progress' && (
+                          {(item.status === 'in_progress' || item.status === 'confirmed') && (
                             <Button
                               size="small"
                               className="btn-gold"
@@ -2082,45 +2225,39 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
           <TabPane tab={<span><BulbOutlined /> AI Финансист</span>} key="financier">
             <div className="admin-section-head">
               <div>
-                <div className="admin-overview-kicker">AI</div>
-                <h3>Финансовый консультант</h3>
+                <div className="admin-overview-kicker">AI-консультант</div>
+                <h3>AI Финансист</h3>
+                <p className="financier-lead">
+                  Аналитика бизнеса, прогнозы и рекомендации
+                </p>
               </div>
             </div>
-            <Card className="card-luxury admin-panel-card">
-              <div className="flex-space-between" style={{ marginBottom: '16px' }}>
-                <div>
-                  <Text className="title-gold" style={{ fontSize: '18px', fontWeight: 700 }}>AI Финансист</Text>
-                  <Text className="text-titanium d-block text-13">
-                    Аналитика бизнеса, прогнозы и рекомендации
-                  </Text>
-                </div>
-                <BulbOutlined className="text-gold" style={{ fontSize: '28px' }} />
-              </div>
 
-              {/* Chat history */}
-              <div style={{
-                height: '360px', overflowY: 'auto', marginBottom: '12px',
-                display: 'flex', flexDirection: 'column', gap: '12px',
-                padding: '4px',
-              }}>
+            <Card className="admin-panel-card financier-panel" bordered={false}>
+              <div className="financier-chat">
                 {showSuggestions ? (
-                  <div className="text-center" style={{ marginTop: '80px' }}>
-                    <BulbOutlined className="text-gold" style={{ fontSize: '40px', opacity: 0.5 }} />
-                    <Text className="text-titanium d-block text-14" style={{ marginTop: '12px' }}>
-                      Задайте вопрос о финансах вашего бизнеса
-                    </Text>
-                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                      {['Какая прибыль за месяц?', 'Кто из мастеров эффективнее?', 'Прогноз выручки на неделю'].map(q => (
-                        <Button
+                  <div className="financier-empty">
+                    <div className="financier-empty-icon">
+                      <BulbOutlined />
+                    </div>
+                    <div className="financier-empty-title">Задайте вопрос о финансах вашего бизнеса</div>
+                    <div className="financier-empty-hint">
+                      Данные салона: выручка, мастера, загрузка, затраты — в одном ответе
+                    </div>
+                    <div className="financier-suggests">
+                      {[
+                        'Какая прибыль за месяц?',
+                        'Кто из мастеров эффективнее?',
+                        'Прогноз выручки на неделю',
+                      ].map((q) => (
+                        <button
                           key={q}
-                          size="small"
-                          className="btn-gold-secondary"
-                          style={{ width: '320px', height: '36px', fontSize: '13px' }}
-                          onClick={() => {
-                            setFinancierInput(q);
-                            setTimeout(() => handleFinancierQuestion(), 100);
-                          }}
-                        >{q}</Button>
+                          type="button"
+                          className="financier-suggest"
+                          onClick={() => handleFinancierQuestion(q)}
+                        >
+                          {q}
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -2128,58 +2265,42 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                   financierMessages.map((msg, i) => (
                     <div
                       key={i}
-                      style={{
-                        maxWidth: '85%',
-                        alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                      }}
+                      className={`financier-msg ${msg.role === 'user' ? 'is-user' : 'is-ai'}`}
                     >
-                      <Card
-                        size="small"
-                        className={msg.role === 'user' ? 'card-detail' : 'card-luxury'}
-                        style={{
-                          padding: msg.role === 'user' ? '8px 14px' : '12px 16px',
-                          borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                          border: msg.role === 'user' ? '1px solid rgba(200,169,119,0.2)' : undefined,
-                          marginBottom: 0,
-                        }}
-                      >
-                        {msg.role === 'user' ? (
-                          <Text className="text-white text-14">{msg.text}</Text>
-                        ) : (
-                          <Text className="text-titanium text-13" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</Text>
+                      <div className="financier-bubble">
+                        {msg.role === 'ai' && (
+                          <div className="financier-bubble-label">
+                            <BulbOutlined /> AI Финансист
+                          </div>
                         )}
-                      </Card>
+                        <div className="financier-bubble-text">{msg.text}</div>
+                      </div>
                     </div>
                   ))
                 )}
                 {financierLoading && (
-                  <div style={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
-                    <Card size="small" className="card-luxury" style={{ padding: '12px 16px', borderRadius: '16px 16px 16px 4px', marginBottom: 0 }}>
-                      <Text className="text-titanium text-13">🤔 Анализирую данные...</Text>
-                    </Card>
+                  <div className="financier-msg is-ai">
+                    <div className="financier-bubble">
+                      <div className="financier-bubble-label">
+                        <BulbOutlined /> AI Финансист
+                      </div>
+                      <div className="financier-bubble-text is-typing">Анализирую данные салона…</div>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Input area */}
-              <div className="flex-space-between" style={{ gap: '8px' }}>
+              <div className="financier-composer">
                 <Button
                   icon={<PlusOutlined />}
+                  className="btn-gold-secondary financier-new-btn"
                   onClick={handleNewDialog}
-                  style={{
-                    backgroundColor: '#232A33',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    color: '#C8A977',
-                    borderRadius: '20px',
-                    height: '46px',
-                    whiteSpace: 'nowrap',
-                  }}
                 >
-                  Новый диалог
+                  + Новый диалог
                 </Button>
                 <Input.TextArea
-                  className="input-luxury"
-                  placeholder="Спросите AI-финансиста..."
+                  className="input-luxury financier-input"
+                  placeholder="Спросите AI-финансиста…"
                   value={financierInput}
                   onChange={(e) => setFinancierInput(e.target.value)}
                   onPressEnter={(e) => {
@@ -2189,12 +2310,11 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
                     }
                   }}
                   rows={1}
-                  style={{ flex: 1, height: '46px', resize: 'none', paddingTop: '12px' }}
+                  autoSize={{ minRows: 1, maxRows: 4 }}
                 />
                 <Button
-                  className="btn-gold"
-                  style={{ width: '56px', height: '46px', padding: 0, minWidth: '56px' }}
-                  onClick={handleFinancierQuestion}
+                  className="btn-gold financier-send"
+                  onClick={() => handleFinancierQuestion()}
                   loading={financierLoading}
                   icon={<SendOutlined />}
                 />
@@ -2887,14 +3007,22 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
 
           {/* ===== TAB 12: NOTIFICATIONS ===== */}
           <TabPane tab={<span><BellOutlined /> Уведомления</span>} key="notifications">
-            <Tabs size="small" tabBarStyle={{ borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
-              <TabPane tab="📋 Список уведомлений" key="list">
-                <NotificationList title="Все уведомления" />
-              </TabPane>
-              <TabPane tab="⚙️ Настройки" key="settings">
-                <NotificationSettings />
-              </TabPane>
-            </Tabs>
+            <Tabs
+              className="notifications-tabs"
+              size="large"
+              items={[
+                {
+                  key: 'list',
+                  label: <span><BellOutlined /> Список уведомлений</span>,
+                  children: <NotificationList title="Все уведомления" />,
+                },
+                {
+                  key: 'settings',
+                  label: <span>Настройки</span>,
+                  children: <NotificationSettings />,
+                },
+              ]}
+            />
           </TabPane>
         </Tabs>
       </Content>

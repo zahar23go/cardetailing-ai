@@ -1,10 +1,10 @@
 /* ============================================================
-   NotificationList — страница со списком уведомлений
+   NotificationList — список уведомлений (стиль Command Center)
    ============================================================ */
 
 import React, { useState, useEffect } from 'react';
 import {
-  Typography, List, Tag, Button, Space, Spin, Empty, message,
+  Typography, List, Tag, Button, Space, Spin, Empty, message, Card,
 } from 'antd';
 import { CheckOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getNotifications, markAsRead, markAllAsRead } from '../api/notifications';
@@ -30,15 +30,15 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 interface NotificationListProps {
-  /** Фильтр: только непрочитанные */
   unreadOnly?: boolean;
-  /** Заголовок */
   title?: string;
+  plaque?: string;
 }
 
 export default function NotificationList({
   unreadOnly = false,
   title = 'Уведомления',
+  plaque = 'Лента событий салона · напоминания, статусы и акции',
 }: NotificationListProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [total, setTotal] = useState(0);
@@ -86,74 +86,86 @@ export default function NotificationList({
   };
 
   return (
-    <div>
-      <div className="flex-space-between mb-12">
-        <Text className="title-gold text-18">{title}</Text>
-        <Space>
-          <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchData(1)} className="btn-logout" />
-          <Button size="small" className="btn-action-gold" onClick={handleMarkAllRead}>
-            <CheckOutlined /> Всё прочитано
+    <div className="notifications-module">
+      <div className="admin-section-head reports-head">
+        <div>
+          <div className="admin-overview-kicker">Коммуникации</div>
+          <h3>{title}</h3>
+          <p className="reports-lead">{plaque}</p>
+        </div>
+        <div className="reports-toolbar">
+          <Button
+            icon={<ReloadOutlined />}
+            className="btn-gold-secondary"
+            onClick={() => fetchData(1)}
+          >
+            Обновить
           </Button>
-        </Space>
+          <Button
+            icon={<CheckOutlined />}
+            className="btn-gold"
+            onClick={handleMarkAllRead}
+          >
+            Всё прочитано
+          </Button>
+        </div>
       </div>
 
-      <Spin spinning={loading}>
-        {notifications.length === 0 && !loading ? (
-          <Empty description={<Text className="text-titanium">Нет уведомлений</Text>} />
-        ) : (
-          <List
-            dataSource={notifications}
-            pagination={{
-              current: page,
-              pageSize: PAGE_SIZE,
-              total: total,
-              onChange: (p) => fetchData(p),
-              showSizeChanger: false,
-              size: 'small',
-            }}
-            renderItem={(item) => (
-              <List.Item
-                style={{
-                  backgroundColor: item.is_read ? 'transparent' : 'rgba(200,169,119,0.05)',
-                  borderRadius: '14px',
-                  padding: '12px 16px',
-                  marginBottom: '8px',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                }}
-              >
-                <List.Item.Meta
-                  title={
-                    <Space>
-                      <Tag color={TYPE_COLORS[item.type]} className="tag-status">
-                        {TYPE_LABELS[item.type] || item.type}
-                      </Tag>
-                      <Text className="text-gold-bold">
-                        {item.title}
-                      </Text>
-                      {!item.is_read && (
-                        <Button
-                          size="small"
-                          className="btn-action-gold"
-                          icon={<CheckOutlined />}
-                          onClick={() => handleMarkRead(item.id)}
-                        />
-                      )}
-                    </Space>
-                  }
-                  description={
-                    <Space direction="vertical" size={2}>
-                      <Text className="text-titanium">{item.message}</Text>
-                      <Text className="text-small opacity-70">
-                        {item.created_at ? dayjs(item.created_at).format('DD.MM.YYYY HH:mm') : ''}
-                      </Text>
-                    </Space>
-                  }
-                />
-              </List.Item>
-            )}
-          />
-        )}
-      </Spin>
+      <Card className="admin-panel-card" bordered={false}>
+        <Spin spinning={loading}>
+          {notifications.length === 0 && !loading ? (
+            <Empty
+              className="notifications-empty"
+              description={<Text className="text-titanium">Нет уведомлений</Text>}
+            />
+          ) : (
+            <List
+              className="notifications-list"
+              dataSource={notifications}
+              pagination={{
+                current: page,
+                pageSize: PAGE_SIZE,
+                total,
+                onChange: (p) => fetchData(p),
+                showSizeChanger: false,
+                size: 'small',
+              }}
+              renderItem={(item) => (
+                <List.Item className={`notification-item${item.is_read ? ' is-read' : ' is-unread'}`}>
+                  <List.Item.Meta
+                    title={
+                      <Space wrap size={8}>
+                        <Tag color={TYPE_COLORS[item.type]} className="tag-status">
+                          {TYPE_LABELS[item.type] || item.type}
+                        </Tag>
+                        <Text className="text-gold-bold">{item.title}</Text>
+                        {!item.is_read && (
+                          <Button
+                            size="small"
+                            className="btn-gold-secondary"
+                            icon={<CheckOutlined />}
+                            onClick={() => handleMarkRead(item.id)}
+                          >
+                            Прочитано
+                          </Button>
+                        )}
+                      </Space>
+                    }
+                    description={
+                      <Space direction="vertical" size={2}>
+                        <Text className="text-titanium">{item.message}</Text>
+                        <Text className="notification-time">
+                          {item.created_at ? dayjs(item.created_at).format('DD.MM.YYYY HH:mm') : ''}
+                        </Text>
+                      </Space>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </Spin>
+      </Card>
     </div>
   );
 }

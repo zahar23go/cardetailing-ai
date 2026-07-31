@@ -2173,17 +2173,26 @@ async def get_discount_analytics(
     )
 
 
-def _discount_percent_from_avg(avg_load: float) -> int:
-    """% скидки от средней загрузки слота: пусто → больше скидка."""
-    if avg_load < 0.25:
+def _discount_percent_relative(hour_load: float, peak_load: float) -> int:
+    """
+    Happy Hours только там, где загрузка заметно ниже пика группы (Пн–Пт / Сб / Вс).
+
+    Пиковые часы на теплокарте → 0% (скидка вредна).
+    Простой / почти пустые слоты → 20–25%.
+    """
+    if peak_load <= 0:
         return 25
-    if avg_load < 0.75:
-        return 20
-    if avg_load < 1.25:
-        return 15
-    if avg_load < 2.0:
+
+    ratio = hour_load / peak_load
+    if ratio >= 0.55:
+        return 0
+    if ratio >= 0.35:
         return 10
-    return 0
+    if ratio >= 0.20:
+        return 15
+    if hour_load <= 0 or ratio < 0.12:
+        return 25
+    return 20
 
 
 def _merge_hour_suggestions(
@@ -2192,7 +2201,7 @@ def _merge_hour_suggestions(
     weekday_label: str,
     prefix: str,
 ) -> list[DiscountSuggestion]:
-    """Склеивает соседние часы с одинаковым % в слоты."""
+    """Склеивает соседние часы с одинаковым % (пики с 0% разрывают цепочку)."""
     suggestions: list[DiscountSuggestion] = []
     hours = sorted(h for h, (p, _) in hour_percents.items() if p > 0)
     if not hours:
@@ -2200,9 +2209,11 @@ def _merge_hour_suggestions(
 
     start = hours[0]
     prev = hours[0]
-    cur_pct, cur_avg = hour_percents[start]
+    cur_pct, _ = hour_percents[start]
 
     def flush(s: int, e: int, pct: int, avg: float):
+        if pct <= 0:
+            return
         suggestions.append(DiscountSuggestion(
             key=f"{prefix}-{s}-{e}-{pct}",
             name=f"Happy Hours {weekday_label} {s:02d}:00–{e:02d}:00",
@@ -2213,8 +2224,8 @@ def _merge_hour_suggestions(
             discount_percent=pct,
             avg_load=round(avg, 2),
             reason=(
-                f"Средняя загрузка {avg:.1f} записей/слот → скидка {pct}%. "
-                f"{'Пик — скидка не нужна' if pct == 0 else 'Свободный слот — нужна скидка'}."
+                f"Загрузка {avg:.2f} отн. пика группы → скидка {pct}%. "
+                f"Свободный слот на теплокарте — Happy Hours подстегнут спрос."
             ),
         ))
 
@@ -2231,6 +2242,28 @@ def _merge_hour_suggestions(
         avgs = [avg]
     flush(start, prev + 1, cur_pct, sum(avgs) / len(avgs))
     return suggestions
+
+
+def _build_group_hour_percents(
+    weekdays: list[int],
+    avg_for,
+) -> dict[int, tuple[int, float]]:
+    """
+    Яркость часа = max по дням группы (как на теплокарте).
+    Пик = max по часам. Скидка только ниже пика.
+    """
+    hour_loads: dict[int, float] = {}
+    for hour in range(8, 23):
+        day_avgs = [avg_for(d, hour) for d in weekdays]
+        hour_loads[hour] = max(day_avgs) if day_avgs else 0.0
+
+    peak = max(hour_loads.values()) if hour_loads else 0.0
+    hour_percents: dict[int, tuple[int, float]] = {}
+    for hour, load in hour_loads.items():
+        mean_load = sum(avg_for(d, hour) for d in weekdays) / max(len(weekdays), 1)
+        pct = _discount_percent_relative(load, peak)
+        hour_percents[hour] = (pct, mean_load)
+    return hour_percents
 
 
 @app.get("/api/analytics/discount-intelligence", response_model=DiscountIntelligenceResponse)
@@ -2291,12 +2324,7 @@ async def get_discount_intelligence(
 
     suggestions: list[DiscountSuggestion] = []
     for weekdays, label, prefix in groups:
-        hour_percents: dict[int, tuple[int, float]] = {}
-        for hour in range(8, 23):
-            avgs = [avg_for(d, hour) for d in weekdays]
-            avg = sum(avgs) / len(avgs)
-            pct = _discount_percent_from_avg(avg)
-            hour_percents[hour] = (pct, avg)
+        hour_percents = _build_group_hour_percents(weekdays, avg_for)
         suggestions.extend(_merge_hour_suggestions(hour_percents, weekdays, label, prefix))
 
     # Существующие правила
@@ -2409,35 +2437,58 @@ async def get_discount_intelligence(
                 after_avg=after_avg,
             ))
 
-            # Рекомендация по текущей загрузке в слоте
-            avgs = []
-            for d in cond_days:
-                for h in range(h0, min(h1, 23)):
-                    if (d, h) in cells_map:
-                        avgs.append(avg_for(d, h))
-            slot_avg_now = sum(avgs) / len(avgs) if avgs else 0
-            ideal = _discount_percent_from_avg(slot_avg_now)
+            # Рекомендация: относительно пика группы; широкий слот с пиком внутри — отключить
+            peak_for_rule = max(
+                (avg_for(d, h) for d in cond_days for h in range(8, 23)),
+                default=0.0,
+            )
+            hour_ideals: list[int] = []
+            hour_loads: list[float] = []
+            for h in range(h0, min(h1, 23)):
+                load = max((avg_for(d, h) for d in cond_days), default=0.0)
+                hour_loads.append(load)
+                hour_ideals.append(_discount_percent_relative(load, peak_for_rule))
+            slot_avg_now = sum(hour_loads) / len(hour_loads) if hour_loads else 0.0
+            peak_hours_inside = sum(1 for p in hour_ideals if p == 0)
+            idle_ideals = [p for p in hour_ideals if p > 0]
+            if peak_hours_inside > 0:
+                ideal = 0
+            elif idle_ideals:
+                ideal = min(idle_ideals)
+            else:
+                ideal = _discount_percent_relative(slot_avg_now, peak_for_rule)
+
             if not rule.is_active:
                 recommendations.append(DiscountRuleAdvice(
                     rule_id=rule.id, rule_name=rule.name, action="keep",
                     message="Правило выключено",
                 ))
+            elif peak_hours_inside > 0:
+                recommendations.append(DiscountRuleAdvice(
+                    rule_id=rule.id, rule_name=rule.name, action="disable",
+                    message=(
+                        f"Слот {h0:02d}:00–{h1:02d}:00 перекрывает пик загрузки "
+                        f"({peak_hours_inside} ч). На пике скидку давать нельзя — "
+                        f"сузьте до пустых часов или отключите."
+                    ),
+                    suggested_percent=0,
+                ))
             elif ideal == 0:
                 recommendations.append(DiscountRuleAdvice(
                     rule_id=rule.id, rule_name=rule.name, action="disable",
-                    message=f"Слот загружен (ср. {slot_avg_now:.1f}) — скидку лучше отключить",
+                    message=f"Слот у пика (ср. {slot_avg_now:.2f}) — скидку лучше отключить",
                     suggested_percent=0,
                 ))
             elif ideal > rule.discount_percent + 4:
                 recommendations.append(DiscountRuleAdvice(
                     rule_id=rule.id, rule_name=rule.name, action="increase",
-                    message=f"Слот пустой (ср. {slot_avg_now:.1f}) — увеличить до {ideal}%",
+                    message=f"Слот пустой (ср. {slot_avg_now:.2f}) — увеличить до {ideal}%",
                     suggested_percent=ideal,
                 ))
             elif ideal < rule.discount_percent - 4:
                 recommendations.append(DiscountRuleAdvice(
                     rule_id=rule.id, rule_name=rule.name, action="decrease",
-                    message=f"Загрузка выросла (ср. {slot_avg_now:.1f}) — снизить до {ideal}%",
+                    message=f"Загрузка выросла (ср. {slot_avg_now:.2f}) — снизить до {ideal}%",
                     suggested_percent=ideal,
                 ))
             elif verdict == "отключить" and times > 0:
@@ -2448,7 +2499,7 @@ async def get_discount_intelligence(
             else:
                 recommendations.append(DiscountRuleAdvice(
                     rule_id=rule.id, rule_name=rule.name, action="keep",
-                    message=f"Слот ок (ср. {slot_avg_now:.1f}, ROI {roi_pct}%)",
+                    message=f"Слот ок (ср. {slot_avg_now:.2f}, ROI {roi_pct}%)",
                     suggested_percent=rule.discount_percent,
                 ))
 
@@ -2538,12 +2589,12 @@ async def broadcast_happy_hours(
 
 
 def _percent_from_priority(priority: float) -> int:
-    """≥0.7 → 20–30%, 0.5–0.69 → 10–20%."""
+    """≥0.7 → 20–30%, 0.45–0.69 → 10–20%."""
     if priority >= 0.7:
         t = min(1.0, (priority - 0.7) / 0.3)
         return int(round(20 + t * 10))
-    if priority >= 0.5:
-        t = (priority - 0.5) / 0.2
+    if priority >= 0.45:
+        t = (priority - 0.45) / 0.25
         return int(round(10 + t * 10))
     return 0
 
@@ -2552,10 +2603,24 @@ async def _compute_service_discount_recs(
     db: AsyncSession,
     tenant_id: UUID,
 ) -> list[ServiceDiscountRecommendation]:
-    """Пересчитать рекомендации по услугам (популярность × маржа)."""
+    """
+    Авто-рекомендации скидок по услугам (бухлогика салона).
+
+    Цель:
+    - подстегнуть просевшие по количеству записей;
+    - подстегнуть низкомаржинальные (объём → списать постоянные на них);
+    - высокомаржинальные с нормальным спросом НЕ резать (на них зарабатываем).
+
+    Формула приоритета:
+      volume_need = 1 − популярность (0…1)
+      margin_need = 1 − маржа (себест./цена)
+      priority = volume_need×0.55 + margin_need×0.45
+    + давление постоянных расходов усиливает % на низкомаржинальных.
+    """
     now = datetime.now(timezone.utc)
     cur_from = now - timedelta(days=30)
     prev_from = now - timedelta(days=60)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     services = (
         await db.execute(
@@ -2579,8 +2644,11 @@ async def _compute_service_discount_recs(
     stats: dict[int, dict] = {
         s.id: {"cur": 0, "prev": 0, "service": s} for s in services
     }
+    revenue_month = 0.0
     for a in appts:
         sid = a.service_id
+        if a.start_time >= month_start:
+            revenue_month += float(a.total_price or 0)
         if sid not in stats:
             continue
         if a.start_time >= cur_from:
@@ -2588,17 +2656,37 @@ async def _compute_service_discount_recs(
         elif a.start_time >= prev_from:
             stats[sid]["prev"] += 1
 
-    max_bookings = max((v["cur"] for v in stats.values()), default=0) or 1
+    # Постоянные расходы текущего месяца (давление на маржу)
+    expenses = (
+        await db.execute(
+            select(Expense).where(
+                Expense.tenant_id == tenant_id,
+                Expense.expense_date >= month_start,
+                Expense.expense_date <= now,
+            )
+        )
+    ).scalars().all()
+    fixed_month = sum(float(e.amount or 0) for e in expenses)
+    overhead_pressure = fixed_month / max(revenue_month, 1.0)
 
-    margins: list[float] = []
+    max_bookings = max((v["cur"] for v in stats.values()), default=0) or 1
+    booking_counts = [v["cur"] for v in stats.values()]
+    median_bookings = sorted(booking_counts)[len(booking_counts) // 2] if booking_counts else 0
+
+    margins_raw: list[float] = []
+    service_margin: dict[int, float] = {}
     for s in services:
         price = float(s.price or 0)
         cost = float(getattr(s, "cost_price", None) or 0) or float(s.material_cost or 0)
         raw = ((price - cost) / price) if price > 0 else 0.0
-        margins.append(max(0.0, min(1.0, raw)))
-    min_margin = min(margins) if margins else 0.0
+        raw = max(0.0, min(1.0, raw))
+        service_margin[s.id] = raw
+        margins_raw.append(raw)
+    margin_median = sorted(margins_raw)[len(margins_raw) // 2] if margins_raw else 0.5
 
-    # Сбрасываем старые pending
+    # Порог «высокая маржа — защищаем цену»
+    HIGH_MARGIN_PROTECT = 0.70
+
     old_pending = (
         await db.execute(
             select(ServiceDiscountRecommendation).where(
@@ -2614,50 +2702,77 @@ async def _compute_service_discount_recs(
     for s in services:
         price = float(s.price or 0)
         cost = float(getattr(s, "cost_price", None) or 0) or float(s.material_cost or 0)
-        margin_raw = max(0.0, min(1.0, ((price - cost) / price) if price > 0 else 0.0))
-        # индекс маржинальности: от минимальной среди услуг до 100%
-        if min_margin >= 0.999:
-            margin_index = 1.0
-        else:
-            margin_index = (margin_raw - min_margin) / (1.0 - min_margin)
-            margin_index = max(0.0, min(1.0, margin_index))
-
+        margin_raw = service_margin[s.id]
         bookings = stats[s.id]["cur"]
         prev = stats[s.id]["prev"]
         popularity = bookings / max_bookings
-        priority = (1 - popularity) * 0.6 + (1 - margin_index) * 0.4
 
-        declined = prev > 0 and bookings < prev * 0.7
-        high_margin = margin_raw >= 0.45
-        scenario = "priority"
-        suggested = 0
-        reason_parts: list[str] = []
+        volume_need = 1.0 - popularity
+        if bookings == 0:
+            volume_need = 1.0
+        elif bookings <= max(median_bookings, 1):
+            volume_need = max(volume_need, 0.65)
 
-        if priority >= 0.5:
-            suggested = _percent_from_priority(priority)
-            scenario = "priority"
-            reason_parts.append(
-                f"Приоритет {priority:.2f} = (1−попул.{popularity:.2f})×0.6 + (1−маржа_инд.{margin_index:.2f})×0.4. "
-                f"Записей за 30д: {bookings} (макс {max_bookings}). "
-                f"Маржа {(margin_raw * 100):.0f}% (себест. {cost:.0f} ₽ / цена {price:.0f} ₽)."
-            )
-        elif high_margin and declined:
-            # высокомаржинальная, но просевшая
-            drop = ((prev - bookings) / prev) * 100 if prev else 0
-            suggested = 15 if priority >= 0.35 else 12
-            scenario = "high_margin_decline"
-            reason_parts.append(
-                f"Дорогая/маржинальная услуга ({(margin_raw * 100):.0f}%) просела: "
-                f"{prev} → {bookings} записей (−{drop:.0f}%). "
-                f"Скидка привлечёт клиентов на высокомаржинальную позицию."
-            )
+        margin_need = 1.0 - margin_raw
+        # индекс для UI (как раньше): относительно медианы каталога
+        if margin_median >= 0.999:
+            margin_index = 1.0
         else:
+            # выше медианы → ближе к 1, ниже → ближе к 0
+            span = max(1.0 - margin_median, margin_median, 0.01)
+            margin_index = max(0.0, min(1.0, 0.5 + (margin_raw - margin_median) / (2 * span)))
+
+        is_low_volume = bookings <= max(1, int(max_bookings * 0.45)) or popularity <= 0.45
+        is_low_margin = margin_raw <= margin_median or margin_raw < 0.55
+
+        # Высокомаржинальные с нормальным/хорошим спросом — не трогаем
+        if margin_raw >= HIGH_MARGIN_PROTECT and not is_low_volume:
             continue
 
+        # Нужна скидка только если просадка по объёму ИЛИ низкая маржа
+        if not (is_low_volume or is_low_margin):
+            continue
+
+        priority = volume_need * 0.55 + margin_need * 0.45
+        if priority < 0.40:
+            continue
+
+        suggested = _percent_from_priority(priority)
         if suggested <= 0:
             continue
 
-        reason_parts.append(f"Рекомендуемая скидка: {suggested}%.")
+        # На высокомаржинальных, но просевших — только мягкая скидка (заполнить слот)
+        if margin_raw >= HIGH_MARGIN_PROTECT and is_low_volume:
+            suggested = min(suggested, 12)
+            scenario = "volume_fill"
+            reason = (
+                f"Просадка по записям: {bookings} за 30д (макс в каталоге {max_bookings}). "
+                f"Маржа высокая ({margin_raw * 100:.0f}%) — цену сильно не режем, "
+                f"мягкая скидка {suggested}% только чтобы подтянуть спрос. "
+                f"Себест. {cost:.0f} ₽ / цена {price:.0f} ₽."
+            )
+        elif is_low_margin:
+            scenario = "low_margin_volume"
+            # Постоянные расходы списываем через объём на низкомаржинальных
+            if overhead_pressure >= 0.20:
+                boost = 5 if overhead_pressure < 0.35 else 8
+                suggested = min(30, suggested + boost)
+            reason = (
+                f"Низкомаржинальная услуга ({margin_raw * 100:.0f}%) — приоритет объёма: "
+                f"постоянные затраты ({fixed_month:,.0f} ₽/мес) удобнее закрывать оборотом здесь, "
+                f"а высокомаржинальные оставлять без скидки. "
+                f"Записей 30д: {bookings} (попул. {popularity:.2f}). "
+                f"Себест. {cost:.0f} ₽ / цена {price:.0f} ₽. "
+                f"Приоритет {priority:.2f} = объём×0.55 + (1−маржа)×0.45 → скидка {suggested}%."
+            )
+        else:
+            scenario = "volume_fill"
+            reason = (
+                f"Мало записей ({bookings} за 30д, макс {max_bookings}) — подстегнуть спрос. "
+                f"Маржа {margin_raw * 100:.0f}%. Рекомендуемая скидка: {suggested}%."
+            )
+
+        # margin_index для хранения: используем «нужность маржи» как 1 - margin для согласованности UI
         rec = ServiceDiscountRecommendation(
             tenant_id=tenant_id,
             service_id=s.id,
@@ -2670,7 +2785,7 @@ async def _compute_service_discount_recs(
             priority=round(priority, 4),
             suggested_percent=suggested,
             scenario=scenario,
-            reason=" ".join(reason_parts),
+            reason=reason,
             status="pending",
             computed_at=now,
         )

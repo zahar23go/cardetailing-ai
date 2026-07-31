@@ -177,8 +177,9 @@ export default function ServiceDiscountRecs() {
         <Card className="admin-panel-card" bordered={false} style={{ marginBottom: 16 }}>
           <Text className="admin-panel-title">Рекомендации по услугам</Text>
           <p className="discount-intel-hint">
-            Приоритет = (1 − популярность)×0.6 + (1 − маржинальность)×0.4.
-            ≥0.7 → 20–30%, 0.5–0.69 → 10–20%. Отдельно: высокомаржинальные просевшие услуги.
+            Авто из учёта: скидка на просевшие (мало записей) и низкомаржинальные
+            (объём закрывает постоянные расходы). Высокомаржинальные с нормальным спросом — без скидки.
+            Формула: приоритет = нужда_по_объёму×0.55 + (1−маржа)×0.45; % растёт, если постоянные затраты давят на выручку.
           </p>
           {pending.length === 0 ? (
             <Empty description={<span className="text-titanium">Нет активных рекомендаций — заполните себестоимость услуг</span>} />
@@ -191,8 +192,14 @@ export default function ServiceDiscountRecs() {
                       <Text className="text-white-bold text-14">{r.service_name}</Text>
                       <div className="service-rec-tags">
                         <Tag color="gold">−{r.suggested_percent}%</Tag>
-                        <Tag color={r.scenario === 'high_margin_decline' ? 'purple' : 'blue'}>
-                          {r.scenario === 'high_margin_decline' ? 'Просадка маржи' : 'Приоритет'}
+                        <Tag color={
+                          r.scenario === 'low_margin_volume' ? 'orange'
+                            : r.scenario === 'volume_fill' ? 'blue'
+                              : 'gold'
+                        }>
+                          {r.scenario === 'low_margin_volume' ? 'Низкая маржа → объём'
+                            : r.scenario === 'volume_fill' ? 'Просадка по записям'
+                              : 'Приоритет'}
                         </Tag>
                         <Tag>приоритет {r.priority.toFixed(2)}</Tag>
                       </div>

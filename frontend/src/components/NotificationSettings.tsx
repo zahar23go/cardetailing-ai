@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Typography, Card, Switch, InputNumber, Button, Space, message, Spin,
+  Typography, Card, Switch, InputNumber, Space, message, Spin,
 } from 'antd';
 import { getNotificationSettings, updateNotificationSettings } from '../api/notifications';
 import type { NotificationSettings as SettingsType } from '../api/notifications';
@@ -61,55 +61,63 @@ export default function NotificationSettingsPage() {
   }
 
   return (
-    <Card className="card-luxury">
-      <Text className="title-gold text-16 d-block mb-8">Настройки уведомлений</Text>
-
-      <Space direction="vertical" size="middle" className="w-full">
-        <div className="flex-space-between">
-          <Text className="text-white">SMS-уведомления</Text>
-          <Switch
-            checked={settings?.sms_enabled || false}
-            onChange={(v) => handleToggle('sms_enabled', v)}
-          />
+    <div className="notifications-module">
+      <div className="admin-section-head">
+        <div>
+          <div className="admin-overview-kicker">Коммуникации</div>
+          <h3>Настройки уведомлений</h3>
+          <p className="reports-lead">Каналы и типы оповещений · SMS, напоминания, акции</p>
         </div>
+      </div>
 
-        <div className="flex-space-between">
-          <Text className="text-white">Напоминания о записи</Text>
-          <Switch
-            checked={settings?.notify_appointment_reminder || false}
-            onChange={(v) => handleToggle('notify_appointment_reminder', v)}
-          />
-        </div>
+      <Card className="admin-panel-card" bordered={false}>
+        <Space direction="vertical" size="middle" className="w-full">
+          <div className="flex-space-between notification-setting-row">
+            <Text className="text-white">SMS-уведомления</Text>
+            <Switch
+              checked={settings?.sms_enabled || false}
+              onChange={(v) => handleToggle('sms_enabled', v)}
+            />
+          </div>
 
-        <div className="flex-space-between">
-          <Text className="text-white">Изменение статуса</Text>
-          <Switch
-            checked={settings?.notify_status_change || false}
-            onChange={(v) => handleToggle('notify_status_change', v)}
-          />
-        </div>
+          <div className="flex-space-between notification-setting-row">
+            <Text className="text-white">Напоминания о записи</Text>
+            <Switch
+              checked={settings?.notify_appointment_reminder || false}
+              onChange={(v) => handleToggle('notify_appointment_reminder', v)}
+            />
+          </div>
 
-        <div className="flex-space-between">
-          <Text className="text-white">Акции и новости</Text>
-          <Switch
-            checked={settings?.notify_promo || false}
-            onChange={(v) => handleToggle('notify_promo', v)}
-          />
-        </div>
+          <div className="flex-space-between notification-setting-row">
+            <Text className="text-white">Изменение статуса</Text>
+            <Switch
+              checked={settings?.notify_status_change || false}
+              onChange={(v) => handleToggle('notify_status_change', v)}
+            />
+          </div>
 
-        <div className="flex-space-between">
-          <Text className="text-white">Напоминать за (часов)</Text>
-          <InputNumber
-            min={1}
-            max={168}
-            value={settings?.remind_hours_before || 24}
-            onChange={handleHoursChange}
-            size="small"
-          />
-        </div>
+          <div className="flex-space-between notification-setting-row">
+            <Text className="text-white">Акции и новости</Text>
+            <Switch
+              checked={settings?.notify_promo || false}
+              onChange={(v) => handleToggle('notify_promo', v)}
+            />
+          </div>
 
-        <TelegramSetup settings={settings} onUpdate={fetchSettings} />
-      </Space>
-    </Card>
+          <div className="flex-space-between notification-setting-row">
+            <Text className="text-white">Напоминать за (часов)</Text>
+            <InputNumber
+              min={1}
+              max={168}
+              value={settings?.remind_hours_before || 24}
+              onChange={handleHoursChange}
+              size="small"
+            />
+          </div>
+
+          <TelegramSetup settings={settings} onUpdate={fetchSettings} />
+        </Space>
+      </Card>
+    </div>
   );
 }
