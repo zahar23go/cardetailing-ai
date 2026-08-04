@@ -2,18 +2,147 @@
    COMPONENTS — Стили для компонентов (Глава 13.3)
    ============================================ */
 
-/* --- КАРТОЧКИ (Cards) --- */
+/* ========== CARD SYSTEM (единая система + алиасы) ==========
+   Новые: .card, .card--admin, .card--kpi, .card--stats, .card--preset, .card--luxury, …
+   Старые имена сохранены как групповые селекторы (ничего не удаляем).
+   ============================================================ */
+
+/* База / админ-панель */
+.card,
+.card--admin,
+.admin-panel-card,
+.admin-card {
+  background: var(--color-carbon) !important;
+  border: 1px solid var(--color-divider) !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.card--admin .ant-card-head,
+.admin-panel-card .ant-card-head,
+.admin-card .ant-card-head {
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-gold);
+  min-height: 48px;
+}
+
+.card--admin.card-important,
+.admin-panel-card.card-important,
+.admin-card.card-important {
+  background: var(--color-card-important) !important;
+  border: 1px solid var(--color-gold) !important;
+  border-left: 4px solid var(--color-gold) !important;
+}
+
+/* KPI */
+.card--kpi,
+.kpi-card,
+.admin-kpi-card {
+  background: var(--color-carbon) !important;
+  border: 1px solid var(--color-divider) !important;
+  border-radius: var(--radius-card) !important;
+  min-height: 112px;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.card--kpi .ant-card-body,
+.kpi-card .ant-card-body,
+.admin-kpi-card .ant-card-body {
+  padding: 14px var(--spacing-lg) !important;
+}
+
+.card--kpi.tone-ok .admin-kpi-value,
+.kpi-card.tone-ok .admin-kpi-value,
+.admin-kpi-card.tone-ok .admin-kpi-value {
+  color: #4ecb71;
+}
+
+.card--kpi.tone-warn .admin-kpi-value,
+.kpi-card.tone-warn .admin-kpi-value,
+.admin-kpi-card.tone-warn .admin-kpi-value {
+  color: var(--color-gold);
+}
+
+.card--kpi.tone-danger .admin-kpi-value,
+.kpi-card.tone-danger .admin-kpi-value,
+.admin-kpi-card.tone-danger .admin-kpi-value {
+  color: #e85d5d;
+}
+
+/* Stats (бывший card-kpi в финансах/аналитике) */
+.card--stats,
+.card-stats,
+.card-kpi {
+  background-color: var(--color-carbon);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+}
+
+.card--stats:hover,
+.card-stats:hover,
+.card-kpi:hover {
+  border-color: rgba(200, 169, 119, 0.15);
+}
+
+/* Preset / suggest-карточки скидок и рекомендаций */
+.card--preset,
+.preset-card,
+.discount-suggest-card,
+.service-rec-card {
+  border: 1px solid rgba(212, 168, 75, 0.22);
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, rgba(26, 24, 20, 0.95), rgba(12, 12, 14, 0.98));
+}
+
+.discount-suggest-card {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.service-rec-card {
+  padding: 14px var(--spacing-lg);
+}
+
+/* Luxury (паддинг 24px) */
+.card--luxury,
 .card-luxury {
   background-color: var(--color-carbon);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-card);
-  padding: 24px;
+  padding: var(--spacing-xl);
   box-shadow: var(--shadow-card);
   transition: all 0.3s ease;
 }
 
+.card--luxury:hover,
 .card-luxury:hover {
   border-color: rgba(200, 169, 119, 0.15);
+}
+
+/* Appointment */
+.card--appointment,
+.card-appointment {
+  background-color: var(--color-carbon);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-sm);
+  transition: all 0.3s ease;
+}
+
+.card--appointment:hover,
+.card-appointment:hover {
+  border-color: rgba(200, 169, 119, 0.15);
+}
+
+/* Detail (вложенная / elevated) */
+.card--detail,
+.card-detail {
+  background-color: var(--color-elevated);
+  border: none;
+  border-radius: var(--radius-sm);
 }
 
 /* --- КНОПКИ (Buttons) --- */
@@ -223,35 +352,10 @@
   margin-bottom: var(--spacing-lg);
 }
 
-/* --- КАРТОЧКИ ДЛЯ COMMAND CENTER --- */
-.card-kpi {
-  background-color: var(--color-carbon);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-lg);
-  transition: all 0.3s ease;
-}
-
-.card-kpi:hover {
-  border-color: rgba(200, 169, 119, 0.15);
-}
-
-.card-appointment {
-  background-color: var(--color-carbon);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-sm);
-  margin-bottom: var(--spacing-sm);
-  transition: all 0.3s ease;
-}
-
-.card-appointment:hover {
-  border-color: rgba(200, 169, 119, 0.15);
-}
-
-.card-detail {
-  background-color: var(--color-elevated);
-  border: none;
-  border-radius: var(--radius-sm);
-}
+/* --- КАРТОЧКИ ДЛЯ COMMAND CENTER ---
+   Стили перенесены в CARD SYSTEM выше:
+   .card-kpi → .card--stats; .card-appointment → .card--appointment; .card-detail → .card--detail
+   Имена классов сохранены как алиасы. */
 
 /* --- КНОПКИ ДЕЙСТВИЙ --- */
 .btn-action-gold {
@@ -2263,7 +2367,7 @@
   display: inline-flex;
   align-items: center;
   padding: 5px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 1px solid rgba(240, 217, 160, 0.85);
   background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 55%, #a67c2d 100%);
   color: #1a1610;
@@ -2284,7 +2388,7 @@
 .admin-header-btn.ant-btn {
   height: auto !important;
   padding: 6px 14px !important;
-  border-radius: 999px !important;
+  border-radius: var(--radius-full) !important;
   border: 1px solid var(--color-divider, #E2E5EB) !important;
   background: var(--btn-secondary-bg, #E8EAED) !important;
   color: var(--btn-secondary-text, #1A1D23) !important;
@@ -2323,7 +2427,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--color-gold, #D4AF37);
   background: var(--btn-secondary-bg, #E8EAED);
   color: var(--color-gold, #D4AF37);
@@ -2370,7 +2474,7 @@
 
 .discount-heatmap-wrap {
   overflow: auto;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   border: 1px solid rgba(212, 168, 75, 0.18);
 }
 
@@ -2412,16 +2516,7 @@
   gap: 12px;
 }
 
-.discount-suggest-card {
-  border: 1px solid rgba(212, 168, 75, 0.22);
-  border-radius: 14px;
-  padding: 14px;
-  background: linear-gradient(160deg, rgba(26, 24, 20, 0.95), rgba(12, 12, 14, 0.98));
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
+/* discount-suggest-card / service-rec-card — база в CARD SYSTEM (.card--preset) */
 .discount-suggest-card .top {
   display: flex;
   justify-content: space-between;
@@ -2457,7 +2552,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   border: 1px solid rgba(212, 168, 75, 0.14);
   background: rgba(18, 18, 20, 0.85);
 }
@@ -2474,13 +2569,7 @@
   margin-top: 2px;
 }
 
-.service-rec-card {
-  border: 1px solid rgba(212, 168, 75, 0.22);
-  border-radius: 14px;
-  padding: 14px 16px;
-  background: linear-gradient(160deg, rgba(26, 24, 20, 0.95), rgba(12, 12, 14, 0.98));
-}
-
+/* service-rec-card — база в CARD SYSTEM (.card--preset); padding задан там же */
 .service-rec-head {
   display: flex;
   flex-wrap: wrap;
@@ -2548,7 +2637,7 @@
   display: flex;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   border: 1px solid rgba(212, 168, 75, 0.18);
   background: rgba(18, 18, 20, 0.9);
   color: var(--color-titanium, #aab2bf);
@@ -2635,7 +2724,7 @@
   height: auto !important;
   min-height: 40px;
   padding: 8px 18px !important;
-  border-radius: 999px !important;
+  border-radius: var(--radius-full) !important;
   display: inline-flex !important;
   align-items: center;
   gap: 6px;
@@ -2699,7 +2788,7 @@
   color: #1A1D23;
   background: #D4AF37;
   border: 1px solid #D4AF37;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
 }
 
@@ -2711,18 +2800,7 @@
   font-size: 22px;
 }
 
-.admin-kpi-card {
-  background: var(--color-carbon, #282C34) !important;
-  border: 1px solid var(--color-divider, #3B4049) !important;
-  border-radius: 12px !important;
-  min-height: 112px;
-  box-shadow: var(--shadow-card, 0 6px 32px rgba(0, 0, 0, 0.5));
-}
-
-.admin-kpi-card .ant-card-body {
-  padding: 14px 16px !important;
-}
-
+/* admin-kpi-card / admin-panel-card — база в CARD SYSTEM (.card--kpi / .card--admin) */
 .admin-kpi-icon {
   color: var(--color-gold, #D4AF37);
   font-size: 18px;
@@ -2741,31 +2819,6 @@
   color: var(--color-gold, #D4AF37);
   line-height: 1.15;
   word-break: break-word;
-}
-
-.admin-kpi-card.tone-ok .admin-kpi-value {
-  color: #4ecb71;
-}
-
-.admin-kpi-card.tone-warn .admin-kpi-value {
-  color: var(--color-gold, #D4AF37);
-}
-
-.admin-kpi-card.tone-danger .admin-kpi-value {
-  color: #e85d5d;
-}
-
-.admin-panel-card {
-  background: var(--color-carbon, #282C34) !important;
-  border: 1px solid var(--color-divider, #3B4049) !important;
-  border-radius: 12px !important;
-  box-shadow: var(--shadow-card, 0 6px 32px rgba(0, 0, 0, 0.5));
-}
-
-.admin-panel-card .ant-card-head {
-  border-bottom: 1px solid var(--color-divider, #3B4049);
-  color: var(--color-gold, #D4AF37);
-  min-height: 48px;
 }
 
 .admin-panel-title {
@@ -2804,7 +2857,7 @@
   text-align: left;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.02);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   padding: 10px 12px;
   cursor: pointer;
   color: inherit;
@@ -2850,7 +2903,7 @@
   align-items: center;
   gap: 10px;
   padding: 12px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   border: 1px solid rgba(212, 168, 75, 0.2);
   background: rgba(212, 168, 75, 0.05);
   color: #fff;
@@ -2873,7 +2926,7 @@
 .admin-mini-stat {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   padding: 10px 12px;
 }
 
@@ -2902,18 +2955,14 @@
   border-left-color: var(--color-gold, #D4AF37);
 }
 
-.admin-panel-card.card-important {
-  background: var(--color-card-important, #2F3540) !important;
-  border: 1px solid var(--color-gold, #D4AF37) !important;
-  border-left: 4px solid var(--color-gold, #D4AF37) !important;
-}
+/* admin-panel-card.card-important — стили в CARD SYSTEM */
 
 .admin-layout .card-kpi,
 .admin-layout .card-luxury,
 .admin-layout .card-appointment {
   background: var(--color-carbon, #282C34) !important;
   border-color: var(--color-divider, #3B4049) !important;
-  border-radius: 12px !important;
+  border-radius: var(--radius-card) !important;
   box-shadow: var(--shadow-card, 0 6px 32px rgba(0, 0, 0, 0.5));
 }
 
@@ -2978,7 +3027,7 @@
   color: #1a1610;
   background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 55%, #a67c2d 100%);
   border: 1px solid rgba(240, 217, 160, 0.85);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   box-shadow:
     0 0 0 1px rgba(166, 124, 45, 0.35),
     0 4px 14px rgba(212, 168, 75, 0.22);
@@ -3000,7 +3049,7 @@
   min-width: 110px;
   justify-content: center;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 1px solid rgba(212, 168, 75, 0.35);
   color: #1a1610;
   font-size: 12px;
@@ -3050,7 +3099,7 @@
 .workload-grid-wrap {
   overflow: auto;
   border: 1px solid rgba(212, 168, 75, 0.2);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: linear-gradient(160deg, rgba(22, 20, 16, 0.98), rgba(10, 10, 12, 0.98));
   max-height: min(72vh, 760px);
 }
@@ -3151,7 +3200,7 @@
   justify-content: flex-start;
   gap: 2px;
   padding: 4px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   border: 1px solid;
   border-left-width: 3px;
   cursor: pointer;
@@ -3184,7 +3233,7 @@
 
 .workload-masters {
   border: 1px solid rgba(212, 168, 75, 0.2);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: linear-gradient(160deg, rgba(22, 20, 16, 0.98), rgba(10, 10, 12, 0.98));
   padding: 16px;
   position: sticky;
@@ -3273,7 +3322,7 @@
   gap: 10px;
   margin-bottom: 14px;
   padding: 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--color-divider, #3B4049);
   background: var(--color-carbon, #161B22);
   box-shadow: var(--shadow-card);
@@ -3312,7 +3361,7 @@
   gap: 8px;
   margin-bottom: 10px;
   padding: 8px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-divider, #3B4049);
   background: var(--color-carbon, #161B22);
 }
@@ -3444,7 +3493,7 @@
 
 .admin-layout .ant-card {
   box-shadow: var(--shadow-card, 0 6px 32px rgba(0, 0, 0, 0.5));
-  border-radius: 12px !important;
+  border-radius: var(--radius-card) !important;
 }
 
 .admin-layout .ant-list-item,
@@ -3532,7 +3581,7 @@
   color: #1A1D23;
   background: #D4AF37;
   border: 1px solid rgba(240, 217, 160, 0.85);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   box-shadow:
     0 0 0 1px rgba(166, 124, 45, 0.35),
     0 4px 14px rgba(212, 175, 55, 0.25);
@@ -3606,7 +3655,7 @@
   font-weight: 600;
   text-align: center;
   padding: 12px 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   color: var(--color-gold, #D4AF37);
   background: transparent;
   border: 1px solid rgba(212, 175, 55, 0.45);
@@ -3634,7 +3683,7 @@
 
 .financier-bubble {
   padding: 12px 16px;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--color-divider, #3B4049);
   background: var(--color-elevated, #161B22);
   box-shadow: var(--shadow-card, 0 6px 24px rgba(0, 0, 0, 0.25));
@@ -3643,11 +3692,11 @@
 .financier-msg.is-user .financier-bubble {
   border-color: rgba(212, 175, 55, 0.4);
   background: rgba(212, 175, 55, 0.14);
-  border-radius: 16px 16px 4px 16px;
+  border-radius: var(--radius-xl) var(--radius-xl) 4px var(--radius-xl);
 }
 
 .financier-msg.is-ai .financier-bubble {
-  border-radius: 16px 16px 16px 4px;
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) 4px;
 }
 
 .financier-bubble-label {
@@ -3688,14 +3737,14 @@
 
 .financier-new-btn.ant-btn {
   height: 46px !important;
-  border-radius: 999px !important;
+  border-radius: var(--radius-full) !important;
   white-space: nowrap;
 }
 
 .financier-input.ant-input,
 .financier-input.ant-input-textarea textarea {
   min-height: 46px !important;
-  border-radius: 14px !important;
+  border-radius: var(--radius-md) !important;
   flex: 1;
 }
 
@@ -3720,7 +3769,7 @@
 
   .financier-send.ant-btn {
     width: 100% !important;
-    border-radius: 12px !important;
+    border-radius: var(--radius-card) !important;
   }
 
   .financier-msg {
@@ -3747,7 +3796,7 @@
   color: #1A1D23;
   background: #D4AF37;
   border: 1px solid rgba(240, 217, 160, 0.85);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   box-shadow:
     0 0 0 1px rgba(166, 124, 45, 0.35),
     0 4px 14px rgba(212, 175, 55, 0.25);
@@ -3805,7 +3854,7 @@
 }
 
 .notification-item {
-  border-radius: 12px !important;
+  border-radius: var(--radius-card) !important;
   padding: 12px 16px !important;
   margin-bottom: 8px !important;
   border: 1px solid var(--color-divider, #3B4049) !important;
@@ -3834,6 +3883,106 @@
 
 .notifications-empty {
   padding: 48px 16px;
+}
+
+/* ============================================
+   BADGE SYSTEM (плашки/чипсы/статусы)
+   ============================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full, 999px);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+/* Размеры */
+.badge--sm {
+  padding: 2px 8px;
+  font-size: 10px;
+}
+
+.badge--lg {
+  padding: 6px 16px;
+  font-size: 14px;
+}
+
+/* Варианты цветов (токены из theme.css) */
+.badge--success {
+  background: var(--color-success-bg, rgba(15, 93, 70, 0.15));
+  color: var(--color-success-text, #4ECB71);
+  border-color: var(--color-success-border, rgba(78, 203, 113, 0.3));
+}
+
+.badge--warning {
+  background: var(--color-warning-bg, rgba(183, 106, 41, 0.15));
+  color: var(--color-warning-text, #E8A83C);
+  border-color: var(--color-warning-border, rgba(232, 168, 60, 0.3));
+}
+
+.badge--danger {
+  background: var(--color-danger-bg, rgba(199, 59, 59, 0.15));
+  color: var(--color-danger-text, #FF6B6B);
+  border-color: var(--color-danger-border, rgba(255, 107, 107, 0.3));
+}
+
+.badge--info {
+  background: var(--color-info-bg, rgba(43, 111, 158, 0.15));
+  color: var(--color-info-text, #6BB8FF);
+  border-color: var(--color-info-border, rgba(107, 184, 255, 0.3));
+}
+
+.badge--neutral {
+  background: var(--color-neutral-bg, rgba(255, 255, 255, 0.06));
+  color: var(--color-neutral-text, #AAB2BF);
+  border-color: var(--color-neutral-border, rgba(255, 255, 255, 0.1));
+}
+
+.badge--gold {
+  /* чип на тёмных карточках */
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.15));
+  color: var(--color-gold-text, #D4AF37) !important;
+  border-color: var(--color-gold-border, rgba(212, 175, 55, 0.3));
+}
+
+/*
+  Lead-плашки секций: сплошное золото + тёмный текст
+  (как COMMAND CENTER / btn-gold), не полупрозрачный chip.
+*/
+.badge--lead,
+.badge.badge--lg.badge--gold,
+.admin-section-head .badge.badge--gold,
+.discount-intel-toolbar .badge.badge--gold {
+  display: inline-flex;
+  margin: var(--spacing-md) 0 0;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: left;
+  max-width: 100%;
+  color: #1A1D23 !important;
+  background: #D4AF37 !important;
+  border: 1px solid rgba(240, 217, 160, 0.85) !important;
+  border-radius: var(--radius-full, 999px);
+  box-shadow:
+    0 0 0 1px rgba(166, 124, 45, 0.35),
+    0 4px 14px rgba(212, 175, 55, 0.25);
+}
+
+.discount-intel-toolbar .badge.badge--gold {
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 12px;
 }
 
 

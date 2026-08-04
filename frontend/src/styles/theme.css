@@ -28,6 +28,9 @@
   --radius-md: 14px;
   --radius-sm: 10px;
   --radius-xs: 6px;
+  /* Алиасы для админ-UI (значения не ломают существующие токены) */
+  --radius-xl: 16px;
+  --radius-full: 999px;
   --shadow-card: 0 8px 28px rgba(0, 0, 0, 0.22);
   --shadow-gold: 0 20px 40px rgba(212, 175, 55, 0.15);
   --shadow-gold-hover: 0 20px 50px rgba(212, 175, 55, 0.25);
@@ -64,4 +67,24 @@
   --brand-input-bg: #161B22;
   --brand-input-border: #2D333B;
   --brand-label: #D4AF37;
+
+  /* Badge colors */
+  --color-success-bg: rgba(15, 93, 70, 0.15);
+  --color-success-text: #4ECB71;
+  --color-success-border: rgba(78, 203, 113, 0.3);
+  --color-warning-bg: rgba(183, 106, 41, 0.15);
+  --color-warning-text: #E8A83C;
+  --color-warning-border: rgba(232, 168, 60, 0.3);
+  --color-danger-bg: rgba(199, 59, 59, 0.15);
+  --color-danger-text: #FF6B6B;
+  --color-danger-border: rgba(255, 107, 107, 0.3);
+  --color-info-bg: rgba(43, 111, 158, 0.15);
+  --color-info-text: #6BB8FF;
+  --color-info-border: rgba(107, 184, 255, 0.3);
+  --color-neutral-bg: rgba(255, 255, 255, 0.06);
+  --color-neutral-text: #AAB2BF;
+  --color-neutral-border: rgba(255, 255, 255, 0.1);
+  --color-gold-bg: rgba(212, 175, 55, 0.15);
+  --color-gold-text: #D4AF37;
+  --color-gold-border: rgba(212, 175, 55, 0.3);
 }

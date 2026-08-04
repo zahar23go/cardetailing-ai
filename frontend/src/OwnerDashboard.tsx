@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import {
   Typography, Card, Row, Col, Statistic, Table, Button, Tag, Space, Tabs, Divider,
   message, Modal, Select, Input, InputNumber, Popconfirm, Badge, Layout, List,
@@ -34,6 +34,8 @@ import {
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import { useBrand } from './design';
+import AdminSidebar from './components/AdminSidebar';
+import { pathFromTab, tabFromPath, type AdminTabKey } from './admin/navConfig';
 
 dayjs.locale('ru');
 
@@ -385,8 +387,27 @@ interface OwnerDashboardProps {
 
 export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { brand } = useBrand();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTabState] = useState('overview');
+
+  /** Синхронизация вкладки с URL */
+  useEffect(() => {
+    const tab = tabFromPath(location.pathname);
+    if (tab && tab !== 'branding') {
+      setActiveTabState(tab);
+    }
+  }, [location.pathname]);
+
+  const setActiveTab = (key: string) => {
+    const path = pathFromTab(key);
+    if (path) {
+      navigate(path);
+      if (key !== 'branding') setActiveTabState(key as AdminTabKey);
+    } else {
+      setActiveTabState(key);
+    }
+  };
 
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [kpiLoading, setKpiLoading] = useState(false);
@@ -1410,21 +1431,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
     [allUsers],
   );
 
-  // sidebar items
-  const sidebarItems = [
-    { key: 'overview', icon: <HomeOutlined />, label: 'Обзор' },
-    { key: 'appointments', icon: <FileTextOutlined />, label: 'Записи' },
-    { key: 'calendar', icon: <CalendarOutlined />, label: 'Календарь' },
-    { key: 'users', icon: <TeamOutlined />, label: 'Пользователи' },
-    { key: 'services', icon: <SettingOutlined />, label: 'Услуги' },
-    { key: 'financier', icon: <BulbOutlined />, label: 'AI Финансист' },
-    { key: 'finances', icon: <DollarOutlined />, label: 'Финансы' },
-    { key: 'analytics', icon: <AreaChartOutlined />, label: 'Аналитика' },
-    { key: 'discounts', icon: <GiftOutlined />, label: 'Скидки' },
-    { key: 'reports', icon: <BarChartOutlined />, label: 'Отчёты' },
-    { key: 'notifications', icon: <BellOutlined />, label: 'Уведомления' },
-  ];
-
+  // sidebar: иерархия в AdminSidebar (navConfig)
   const bottomNavItems = [
     { key: 'overview', icon: <HomeOutlined />, label: 'Обзор' },
     { key: 'appointments', icon: <FileTextOutlined />, label: 'Записи' },
@@ -1457,7 +1464,7 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
           <Button
             type="text"
             className="admin-header-btn"
-            onClick={() => navigate('/branding')}
+            onClick={() => navigate('/settings/branding')}
           >
             Брендинг
           </Button>
@@ -1486,20 +1493,12 @@ export default function OwnerDashboard({ user, onLogout }: OwnerDashboardProps) 
           width={228}
           trigger={null}
         >
-          {sidebarItems.map(item => (
-            <button
-              key={item.key}
-              className={`sidebar-item${activeTab === item.key ? ' active' : ''}`}
-              onClick={() => { setActiveTab(item.key); }}
-            >
-              <span className="sidebar-icon">{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
+          <AdminSidebar />
         </Sider>
 
         {/* CONTENT */}
         <Content className="client-content admin-content">
+        <Outlet />
         <Tabs
           className="admin-tabs"
           activeKey={activeTab}

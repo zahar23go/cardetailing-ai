@@ -132,7 +132,7 @@ const SCREENS = [
   {
     title: 'Брендинг',
     desc: 'Пресеты goldMetal / goldGlow / silver',
-    path: '/branding',
+    path: '/settings/branding',
   },
 ];
 

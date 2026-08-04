@@ -53,15 +53,14 @@ export default function TelegramSetup({ settings, onUpdate }: TelegramSetupProps
 
       {isConnected ? (
         <Space direction="vertical" size="small" className="w-full">
-          <Text className="text-titanium text-13">
-            ✅ Telegram подключён
-          </Text>
+          <span className="badge badge--success">Telegram подключён</span>
           <Button className="btn-action-danger" onClick={handleDisconnect}>
             Отключить Telegram
           </Button>
         </Space>
       ) : (
         <Space direction="vertical" size="small" className="w-full">
+          <span className="badge badge--warning">Ожидает подключения</span>
           <Text className="text-titanium text-13">
             Напишите боту @CarDetailingBot команду /start, затем введите код:
           </Text>

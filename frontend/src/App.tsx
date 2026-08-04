@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -18,14 +18,24 @@ interface User {
 
 const API_BASE = '';
 
+/** Пустой outlet — контент рисует OwnerDashboard по URL */
+function AdminSection() {
+  return <Outlet />;
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) fetchUser(token);
+    if (token) {
+      fetchUser(token).finally(() => setAuthReady(true));
+    } else {
+      setAuthReady(true);
+    }
   }, []);
 
   const fetchUser = async (token: string) => {
@@ -45,9 +55,12 @@ function App() {
     }
   };
 
-  /** После входа/регистрации — хаб «Смотреть концепцию», не тупиковый /main */
   const goAfterAuth = (role?: string) => {
-    if (role === 'admin' || role === 'super_admin' || role === 'master') {
+    if (role === 'admin' || role === 'super_admin') {
+      navigate('/overview');
+      return;
+    }
+    if (role === 'master') {
       navigate('/');
       return;
     }
@@ -95,9 +108,23 @@ function App() {
     navigate('/');
   };
 
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isMaster = user?.role === 'master';
+  const isClient = user?.role === 'client';
+
+  const loginEl = (
+    <LoginPage
+      onLogin={handleLogin}
+      onRegister={() => navigate('/register')}
+    />
+  );
+
+  if (!authReady) {
+    return null;
+  }
+
   return (
     <Routes>
-      <Route path="/branding" element={<BrandingPage />} />
       <Route path="/register" element={<RegisterPage onRegistered={handleRegistered} />} />
       <Route
         path="/concept"
@@ -117,33 +144,84 @@ function App() {
           />
         }
       />
+
+      {/* Админ-layout: один OwnerDashboard, дочерние path только для URL */}
+      <Route
+        element={
+          isAuthenticated && user && isAdmin ? (
+            <OwnerDashboard user={user} onLogout={handleLogout} />
+          ) : !isAuthenticated ? (
+            loginEl
+          ) : isMaster ? (
+            <Navigate to="/" replace />
+          ) : isClient ? (
+            <Navigate to="/concept" replace />
+          ) : (
+            loginEl
+          )
+        }
+      >
+        <Route path="overview" element={<AdminSection />} />
+        <Route path="analytics/:section" element={<AdminSection />} />
+        <Route path="upload/:section" element={<AdminSection />} />
+        <Route path="crm/:section" element={<AdminSection />} />
+        <Route path="discounts" element={<AdminSection />} />
+        <Route path="settings/notifications" element={<AdminSection />} />
+      </Route>
+
+      <Route
+        path="/settings/branding"
+        element={
+          isAuthenticated && isAdmin
+            ? <BrandingPage />
+            : !isAuthenticated
+              ? loginEl
+              : <Navigate to="/" replace />
+        }
+      />
+
+      {/* Редиректы со старых путей */}
+      <Route path="/branding" element={<Navigate to="/settings/branding" replace />} />
+      <Route path="/financier" element={<Navigate to="/analytics/ai-financier" replace />} />
+      <Route path="/finances" element={<Navigate to="/analytics/finances" replace />} />
+      <Route path="/reports" element={<Navigate to="/analytics/reports" replace />} />
+      <Route path="/appointments" element={<Navigate to="/upload/records" replace />} />
+      <Route path="/calendar" element={<Navigate to="/upload/calendar" replace />} />
+      <Route path="/users" element={<Navigate to="/crm/users" replace />} />
+      <Route path="/services" element={<Navigate to="/crm/services" replace />} />
+      <Route path="/notifications" element={<Navigate to="/settings/notifications" replace />} />
+      <Route path="/analytics" element={<Navigate to="/analytics/metrics" replace />} />
+      <Route path="/upload" element={<Navigate to="/upload/records" replace />} />
+      <Route path="/crm" element={<Navigate to="/crm/users" replace />} />
+      <Route path="/settings" element={<Navigate to="/settings/notifications" replace />} />
+
       <Route
         path="/"
         element={
           isAuthenticated && user ? (
-            user.role === 'client' ? (
+            isClient ? (
               <Navigate to="/concept" replace />
-            ) :
-            user.role === 'admin' || user.role === 'super_admin' ? (
-              <OwnerDashboard user={user} onLogout={handleLogout} />
-            ) :
-            user.role === 'master' ? (
+            ) : isAdmin ? (
+              <Navigate to="/overview" replace />
+            ) : isMaster ? (
               <MasterDashboard user={user} onLogout={handleLogout} />
             ) : (
-              <LoginPage
-                onLogin={handleLogin}
-                onRegister={() => navigate('/register')}
-              />
+              loginEl
             )
           ) : (
-            <LoginPage
-              onLogin={handleLogin}
-              onRegister={() => navigate('/register')}
-            />
+            loginEl
           )
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+
+      <Route
+        path="*"
+        element={
+          isAuthenticated && isAdmin
+            ? <Navigate to="/overview" replace />
+            : <Navigate to="/" replace />
+        }
+      />
     </Routes>
   );
 }

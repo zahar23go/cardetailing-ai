@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Typography, List, Tag, Button, Space, Spin, Empty, message, Card,
+  Typography, List, Button, Space, Spin, Empty, message, Card,
 } from 'antd';
 import { CheckOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getNotifications, markAsRead, markAllAsRead } from '../api/notifications';
@@ -21,12 +21,13 @@ const TYPE_LABELS: Record<string, string> = {
   info: 'Инфо',
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  appointment_reminder: 'gold',
-  appointment_cancelled: 'red',
-  status_change: 'blue',
-  promo: 'green',
-  info: 'default',
+/** Вариант .badge по типу уведомления */
+const TYPE_BADGE: Record<string, string> = {
+  appointment_reminder: 'badge--gold',
+  appointment_cancelled: 'badge--danger',
+  status_change: 'badge--info',
+  promo: 'badge--success',
+  info: 'badge--neutral',
 };
 
 interface NotificationListProps {
@@ -91,7 +92,7 @@ export default function NotificationList({
         <div>
           <div className="admin-overview-kicker">Коммуникации</div>
           <h3>{title}</h3>
-          <p className="reports-lead">{plaque}</p>
+          <span className="badge badge--lg badge--gold badge--lead">{plaque}</span>
         </div>
         <div className="reports-toolbar">
           <Button
@@ -135,9 +136,9 @@ export default function NotificationList({
                   <List.Item.Meta
                     title={
                       <Space wrap size={8}>
-                        <Tag color={TYPE_COLORS[item.type]} className="tag-status">
+                        <span className={`badge badge--sm tag-status ${TYPE_BADGE[item.type] || 'badge--neutral'}`}>
                           {TYPE_LABELS[item.type] || item.type}
-                        </Tag>
+                        </span>
                         <Text className="text-gold-bold">{item.title}</Text>
                         {!item.is_read && (
                           <Button

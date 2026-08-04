@@ -297,7 +297,7 @@ export default function BrandingPage() {
             type="button"
             onClick={() => {
               if (window.history.length > 1) navigate(-1);
-              else navigate('/');
+              else navigate('/overview');
             }}
           >
             ← Назад

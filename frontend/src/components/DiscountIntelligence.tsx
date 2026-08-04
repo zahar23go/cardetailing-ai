@@ -186,7 +186,7 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
     <div className="discount-intel">
       <div className="discount-intel-toolbar">
         <Space wrap>
-          <Text className="text-gold">Период анализа:</Text>
+          <span className="badge badge--gold badge--lead">Период анализа</span>
           {[30, 60, 90].map((d) => (
             <Button
               key={d}

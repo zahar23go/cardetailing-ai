@@ -66,7 +66,7 @@ export default function NotificationSettingsPage() {
         <div>
           <div className="admin-overview-kicker">Коммуникации</div>
           <h3>Настройки уведомлений</h3>
-          <p className="reports-lead">Каналы и типы оповещений · SMS, напоминания, акции</p>
+          <span className="badge badge--lg badge--gold badge--lead">Каналы и типы оповещений · SMS, напоминания, акции</span>
         </div>
       </div>
 

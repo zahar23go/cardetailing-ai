@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Typography, Card, Row, Col, Select, Button, Space, Spin, Table, Tag, Empty,
+  Typography, Card, Row, Col, Select, Button, Space, Spin, Table, Empty,
 } from 'antd';
 import {
   DownloadOutlined, ReloadOutlined,
@@ -95,7 +95,7 @@ export default function ReportManager() {
         <div>
           <div className="admin-overview-kicker">Аналитика</div>
           <h3>Отчёты по выручке</h3>
-          <p className="reports-lead">{PERIOD_PLAQUE[period] || PERIOD_PLAQUE.month}</p>
+          <span className="badge badge--lg badge--gold badge--lead">{PERIOD_PLAQUE[period] || PERIOD_PLAQUE.month}</span>
         </div>
         <div className="reports-toolbar">
           <Select
@@ -176,7 +176,7 @@ export default function ReportManager() {
                     render: (v, r) => (
                       <Space size={8} wrap>
                         <Text className="text-white text-13">{v}</Text>
-                        {r.category && <Tag className="tag-category">{r.category}</Tag>}
+                        {r.category && <span className="badge badge--sm badge--neutral tag-category">{r.category}</span>}
                       </Space>
                     ),
                   },
