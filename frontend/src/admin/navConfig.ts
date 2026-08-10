@@ -1,5 +1,5 @@
 /**
- * Иерархия админ-меню + маппинг URL ↔ ключи вкладок OwnerDashboard.
+ * Иерархия админ-меню + маппинг URL ↔ ключи навигации.
  */
 
 export type AdminTabKey =
@@ -37,10 +37,10 @@ export type NavEntry = NavLeaf | NavGroup;
 
 /** Канонические пути → ключ вкладки (branding — отдельная страница) */
 export const PATH_TO_TAB: Record<string, AdminTabKey | 'branding'> = {
-  '/overview': 'overview',
+  '/dashboard': 'overview',
   '/analytics/ai-financier': 'financier',
   '/analytics/finances': 'finances',
-  '/analytics/metrics': 'analytics',
+  '/analytics/analytics': 'analytics',
   '/analytics/reports': 'reports',
   '/analytics/service-analytics': 'service-analytics',
   '/upload/records': 'appointments',
@@ -53,10 +53,10 @@ export const PATH_TO_TAB: Record<string, AdminTabKey | 'branding'> = {
 };
 
 export const TAB_TO_PATH: Record<AdminTabKey | 'branding', string> = {
-  overview: '/overview',
+  overview: '/dashboard',
   financier: '/analytics/ai-financier',
   finances: '/analytics/finances',
-  analytics: '/analytics/metrics',
+  analytics: '/analytics/analytics',
   reports: '/analytics/reports',
   'service-analytics': '/analytics/service-analytics',
   appointments: '/upload/records',
@@ -70,16 +70,20 @@ export const TAB_TO_PATH: Record<AdminTabKey | 'branding', string> = {
 
 /** Старые пути / алиасы → новые */
 export const LEGACY_REDIRECTS: Record<string, string> = {
-  '/': '/overview',
+  '/': '/dashboard',
+  '/overview': '/dashboard',
   '/branding': '/settings/branding',
-  '/analytics': '/analytics/metrics',
+  '/ai-financier': '/analytics/ai-financier',
+  '/analytics': '/analytics/analytics',
+  '/analytics/metrics': '/analytics/analytics',
   '/upload': '/upload/records',
   '/crm': '/crm/users',
   '/settings': '/settings/notifications',
-  // legacy flat names (если появятся в закладках)
+  // legacy flat names
   '/financier': '/analytics/ai-financier',
   '/finances': '/analytics/finances',
   '/reports': '/analytics/reports',
+  '/records': '/upload/records',
   '/appointments': '/upload/records',
   '/calendar': '/upload/calendar',
   '/users': '/crm/users',
@@ -93,7 +97,7 @@ export const ADMIN_NAV: NavEntry[] = [
   {
     type: 'leaf',
     key: 'overview',
-    path: '/overview',
+    path: '/dashboard',
     label: 'Главная / Обзор',
     icon: 'home',
   },
@@ -105,9 +109,8 @@ export const ADMIN_NAV: NavEntry[] = [
     children: [
       { type: 'leaf', key: 'financier', path: '/analytics/ai-financier', label: 'ИИ Финансист', icon: 'financier' },
       { type: 'leaf', key: 'finances', path: '/analytics/finances', label: 'Финансы', icon: 'finances' },
-      { type: 'leaf', key: 'analytics', path: '/analytics/metrics', label: 'Аналитика', icon: 'metrics' },
+      { type: 'leaf', key: 'analytics', path: '/analytics/analytics', label: 'Аналитика', icon: 'metrics' },
       { type: 'leaf', key: 'reports', path: '/analytics/reports', label: 'Отчёты', icon: 'reports' },
-      { type: 'leaf', key: 'service-analytics', path: '/analytics/service-analytics', label: 'Аналитика услуг', icon: 'metrics' },
     ],
   },
   {
