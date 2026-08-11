@@ -1,0 +1,203 @@
+{
+  "meta": {
+    "salon": "Тестовый детейлинг-центр",
+    "period": "2026-07",
+    "currency": "RUB",
+    "description": "Фикстуры для юнит/интеграционных тестов формул ИИ-Финансиста"
+  },
+  "services": [
+    { "id": 1, "name": "Комплексная мойка", "price": 2500, "cost_price": 400, "material_cost": 400 },
+    { "id": 2, "name": "Полировка кузова", "price": 8000, "cost_price": 1500, "material_cost": 1500 },
+    { "id": 3, "name": "Керамика", "price": 25000, "cost_price": 8000, "material_cost": 8000 },
+    { "id": 4, "name": "Химчистка салона", "price": 6000, "cost_price": 2200, "material_cost": 2200 },
+    { "id": 5, "name": "Антидождь", "price": 3500, "cost_price": 900, "material_cost": 900 }
+  ],
+  "transactions": [
+    {
+      "id": 1,
+      "service_id": 1,
+      "service_name": "Комплексная мойка",
+      "master_id": 10,
+      "master_name": "Иван",
+      "total_price": 2500,
+      "material_cost": 400,
+      "status": "completed",
+      "start_time": "2026-07-02T10:00:00+03:00",
+      "weekday": 3,
+      "hour": 10
+    },
+    {
+      "id": 2,
+      "service_id": 1,
+      "service_name": "Комплексная мойка",
+      "master_id": 10,
+      "master_name": "Иван",
+      "total_price": 2500,
+      "material_cost": 400,
+      "status": "completed",
+      "start_time": "2026-07-03T11:00:00+03:00",
+      "weekday": 4,
+      "hour": 11
+    },
+    {
+      "id": 3,
+      "service_id": 2,
+      "service_name": "Полировка кузова",
+      "master_id": 11,
+      "master_name": "Пётр",
+      "total_price": 8000,
+      "material_cost": 1500,
+      "status": "completed",
+      "start_time": "2026-07-04T14:00:00+03:00",
+      "weekday": 5,
+      "hour": 14
+    },
+    {
+      "id": 4,
+      "service_id": 3,
+      "service_name": "Керамика",
+      "master_id": 11,
+      "master_name": "Пётр",
+      "total_price": 25000,
+      "material_cost": 8000,
+      "status": "completed",
+      "start_time": "2026-07-05T09:00:00+03:00",
+      "weekday": 6,
+      "hour": 9
+    },
+    {
+      "id": 5,
+      "service_id": 4,
+      "service_name": "Химчистка салона",
+      "master_id": 10,
+      "master_name": "Иван",
+      "total_price": 6000,
+      "material_cost": 2200,
+      "status": "completed",
+      "start_time": "2026-07-07T12:00:00+03:00",
+      "weekday": 1,
+      "hour": 12
+    },
+    {
+      "id": 6,
+      "service_id": 5,
+      "service_name": "Антидождь",
+      "master_id": 10,
+      "master_name": "Иван",
+      "total_price": 3500,
+      "material_cost": 900,
+      "status": "completed",
+      "start_time": "2026-07-08T16:00:00+03:00",
+      "weekday": 2,
+      "hour": 16
+    },
+    {
+      "id": 7,
+      "service_id": 1,
+      "service_name": "Комплексная мойка",
+      "master_id": 11,
+      "master_name": "Пётр",
+      "total_price": 2500,
+      "material_cost": 400,
+      "status": "completed",
+      "start_time": "2026-07-09T10:00:00+03:00",
+      "weekday": 3,
+      "hour": 10
+    },
+    {
+      "id": 8,
+      "service_id": 2,
+      "service_name": "Полировка кузова",
+      "master_id": 11,
+      "master_name": "Пётр",
+      "total_price": 8000,
+      "material_cost": 1500,
+      "status": "pending",
+      "start_time": "2026-07-10T15:00:00+03:00",
+      "weekday": 4,
+      "hour": 15
+    },
+    {
+      "id": 9,
+      "service_id": 4,
+      "service_name": "Химчистка салона",
+      "master_id": 10,
+      "master_name": "Иван",
+      "total_price": 6000,
+      "material_cost": 2200,
+      "status": "completed",
+      "start_time": "2026-07-11T13:00:00+03:00",
+      "weekday": 5,
+      "hour": 13
+    },
+    {
+      "id": 10,
+      "service_id": 1,
+      "service_name": "Комплексная мойка",
+      "master_id": 10,
+      "master_name": "Иван",
+      "total_price": 2500,
+      "material_cost": 400,
+      "status": "completed",
+      "start_time": "2026-07-12T10:00:00+03:00",
+      "weekday": 6,
+      "hour": 10
+    }
+  ],
+  "expenses": [
+    { "id": 1, "category": "rent", "amount": 120000, "expense_date": "2026-07-01", "payment_status": "paid" },
+    { "id": 2, "category": "salary", "amount": 180000, "expense_date": "2026-07-05", "payment_status": "paid" },
+    { "id": 3, "category": "marketing", "amount": 25000, "expense_date": "2026-07-08", "payment_status": "paid" },
+    { "id": 4, "category": "utilities", "amount": 18000, "expense_date": "2026-07-10", "payment_status": "paid" },
+    { "id": 5, "category": "consumables", "amount": 15000, "expense_date": "2026-07-12", "payment_status": "unpaid" }
+  ],
+  "expenses_prev_month": [
+    { "id": 11, "category": "rent", "amount": 120000, "expense_date": "2026-06-01" },
+    { "id": 12, "category": "salary", "amount": 170000, "expense_date": "2026-06-05" },
+    { "id": 13, "category": "marketing", "amount": 15000, "expense_date": "2026-06-08" },
+    { "id": 14, "category": "utilities", "amount": 16000, "expense_date": "2026-06-10" },
+    { "id": 15, "category": "consumables", "amount": 10000, "expense_date": "2026-06-12" }
+  ],
+  "expected": {
+    "completed_count": 9,
+    "total_revenue": 58500,
+    "total_material_cost": 16400,
+    "total_expenses": 358000,
+    "avg_check": 6500,
+    "gross_profit": 42100,
+    "gross_margin_percent": 72.0,
+    "net_profit": -315900,
+    "net_margin_percent": -540.0,
+    "break_even_revenue": 497458.43,
+    "service_margins": {
+      "1": { "margin_percent": 84.0, "price": 2500, "cost": 400 },
+      "2": { "margin_percent": 81.3, "price": 8000, "cost": 1500 },
+      "3": { "margin_percent": 68.0, "price": 25000, "cost": 8000 },
+      "4": { "margin_percent": 63.3, "price": 6000, "cost": 2200 },
+      "5": { "margin_percent": 74.3, "price": 3500, "cost": 900 }
+    },
+    "masters": {
+      "Иван": { "completed": 6, "revenue": 23000 },
+      "Пётр": { "completed": 3, "revenue": 35500 }
+    }
+  },
+  "load_cases": [
+    { "hour_load": 5.0, "peak_load": 5.0, "expected_discount": 0 },
+    { "hour_load": 2.0, "peak_load": 5.0, "expected_discount": 10 },
+    { "hour_load": 1.2, "peak_load": 5.0, "expected_discount": 15 },
+    { "hour_load": 0.8, "peak_load": 5.0, "expected_discount": 20 },
+    { "hour_load": 0.4, "peak_load": 5.0, "expected_discount": 25 },
+    { "hour_load": 0.0, "peak_load": 5.0, "expected_discount": 25 },
+    { "hour_load": 1.0, "peak_load": 0.0, "expected_discount": 25 }
+  ],
+  "discount_roi_cases": [
+    { "times_used": 10, "discount_cost": 5000, "avg_check": 6500, "expected_verdict": "держать", "expected_roi_min": 20 },
+    { "times_used": 2, "discount_cost": 8000, "avg_check": 6500, "expected_verdict": "отключить", "expected_roi_max": 0 },
+    { "times_used": 5, "discount_cost": 18000, "avg_check": 6500, "expected_verdict": "пересмотреть" }
+  ],
+  "priority_cases": [
+    { "priority": 0.85, "expected_percent_min": 20, "expected_percent_max": 30 },
+    { "priority": 0.55, "expected_percent_min": 10, "expected_percent_max": 20 },
+    { "priority": 0.3, "expected_percent": 0 }
+  ]
+}

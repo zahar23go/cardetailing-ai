@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.database import get_db, init_db
+from app.core.database import get_db, init_db, async_session_maker
 from app.core.deepseek_client import get_ai_response, get_financier_response, get_consultant_response
 from app.core.image_service import validate_image, save_file_local, generate_filename, delete_file_local
 from app.models import Box, BoxService, Tenant, User, UserRole, AppointmentStatus, Service, Car, Appointment, Expense, DiscountRule, ClientDiscount, LoyaltyPoints, LoyaltyTierConfig, Photo, EntityType, Notification, UserNotificationSettings, WorkingHours, AppointmentHistory, Payment, ServiceDiscountRecommendation
@@ -56,13 +56,17 @@ from app.schemas import (
     WorkingHoursOut, WorkingHoursUpdate,
     BoxCreate, BoxUpdate, BoxOut,
     CalendarResponse, CalendarDay, CalendarAppointment, HistoryEntryOut, HistoryResponse, ServiceTrendPoint, ServiceTrend, ServiceComparison, TopService, ForecastPoint, ServiceAnalyticsResponse, PaymentCreateRequest, PaymentOut, PaymentWebhookRequest, RevenueDetail, PeriodComparison, MasterRevenueSummary, ServiceRevenueSummary, RevenueReportResponse,
+    MaterialCreate, MaterialUpdate, MaterialOut, MaterialCategoryItem,
+    TechCardCreate, TechCardUpdate, TechCardOut,
+    MaterialMovementOut, StockHistoryPoint, AbcItemOut, CriticalItemOut, InventorySummaryOut,
+    PurchaseRecommendOut, ConsumptionAuditOut, TechAnalyticsSummaryOut,
 )
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     await init_db()
-    async for db in get_db():
+    async with async_session_maker() as db:
         tenant_result = await db.execute(select(Tenant).limit(1))
         default_tenant = tenant_result.scalar_one_or_none()
         if not default_tenant:
@@ -90,7 +94,6 @@ async def lifespan(app: FastAPI):
             print("[OK] Super-admin created (phone: +79999999999, password: admin123)")
         else:
             print("[OK] Super-admin already exists")
-        break
     yield
 
 app = FastAPI(title="CarDetailing AI", version="1.0.0", lifespan=lifespan)
@@ -171,12 +174,14 @@ def _require_master(current_user: dict = Depends(_get_current_user)):
 # ========== SERVICE HELPERS ==========
 
 def _service_to_out(service: Service) -> ServiceOut:
+    from app.finance_formulas import resolve_service_cost, service_margin_percent
     price = float(service.price or 0)
-    cost = float(getattr(service, "cost_price", None) or 0)
-    if cost <= 0:
-        cost = float(service.material_cost or 0)
+    cost = resolve_service_cost(
+        getattr(service, "cost_price", None),
+        service.material_cost,
+    )
     material = float(service.material_cost or 0)
-    margin = round(((price - cost) / price) * 100, 1) if price > 0 else 0.0
+    margin = service_margin_percent(price, cost)
     return ServiceOut(
         id=service.id,
         name=service.name,
@@ -1591,6 +1596,356 @@ async def delete_expense(
     return {"message": "Expense deleted"}
 
 
+# =============================================================================
+# ТЕХНОЛОГИЯ — Склад (Materials)
+# =============================================================================
+
+@app.get("/api/materials/categories", response_model=list[MaterialCategoryItem])
+async def get_material_categories(current_user: dict = Depends(_require_admin)):
+    """Справочник категорий склада."""
+    from app.services.materials_service import list_category_items
+    return [MaterialCategoryItem(**c) for c in list_category_items()]
+
+
+@app.get("/api/materials")
+async def get_materials(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    category: str | None = Query(None),
+    is_active: bool | None = Query(None),
+    low_stock_only: bool = Query(False),
+    search: str | None = Query(None, description="Поиск по name / sku / supplier"),
+):
+    """Список позиций склада с фильтрами."""
+    from app.services.materials_service import list_materials, material_to_out
+    tenant_id = UUID(current_user["tenant_id"])
+    items, total = await list_materials(
+        db,
+        tenant_id,
+        skip=skip,
+        limit=limit,
+        category=category,
+        is_active=is_active,
+        low_stock_only=low_stock_only,
+        search=search,
+    )
+    return {
+        "items": [material_to_out(m) for m in items],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+
+@app.get("/api/materials/{material_id}", response_model=MaterialOut)
+async def get_material_by_id(
+    material_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Получить позицию склада по id."""
+    from app.services.materials_service import get_material, material_to_out
+    material = await get_material(db, UUID(current_user["tenant_id"]), material_id)
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    return material_to_out(material)
+
+
+@app.post("/api/materials", response_model=MaterialOut, status_code=201)
+async def create_material_endpoint(
+    request: MaterialCreate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Создать позицию склада."""
+    from app.services.materials_service import create_material, material_to_out
+    material = await create_material(db, UUID(current_user["tenant_id"]), request)
+    return material_to_out(material)
+
+
+@app.put("/api/materials/{material_id}", response_model=MaterialOut)
+async def update_material_endpoint(
+    material_id: int,
+    request: MaterialUpdate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Обновить позицию склада."""
+    from app.services.materials_service import update_material, material_to_out
+    material = await update_material(
+        db, UUID(current_user["tenant_id"]), material_id, request
+    )
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    return material_to_out(material)
+
+
+@app.post("/api/materials/{material_id}/adjust", response_model=MaterialOut)
+async def adjust_material_quantity(
+    material_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+    delta: float = Query(..., description="Приход (+) или расход (−)"),
+):
+    """Изменить остаток: delta > 0 — приход, delta < 0 — расход (не ниже 0)."""
+    from app.services.materials_service import adjust_quantity, material_to_out
+    material = await adjust_quantity(
+        db,
+        UUID(current_user["tenant_id"]),
+        material_id,
+        delta,
+        created_by_id=int(current_user["id"]),
+    )
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    return material_to_out(material)
+
+
+@app.delete("/api/materials/{material_id}")
+async def delete_material_endpoint(
+    material_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Удалить позицию склада."""
+    from app.services.materials_service import delete_material
+    ok = await delete_material(db, UUID(current_user["tenant_id"]), material_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Material not found")
+    return {"message": "Material deleted"}
+
+
+# =============================================================================
+# ТЕХНОЛОГИЯ — Техкарты (услуга → материалы)
+# =============================================================================
+
+@app.get("/api/tech-cards")
+async def get_tech_cards(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    service_id: int | None = Query(None),
+    is_active: bool | None = Query(None),
+    search: str | None = Query(None),
+):
+    """Список техкарт с материалами."""
+    from app.services.tech_cards_service import list_tech_cards, tech_card_to_out
+    items, total = await list_tech_cards(
+        db,
+        UUID(current_user["tenant_id"]),
+        skip=skip,
+        limit=limit,
+        service_id=service_id,
+        is_active=is_active,
+        search=search,
+    )
+    return {
+        "items": [tech_card_to_out(c) for c in items],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+
+@app.get("/api/tech-cards/{card_id}", response_model=TechCardOut)
+async def get_tech_card_by_id(
+    card_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Получить техкарту по id."""
+    from app.services.tech_cards_service import get_tech_card, tech_card_to_out
+    card = await get_tech_card(db, UUID(current_user["tenant_id"]), card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Tech card not found")
+    return tech_card_to_out(card)
+
+
+@app.post("/api/tech-cards", response_model=TechCardOut, status_code=201)
+async def create_tech_card_endpoint(
+    request: TechCardCreate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Создать техкарту для услуги."""
+    from app.services.tech_cards_service import create_tech_card, tech_card_to_out
+    try:
+        card = await create_tech_card(db, UUID(current_user["tenant_id"]), request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return tech_card_to_out(card)
+
+
+@app.put("/api/tech-cards/{card_id}", response_model=TechCardOut)
+async def update_tech_card_endpoint(
+    card_id: int,
+    request: TechCardUpdate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Обновить техкарту и состав материалов."""
+    from app.services.tech_cards_service import update_tech_card, tech_card_to_out
+    try:
+        card = await update_tech_card(
+            db, UUID(current_user["tenant_id"]), card_id, request
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not card:
+        raise HTTPException(status_code=404, detail="Tech card not found")
+    return tech_card_to_out(card)
+
+
+@app.delete("/api/tech-cards/{card_id}")
+async def delete_tech_card_endpoint(
+    card_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Удалить техкарту."""
+    from app.services.tech_cards_service import delete_tech_card
+    ok = await delete_tech_card(db, UUID(current_user["tenant_id"]), card_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Tech card not found")
+    return {"message": "Tech card deleted"}
+
+
+# =============================================================================
+# ТЕХНОЛОГИЯ — Учёт (Inventory)
+# =============================================================================
+
+@app.get("/api/inventory/summary", response_model=InventorySummaryOut)
+async def get_inventory_summary(
+    days: int = Query(30, ge=1, le=365),
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Сводка учёта склада."""
+    from app.services.inventory_service import inventory_summary
+    data = await inventory_summary(db, UUID(current_user["tenant_id"]), days=days)
+    return InventorySummaryOut(**data)
+
+
+@app.get("/api/inventory/movements")
+async def get_inventory_movements(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    material_id: int | None = Query(None),
+    movement_type: str | None = Query(None),
+    days: int = Query(90, ge=1, le=365),
+):
+    """История движения материалов."""
+    from app.services.inventory_service import list_movements, movement_to_out
+    date_from = datetime.now(timezone.utc) - timedelta(days=days)
+    items, total = await list_movements(
+        db,
+        UUID(current_user["tenant_id"]),
+        skip=skip,
+        limit=limit,
+        material_id=material_id,
+        movement_type=movement_type,
+        date_from=date_from,
+    )
+    return {
+        "items": [MaterialMovementOut(**movement_to_out(m)) for m in items],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+
+@app.get("/api/inventory/stock-history", response_model=list[StockHistoryPoint])
+async def get_stock_history(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+    material_id: int | None = Query(None),
+    days: int = Query(30, ge=7, le=180),
+):
+    """График изменения остатка (по дням)."""
+    from app.services.inventory_service import stock_history
+    points = await stock_history(
+        db,
+        UUID(current_user["tenant_id"]),
+        material_id=material_id,
+        days=days,
+    )
+    return [StockHistoryPoint(**p) for p in points]
+
+
+@app.get("/api/inventory/abc", response_model=list[AbcItemOut])
+async def get_inventory_abc(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+    days: int = Query(90, ge=7, le=365),
+):
+    """ABC-анализ материалов по стоимости расхода."""
+    from app.services.inventory_service import abc_analysis
+    rows = await abc_analysis(db, UUID(current_user["tenant_id"]), days=days)
+    return [AbcItemOut(**r) for r in rows]
+
+
+@app.get("/api/inventory/critical", response_model=list[CriticalItemOut])
+async def get_inventory_critical(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Критические позиции (остаток ≤ мин. запас)."""
+    from app.services.inventory_service import critical_positions
+    rows = await critical_positions(db, UUID(current_user["tenant_id"]))
+    return [CriticalItemOut(**r) for r in rows]
+
+
+# =============================================================================
+# ТЕХНОЛОГИЯ — Аналитика (закупки + норма vs факт)
+# =============================================================================
+
+@app.get("/api/tech-analytics/summary", response_model=TechAnalyticsSummaryOut)
+async def get_tech_analytics_summary(
+    days: int = Query(30, ge=1, le=365),
+    cover_days: int = Query(30, ge=7, le=180),
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Сводка аналитики склада: закупки и аудит расхода."""
+    from app.services.tech_analytics_service import tech_analytics_summary
+    data = await tech_analytics_summary(
+        db, UUID(current_user["tenant_id"]), days=days, cover_days=cover_days
+    )
+    return TechAnalyticsSummaryOut(**data)
+
+
+@app.get("/api/tech-analytics/purchase-recommendations", response_model=list[PurchaseRecommendOut])
+async def get_purchase_recommendations(
+    days: int = Query(30, ge=7, le=365),
+    cover_days: int = Query(30, ge=7, le=180),
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Рекомендации по закупкам на основе расхода и мин. запаса."""
+    from app.services.tech_analytics_service import purchase_recommendations
+    rows = await purchase_recommendations(
+        db, UUID(current_user["tenant_id"]), days=days, cover_days=cover_days
+    )
+    return [PurchaseRecommendOut(**r) for r in rows]
+
+
+@app.get("/api/tech-analytics/consumption-audit", response_model=list[ConsumptionAuditOut])
+async def get_consumption_audit(
+    days: int = Query(30, ge=7, le=365),
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Аудит расхода: норма (техкарта × услуги) vs факт (движения)."""
+    from app.services.tech_analytics_service import consumption_audit
+    rows = await consumption_audit(db, UUID(current_user["tenant_id"]), days=days)
+    return [ConsumptionAuditOut(**r) for r in rows]
+
+
 @app.get("/api/analytics/expenses", response_model=ExpenseAnalyticsResponse)
 async def get_expense_analytics(
     months: int = Query(6, ge=1, le=24),
@@ -1682,10 +2037,10 @@ async def get_expense_analytics(
     fixed_month = sum(float(e.amount or 0) for e in month_expenses)
 
     # Contribution margin ratio
-    contrib = revenue_month - material_month
-    contrib_ratio = (contrib / revenue_month) if revenue_month > 0 else 0.4
-    break_even = round(fixed_month / contrib_ratio, 2) if contrib_ratio > 0 else 0.0
-    forecast_profit = round(revenue_month - material_month - fixed_month, 2)
+    from app.finance_formulas import contribution_ratio, break_even_revenue, forecast_profit as calc_forecast_profit
+    contrib_ratio = contribution_ratio(revenue_month, material_month)
+    break_even = break_even_revenue(fixed_month, contrib_ratio)
+    forecast_profit = calc_forecast_profit(revenue_month, material_month, fixed_month)
 
     insights: list[ExpenseInsight] = []
 
@@ -1789,9 +2144,17 @@ async def get_pl_report(
     appts = month_appts.scalars().all()
     completed = [a for a in appts if a.status == "completed"]
 
+    from app.finance_formulas import (
+        avg_check as calc_avg_check,
+        gross_margin_percent,
+        gross_profit as calc_gross_profit,
+        net_margin_percent,
+        net_profit as calc_net_profit,
+    )
+
     total_revenue = sum(float(a.total_price or 0) for a in completed)
     completed_count = len(completed)
-    avg_check = round(total_revenue / completed_count, 2) if completed_count else 0
+    avg_check = calc_avg_check(total_revenue, completed_count)
 
     # --- Материальные затраты ---
     total_material_cost = sum(float(a.service.material_cost or 0) for a in completed if a.service)
@@ -1848,10 +2211,10 @@ async def get_pl_report(
         expenses_by_category[cat] = expenses_by_category.get(cat, 0) + float(e.amount or 0)
 
     # --- Итоговые расчёты ---
-    gross_profit = round(total_revenue - total_material_cost, 2)
-    gross_margin = round(gross_profit / total_revenue * 100, 1) if total_revenue else 0
-    net_profit = round(gross_profit - total_expenses, 2)
-    net_margin = round(net_profit / total_revenue * 100, 1) if total_revenue else 0
+    gross_profit = calc_gross_profit(total_revenue, total_material_cost)
+    gross_margin = gross_margin_percent(total_revenue, total_material_cost)
+    net_profit = calc_net_profit(total_revenue, total_material_cost, total_expenses)
+    net_margin = net_margin_percent(total_revenue, total_material_cost, total_expenses)
 
     return PLReport(
         total_revenue=round(total_revenue, 2),
@@ -2174,25 +2537,9 @@ async def get_discount_analytics(
 
 
 def _discount_percent_relative(hour_load: float, peak_load: float) -> int:
-    """
-    Happy Hours только там, где загрузка заметно ниже пика группы (Пн–Пт / Сб / Вс).
-
-    Пиковые часы на теплокарте → 0% (скидка вредна).
-    Простой / почти пустые слоты → 20–25%.
-    """
-    if peak_load <= 0:
-        return 25
-
-    ratio = hour_load / peak_load
-    if ratio >= 0.55:
-        return 0
-    if ratio >= 0.35:
-        return 10
-    if ratio >= 0.20:
-        return 15
-    if hour_load <= 0 or ratio < 0.12:
-        return 25
-    return 20
+    """Happy Hours только там, где загрузка заметно ниже пика группы."""
+    from app.finance_formulas import discount_percent_relative
+    return discount_percent_relative(hour_load, peak_load)
 
 
 def _merge_hour_suggestions(
@@ -2357,18 +2704,16 @@ async def get_discount_intelligence(
         used = usage_by_rule.get(rule.id, [])
         cost = sum(float(cd.applied_amount or 0) for cd in used)
         times = len(used)
-        # Эвристика: каждая скидка «привела» ~0.6 визита сверх базовой загрузки
-        extra_rev = round(times * avg_check * 0.6, 2) if avg_check else 0.0
-        roi_pct = round(((extra_rev - cost) / cost) * 100, 1) if cost > 0 else (100.0 if times > 0 else 0.0)
-        verdict = "держать" if roi_pct >= 20 else ("пересмотреть" if roi_pct >= 0 else "отключить")
+        from app.finance_formulas import discount_roi
+        roi_calc = discount_roi(times, cost, avg_check)
         roi.append(DiscountRoiItem(
             rule_id=rule.id,
             rule_name=rule.name,
             times_used=times,
             discount_cost=round(cost, 2),
-            estimated_extra_revenue=extra_rev,
-            roi_percent=roi_pct,
-            verdict=verdict,
+            estimated_extra_revenue=roi_calc["estimated_extra_revenue"],
+            roi_percent=roi_calc["roi_percent"],
+            verdict=roi_calc["verdict"],
         ))
 
         if rule.type == "happy_hours" and rule.slot_start and rule.slot_end:
@@ -2590,13 +2935,8 @@ async def broadcast_happy_hours(
 
 def _percent_from_priority(priority: float) -> int:
     """≥0.7 → 20–30%, 0.45–0.69 → 10–20%."""
-    if priority >= 0.7:
-        t = min(1.0, (priority - 0.7) / 0.3)
-        return int(round(20 + t * 10))
-    if priority >= 0.45:
-        t = (priority - 0.45) / 0.25
-        return int(round(10 + t * 10))
-    return 0
+    from app.finance_formulas import percent_from_priority
+    return percent_from_priority(priority)
 
 
 async def _compute_service_discount_recs(

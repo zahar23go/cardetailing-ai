@@ -9,7 +9,8 @@ import {
   HomeOutlined, AreaChartOutlined, BulbOutlined, DollarOutlined,
   BarChartOutlined, FileTextOutlined, CalendarOutlined, TeamOutlined,
   SettingOutlined, GiftOutlined, BellOutlined, DownOutlined, RightOutlined,
-  ToolOutlined, BgColorsOutlined, AppstoreOutlined,
+  ToolOutlined, BgColorsOutlined, AppstoreOutlined, ExperimentOutlined,
+  DatabaseOutlined, ProfileOutlined, FundOutlined, LineChartOutlined,
 } from '@ant-design/icons';
 import {
   ADMIN_NAV,
@@ -33,6 +34,11 @@ const ICONS: Record<string, React.ReactNode> = {
   users: <TeamOutlined />,
   services: <ToolOutlined />,
   discounts: <GiftOutlined />,
+  technology: <ExperimentOutlined />,
+  warehouse: <DatabaseOutlined />,
+  'tech-cards': <ProfileOutlined />,
+  inventory: <FundOutlined />,
+  'tech-analytics': <LineChartOutlined />,
   settings: <SettingOutlined />,
   notifications: <BellOutlined />,
   branding: <BgColorsOutlined />,

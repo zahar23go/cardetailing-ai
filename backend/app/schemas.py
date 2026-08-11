@@ -1090,3 +1090,275 @@ class PaymentWebhookRequest(BaseModel):
     payment_id: str
     status: str
     amount: float = 0
+
+
+# =============================================================================
+# ТЕХНОЛОГИЯ — Склад (Materials)
+# =============================================================================
+
+MATERIAL_CATEGORIES = ("chemistry", "consumables", "inventory", "workwear", "other")
+MATERIAL_UNITS = ("pcs", "ml", "l", "g", "kg", "m", "pack")
+
+
+class MaterialCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    sku: Optional[str] = Field(None, max_length=100)
+    category: str = Field(default="other")
+    unit: str = Field(default="pcs")
+    quantity: float = Field(default=0, ge=0)
+    min_quantity: float = Field(default=0, ge=0)
+    purchase_price: float = Field(default=0, ge=0)
+    supplier: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = None
+    is_active: bool = True
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, v: str) -> str:
+        if v not in MATERIAL_CATEGORIES:
+            raise ValueError(f"category must be one of {MATERIAL_CATEGORIES}")
+        return v
+
+    @field_validator("unit")
+    @classmethod
+    def validate_unit(cls, v: str) -> str:
+        if v not in MATERIAL_UNITS:
+            raise ValueError(f"unit must be one of {MATERIAL_UNITS}")
+        return v
+
+
+class MaterialUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    sku: Optional[str] = Field(None, max_length=100)
+    category: Optional[str] = None
+    unit: Optional[str] = None
+    quantity: Optional[float] = Field(None, ge=0)
+    min_quantity: Optional[float] = Field(None, ge=0)
+    purchase_price: Optional[float] = Field(None, ge=0)
+    supplier: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in MATERIAL_CATEGORIES:
+            raise ValueError(f"category must be one of {MATERIAL_CATEGORIES}")
+        return v
+
+    @field_validator("unit")
+    @classmethod
+    def validate_unit(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in MATERIAL_UNITS:
+            raise ValueError(f"unit must be one of {MATERIAL_UNITS}")
+        return v
+
+
+class MaterialOut(BaseModel):
+    id: int
+    name: str
+    sku: Optional[str] = None
+    category: str
+    unit: str
+    quantity: float
+    min_quantity: float
+    purchase_price: float
+    supplier: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: bool = True
+    is_low_stock: bool = False
+    stock_value: float = 0
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class MaterialCategoryItem(BaseModel):
+    key: str
+    label: str
+
+
+# =============================================================================
+# ТЕХНОЛОГИЯ — Техкарты (услуга → материалы)
+# =============================================================================
+
+class TechCardItemIn(BaseModel):
+    material_id: int
+    quantity: float = Field(..., gt=0)
+    notes: Optional[str] = None
+
+
+class TechCardItemOut(BaseModel):
+    id: int
+    material_id: int
+    material_name: str
+    material_unit: str
+    material_sku: Optional[str] = None
+    purchase_price: float = 0
+    stock_quantity: float = 0
+    quantity: float
+    line_cost: float = 0
+    notes: Optional[str] = None
+    is_low_stock: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class TechCardCreate(BaseModel):
+    service_id: int
+    name: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = None
+    is_active: bool = True
+    items: list[TechCardItemIn] = Field(default_factory=list)
+
+
+class TechCardUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+    items: Optional[list[TechCardItemIn]] = None
+
+
+class TechCardOut(BaseModel):
+    id: int
+    service_id: int
+    service_name: str
+    service_price: float = 0
+    name: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: bool = True
+    items: list[TechCardItemOut] = []
+    items_count: int = 0
+    estimated_cost: float = 0
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
+# ТЕХНОЛОГИЯ — Учёт (Inventory)
+# =============================================================================
+
+class MaterialMovementOut(BaseModel):
+    id: int
+    material_id: int
+    material_name: str
+    material_unit: str
+    movement_type: str
+    movement_type_label: str
+    delta: float
+    quantity_before: float
+    quantity_after: float
+    reason: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class StockHistoryPoint(BaseModel):
+    date: str
+    quantity: float
+    value: float = 0
+
+
+class AbcItemOut(BaseModel):
+    material_id: int
+    material_name: str
+    category: str
+    unit: str
+    consumption_qty: float = 0
+    consumption_value: float = 0
+    stock_value: float = 0
+    metric_value: float = 0
+    share_percent: float = 0
+    cumulative_percent: float = 0
+    abc_class: str
+    quantity: float = 0
+    min_quantity: float = 0
+    is_low_stock: bool = False
+
+
+class CriticalItemOut(BaseModel):
+    material_id: int
+    material_name: str
+    sku: Optional[str] = None
+    category: str
+    unit: str
+    quantity: float
+    min_quantity: float
+    deficit: float
+    purchase_price: float = 0
+    restock_cost: float = 0
+    supplier: Optional[str] = None
+
+
+class InventorySummaryOut(BaseModel):
+    materials_count: int = 0
+    stock_value: float = 0
+    critical_count: int = 0
+    movements_period: int = 0
+    period_days: int = 30
+
+
+# =============================================================================
+# ТЕХНОЛОГИЯ — Аналитика (закупки + норма vs факт)
+# =============================================================================
+
+class PurchaseRecommendOut(BaseModel):
+    material_id: int
+    material_name: str
+    sku: Optional[str] = None
+    category: str
+    unit: str
+    quantity: float
+    min_quantity: float
+    avg_daily_consumption: float = 0
+    days_of_stock: Optional[float] = None
+    target_quantity: float
+    recommend_qty: float
+    purchase_price: float = 0
+    estimate_cost: float = 0
+    supplier: Optional[str] = None
+    priority: str
+    reason: str
+
+
+class AuditServiceBreakout(BaseModel):
+    service_id: int
+    service_name: str
+    completed_count: int = 0
+    norm_per_service: float = 0
+    norm_total: float = 0
+
+
+class ConsumptionAuditOut(BaseModel):
+    material_id: int
+    material_name: str
+    sku: Optional[str] = None
+    category: str
+    unit: str
+    purchase_price: float = 0
+    norm_qty: float = 0
+    fact_qty: float = 0
+    variance_qty: float = 0
+    variance_percent: Optional[float] = None
+    norm_cost: float = 0
+    fact_cost: float = 0
+    variance_cost: float = 0
+    status: str
+    status_label: str
+    services: list[AuditServiceBreakout] = []
+
+
+class TechAnalyticsSummaryOut(BaseModel):
+    period_days: int = 30
+    cover_days: int = 30
+    purchase_items: int = 0
+    purchase_estimate_cost: float = 0
+    purchase_critical: int = 0
+    audit_items: int = 0
+    audit_overspend: int = 0
+    audit_underspend: int = 0
+    audit_variance_cost: float = 0
+
+

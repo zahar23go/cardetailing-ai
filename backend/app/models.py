@@ -1,7 +1,7 @@
 """
 Database models for CarDetailing AI.
 
-SQLAlchemy ORM models: Tenant, User, Car, Service, Appointment.
+SQLAlchemy ORM models: Tenant, User, Car, Service, Appointment, Material, …
 """
 
 import enum
@@ -19,6 +19,7 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, backref
@@ -78,6 +79,8 @@ class Tenant(Base):
     appointments = relationship("Appointment", back_populates="tenant", cascade="all, delete-orphan")
     expenses = relationship("Expense", back_populates="tenant", cascade="all, delete-orphan")
     boxes = relationship("Box", back_populates="tenant", cascade="all, delete-orphan")
+    materials = relationship("Material", back_populates="tenant", cascade="all, delete-orphan")
+    tech_cards = relationship("TechCard", back_populates="tenant", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Tenant(id={self.id}, name='{self.name}', subdomain='{self.subdomain}')>"
@@ -829,3 +832,252 @@ class ServiceDiscountRecommendation(Base):
 
     service = relationship("Service")
     discount_rule = relationship("DiscountRule")
+
+
+# =============================================================================
+# ТЕХНОЛОГИЯ — Склад (Materials)
+# =============================================================================
+
+class MaterialCategory(str, enum.Enum):
+    """Категории номенклатуры склада (модуль «Технология»)."""
+    chemistry = "chemistry"          # Химия
+    consumables = "consumables"      # Расходники
+    inventory = "inventory"          # Инвентарь
+    workwear = "workwear"            # Спецодежда
+    other = "other"
+
+
+class MaterialUnit(str, enum.Enum):
+    """Единицы измерения на складе."""
+    pcs = "pcs"   # шт
+    ml = "ml"
+    l = "l"
+    g = "g"
+    kg = "kg"
+    m = "m"
+    pack = "pack"  # упак.
+
+
+class Material(Base):
+    """
+    Номенклатура склада (модуль «Технология» / Склад).
+
+    Не путать с Service.material_cost — это скаляр себестоимости услуги в P&L.
+    """
+    __tablename__ = "materials"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String(255), nullable=False, index=True)
+    sku = Column(String(100), nullable=True, index=True, comment="Артикул / SKU")
+    category = Column(
+        String(50),
+        nullable=False,
+        default=MaterialCategory.other.value,
+        index=True,
+        comment="chemistry, consumables, inventory, workwear, other",
+    )
+    unit = Column(
+        String(20),
+        nullable=False,
+        default=MaterialUnit.pcs.value,
+        comment="pcs, ml, l, g, kg, m, pack",
+    )
+    quantity = Column(
+        Numeric(12, 3),
+        nullable=False,
+        default=0,
+        comment="Текущий остаток",
+    )
+    min_quantity = Column(
+        Numeric(12, 3),
+        nullable=False,
+        default=0,
+        comment="Минимальный запас (порог алерта)",
+    )
+    purchase_price = Column(
+        Numeric(10, 2),
+        nullable=False,
+        default=0,
+        comment="Закупочная цена за единицу",
+    )
+    supplier = Column(String(255), nullable=True, comment="Поставщик")
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    tenant = relationship("Tenant", back_populates="materials")
+    tech_card_items = relationship("TechCardItem", back_populates="material")
+    movements = relationship(
+        "MaterialMovement",
+        back_populates="material",
+        cascade="all, delete-orphan",
+        order_by="MaterialMovement.created_at.desc()",
+    )
+
+    def __repr__(self) -> str:
+        return f"<Material(id={self.id}, name='{self.name}', qty={self.quantity})>"
+
+
+class MaterialMovementType(str, enum.Enum):
+    """Типы движений склада."""
+    in_ = "in"           # приход
+    out = "out"          # расход
+    adjust = "adjust"    # ручная корректировка
+    initial = "initial"  # начальный остаток
+
+
+class MaterialMovement(Base):
+    """История движения материалов (модуль «Технология» / Учёт)."""
+    __tablename__ = "material_movements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    material_id = Column(
+        Integer,
+        ForeignKey("materials.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    movement_type = Column(
+        String(20),
+        nullable=False,
+        index=True,
+        comment="in, out, adjust, initial",
+    )
+    delta = Column(
+        Numeric(12, 3),
+        nullable=False,
+        comment="Изменение остатка (+/−)",
+    )
+    quantity_before = Column(Numeric(12, 3), nullable=False, default=0)
+    quantity_after = Column(Numeric(12, 3), nullable=False, default=0)
+    reason = Column(String(255), nullable=True)
+    created_by_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    material = relationship("Material", back_populates="movements")
+    created_by = relationship("User")
+
+    def __repr__(self) -> str:
+        return f"<MaterialMovement(id={self.id}, material={self.material_id}, delta={self.delta})>"
+
+
+# =============================================================================
+# ТЕХНОЛОГИЯ — Техкарты (услуга → материалы)
+# =============================================================================
+
+class TechCard(Base):
+    """
+    Техкарта: рецепт материалов на услугу.
+    Одна техкарта на услугу в рамках тенанта.
+    """
+    __tablename__ = "tech_cards"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "service_id", name="uq_tech_cards_tenant_service"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    service_id = Column(
+        Integer,
+        ForeignKey("services.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String(255), nullable=True, comment="Название техкарты (по умолчанию — имя услуги)")
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    tenant = relationship("Tenant", back_populates="tech_cards")
+    service = relationship("Service")
+    items = relationship(
+        "TechCardItem",
+        back_populates="tech_card",
+        cascade="all, delete-orphan",
+        order_by="TechCardItem.id",
+    )
+
+    def __repr__(self) -> str:
+        return f"<TechCard(id={self.id}, service_id={self.service_id})>"
+
+
+class TechCardItem(Base):
+    """Строка техкарты: материал и расход на одну услугу."""
+    __tablename__ = "tech_card_items"
+    __table_args__ = (
+        UniqueConstraint("tech_card_id", "material_id", name="uq_tech_card_items_card_material"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tech_card_id = Column(
+        Integer,
+        ForeignKey("tech_cards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    material_id = Column(
+        Integer,
+        ForeignKey("materials.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    quantity = Column(
+        Numeric(12, 3),
+        nullable=False,
+        default=0,
+        comment="Расход материала на одну услугу",
+    )
+    notes = Column(Text, nullable=True)
+
+    tech_card = relationship("TechCard", back_populates="items")
+    material = relationship("Material", back_populates="tech_card_items")
+
+    def __repr__(self) -> str:
+        return f"<TechCardItem(card={self.tech_card_id}, material={self.material_id}, qty={self.quantity})>"

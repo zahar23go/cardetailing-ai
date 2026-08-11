@@ -21,6 +21,10 @@ import CalendarPage from '../pages/upload/calendar';
 import UsersPage from '../pages/crm/users';
 import ServicesPage from '../pages/crm/services';
 import DiscountsPage from '../pages/discounts';
+import WarehousePage from '../pages/technology/warehouse';
+import TechCardsPage from '../pages/technology/tech-cards';
+import InventoryPage from '../pages/technology/inventory';
+import TechAnalyticsPage from '../pages/technology/analytics';
 import NotificationsPage from '../pages/settings/notifications';
 import BrandingPage from '../pages/settings/branding';
 import ServiceAnalyticsPage from '../pages/analytics/service-analytics';
@@ -122,6 +126,15 @@ export default function AppRoutes({
         </Route>
 
         <Route path="discounts" element={<DiscountsPage />} />
+
+        <Route path="technology">
+          <Route index element={<Navigate to="warehouse" replace />} />
+          <Route path="warehouse" element={<WarehousePage />} />
+          <Route path="tech-cards" element={<TechCardsPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="analytics" element={<TechAnalyticsPage />} />
+        </Route>
+
         <Route path="settings/notifications" element={<NotificationsPage />} />
         <Route path="settings/branding" element={<BrandingPage />} />
       </Route>
@@ -141,6 +154,7 @@ export default function AppRoutes({
       <Route path="/notifications" element={<Navigate to="/settings/notifications" replace />} />
       <Route path="/analytics/metrics" element={<Navigate to="/analytics/analytics" replace />} />
       <Route path="/settings" element={<Navigate to="/settings/notifications" replace />} />
+      <Route path="/warehouse" element={<Navigate to="/technology/warehouse" replace />} />
 
       <Route
         path="/"

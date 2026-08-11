@@ -14,7 +14,11 @@ export type AdminTabKey =
   | 'discounts'
   | 'reports'
   | 'notifications'
-  | 'service-analytics';
+  | 'service-analytics'
+  | 'warehouse'
+  | 'tech-cards'
+  | 'inventory'
+  | 'tech-analytics';
 
 export type NavLeaf = {
   type: 'leaf';
@@ -48,6 +52,10 @@ export const PATH_TO_TAB: Record<string, AdminTabKey | 'branding'> = {
   '/crm/users': 'users',
   '/crm/services': 'services',
   '/discounts': 'discounts',
+  '/technology/warehouse': 'warehouse',
+  '/technology/tech-cards': 'tech-cards',
+  '/technology/inventory': 'inventory',
+  '/technology/analytics': 'tech-analytics',
   '/settings/notifications': 'notifications',
   '/settings/branding': 'branding',
 };
@@ -64,6 +72,10 @@ export const TAB_TO_PATH: Record<AdminTabKey | 'branding', string> = {
   users: '/crm/users',
   services: '/crm/services',
   discounts: '/discounts',
+  warehouse: '/technology/warehouse',
+  'tech-cards': '/technology/tech-cards',
+  inventory: '/technology/inventory',
+  'tech-analytics': '/technology/analytics',
   notifications: '/settings/notifications',
   branding: '/settings/branding',
 };
@@ -89,6 +101,8 @@ export const LEGACY_REDIRECTS: Record<string, string> = {
   '/users': '/crm/users',
   '/services': '/crm/services',
   '/notifications': '/settings/notifications',
+  '/warehouse': '/technology/warehouse',
+  '/technology': '/technology/warehouse',
 };
 
 export const NAV_STORAGE_KEY = 'admin-nav-open';
@@ -139,6 +153,18 @@ export const ADMIN_NAV: NavEntry[] = [
     path: '/discounts',
     label: 'Скидки',
     icon: 'discounts',
+  },
+  {
+    type: 'group',
+    id: 'technology',
+    label: 'Технология',
+    icon: 'technology',
+    children: [
+      { type: 'leaf', key: 'warehouse', path: '/technology/warehouse', label: 'Склад', icon: 'warehouse' },
+      { type: 'leaf', key: 'tech-cards', path: '/technology/tech-cards', label: 'Техкарты', icon: 'tech-cards' },
+      { type: 'leaf', key: 'inventory', path: '/technology/inventory', label: 'Учёт', icon: 'inventory' },
+      { type: 'leaf', key: 'tech-analytics', path: '/technology/analytics', label: 'Аналитика', icon: 'tech-analytics' },
+    ],
   },
   {
     type: 'group',
