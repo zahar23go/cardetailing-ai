@@ -650,7 +650,9 @@ async def resolve_audit_log(
 ) -> AuditLog | None:
     row = (
         await db.execute(
-            select(AuditLog).where(
+            select(AuditLog)
+            .options(selectinload(AuditLog.material))
+            .where(
                 AuditLog.id == log_id,
                 AuditLog.tenant_id == tenant_id,
             )
@@ -661,7 +663,7 @@ async def resolve_audit_log(
     row.status = "resolved"
     row.resolved_at = datetime.now(timezone.utc)
     await db.commit()
-    await db.refresh(row)
+    await db.refresh(row, attribute_names=["status", "resolved_at"])
     return row
 
 
