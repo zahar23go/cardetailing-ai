@@ -60,6 +60,7 @@ from app.schemas import (
     TechCardCreate, TechCardUpdate, TechCardOut,
     MaterialMovementOut, StockHistoryPoint, AbcItemOut, CriticalItemOut, InventorySummaryOut,
     PurchaseRecommendOut, ConsumptionAuditOut, TechAnalyticsSummaryOut,
+    AnomalyOut, AuditLogOut, AuditSyncResultOut,
 )
 
 @contextlib.asynccontextmanager
@@ -1944,6 +1945,74 @@ async def get_consumption_audit(
     from app.services.tech_analytics_service import consumption_audit
     rows = await consumption_audit(db, UUID(current_user["tenant_id"]), days=days)
     return [ConsumptionAuditOut(**r) for r in rows]
+
+
+@app.get("/api/tech-analytics/anomalies", response_model=list[AnomalyOut])
+async def get_tech_anomalies(
+    days: int = Query(30, ge=7, le=365),
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Аномалии расхода: скачки, крупные списания, перерасход, расход без нормы."""
+    from app.services.tech_analytics_service import detect_anomalies
+    rows = await detect_anomalies(db, UUID(current_user["tenant_id"]), days=days)
+    return [AnomalyOut(**r) for r in rows]
+
+
+@app.post("/api/tech-analytics/sync", response_model=AuditSyncResultOut)
+async def sync_tech_analytics(
+    days: int = Query(30, ge=7, le=365),
+    cover_days: int = Query(30, ge=7, le=180),
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Пересчитать аналитику и синхронизировать AuditLog."""
+    from app.services.tech_analytics_service import sync_audit_logs
+    data = await sync_audit_logs(
+        db, UUID(current_user["tenant_id"]), days=days, cover_days=cover_days
+    )
+    return AuditSyncResultOut(**data)
+
+
+@app.get("/api/tech-analytics/audit-logs")
+async def get_audit_logs(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+    kind: str | None = Query(None),
+    status: str | None = Query("open"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """Журнал AuditLog (рекомендации / аудит / аномалии)."""
+    from app.services.tech_analytics_service import list_audit_logs, audit_log_to_out
+    items, total = await list_audit_logs(
+        db,
+        UUID(current_user["tenant_id"]),
+        kind=kind,
+        status=status if status not in (None, "", "all") else None,
+        skip=skip,
+        limit=limit,
+    )
+    return {
+        "items": [AuditLogOut(**audit_log_to_out(i)) for i in items],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+
+@app.post("/api/tech-analytics/audit-logs/{log_id}/resolve", response_model=AuditLogOut)
+async def resolve_tech_audit_log(
+    log_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Пометить запись AuditLog как resolved."""
+    from app.services.tech_analytics_service import resolve_audit_log, audit_log_to_out
+    row = await resolve_audit_log(db, UUID(current_user["tenant_id"]), log_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Audit log not found")
+    return AuditLogOut(**audit_log_to_out(row))
 
 
 @app.get("/api/analytics/expenses", response_model=ExpenseAnalyticsResponse)

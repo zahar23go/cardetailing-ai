@@ -1,6 +1,6 @@
 /**
  * Аналитика технологии — /technology/analytics
- * Рекомендации по закупкам + аудит расхода (норма vs факт).
+ * Рекомендации, аудит норма vs факт, аномалии, журнал AuditLog.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -8,6 +8,7 @@ import {
 } from 'antd';
 import {
   ReloadOutlined, ShoppingCartOutlined, AuditOutlined, WarningOutlined,
+  ThunderboltOutlined, CheckOutlined,
 } from '@ant-design/icons';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
@@ -26,6 +27,8 @@ interface Summary {
   audit_overspend: number;
   audit_underspend: number;
   audit_variance_cost: number;
+  anomaly_count: number;
+  open_audit_logs: number;
 }
 
 interface PurchaseRow {
@@ -71,12 +74,39 @@ interface AuditRow {
   services: AuditService[];
 }
 
-async function apiFetch<T>(path: string): Promise<T> {
+interface AnomalyRow {
+  code: string;
+  severity: string;
+  material_id: number;
+  material_name: string;
+  unit: string;
+  title: string;
+  message: string;
+  metric_value: number;
+  cost_impact: number;
+  fingerprint: string;
+}
+
+interface AuditLogRow {
+  id: number;
+  kind: string;
+  severity: string;
+  material_id?: number | null;
+  material_name?: string | null;
+  title: string;
+  message?: string | null;
+  status: string;
+  created_at?: string;
+}
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token');
   const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers || {}),
     },
   });
   if (!res.ok) {
@@ -88,6 +118,14 @@ async function apiFetch<T>(path: string): Promise<T> {
 
 function formatCurrency(val: number) {
   return `${Number(val || 0).toLocaleString('ru-RU')} ₽`;
+}
+
+function formatDate(iso?: string) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
 function priorityBadge(p: string) {
@@ -103,27 +141,46 @@ function auditBadge(status: string, label: string) {
   return <Badge variant="neutral" size="sm">{label}</Badge>;
 }
 
+function severityBadge(s: string) {
+  if (s === 'critical') return <Badge variant="danger" size="sm">critical</Badge>;
+  if (s === 'warn') return <Badge variant="warning" size="sm">warn</Badge>;
+  return <Badge variant="info" size="sm">info</Badge>;
+}
+
+function kindBadge(k: string) {
+  if (k === 'anomaly') return <Badge variant="danger" size="sm">Аномалия</Badge>;
+  if (k === 'audit') return <Badge variant="warning" size="sm">Аудит</Badge>;
+  return <Badge variant="info" size="sm">Закупка</Badge>;
+}
+
 export default function TechAnalyticsPage() {
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [days, setDays] = useState(30);
   const [coverDays, setCoverDays] = useState(30);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [purchases, setPurchases] = useState<PurchaseRow[]>([]);
   const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [anomalies, setAnomalies] = useState<AnomalyRow[]>([]);
+  const [logs, setLogs] = useState<AuditLogRow[]>([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [sum, buy, aud] = await Promise.all([
+      const [sum, buy, aud, anom, journal] = await Promise.all([
         apiFetch<Summary>(`/api/tech-analytics/summary?days=${days}&cover_days=${coverDays}`),
         apiFetch<PurchaseRow[]>(
           `/api/tech-analytics/purchase-recommendations?days=${days}&cover_days=${coverDays}`,
         ),
         apiFetch<AuditRow[]>(`/api/tech-analytics/consumption-audit?days=${days}`),
+        apiFetch<AnomalyRow[]>(`/api/tech-analytics/anomalies?days=${days}`),
+        apiFetch<{ items: AuditLogRow[] }>('/api/tech-analytics/audit-logs?status=open&limit=50'),
       ]);
       setSummary(sum);
       setPurchases(buy || []);
       setAudit(aud || []);
+      setAnomalies(anom || []);
+      setLogs(journal.items || []);
     } catch {
       message.error('Ошибка загрузки аналитики');
     }
@@ -133,6 +190,33 @@ export default function TechAnalyticsPage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const runSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await apiFetch<{ created: number; updated: number; resolved: number; anomalies: number }>(
+        `/api/tech-analytics/sync?days=${days}&cover_days=${coverDays}`,
+        { method: 'POST' },
+      );
+      message.success(
+        `Синхронизация: +${res.created} / ≈${res.updated} / закрыто ${res.resolved} (аномалий ${res.anomalies})`,
+      );
+      await refresh();
+    } catch {
+      message.error('Не удалось синхронизировать AuditLog');
+    }
+    setSyncing(false);
+  };
+
+  const resolveLog = async (id: number) => {
+    try {
+      await apiFetch(`/api/tech-analytics/audit-logs/${id}/resolve`, { method: 'POST' });
+      message.success('Запись закрыта');
+      await refresh();
+    } catch {
+      message.error('Не удалось закрыть запись');
+    }
+  };
 
   return (
     <>
@@ -164,6 +248,14 @@ export default function TechAnalyticsPage() {
               { value: 60, label: 'Покрытие 60 дн.' },
             ]}
           />
+          <Button
+            icon={<ThunderboltOutlined />}
+            className="btn-gold"
+            loading={syncing}
+            onClick={runSync}
+          >
+            Синхронизировать
+          </Button>
           <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={refresh}>
             Обновить
           </Button>
@@ -172,14 +264,14 @@ export default function TechAnalyticsPage() {
 
       <Spin spinning={loading}>
         <Row gutter={[14, 14]} style={{ marginBottom: 16 }}>
-          <Col xs={12} sm={6}>
+          <Col xs={12} sm={6} md={4}>
             <Card variant="kpi">
               <div className="admin-kpi-icon"><ShoppingCartOutlined /></div>
               <div className="admin-kpi-label">К закупке</div>
               <div className="admin-kpi-value">{summary?.purchase_items ?? 0}</div>
             </Card>
           </Col>
-          <Col xs={12} sm={6}>
+          <Col xs={12} sm={6} md={5}>
             <Card variant="stats">
               <div className="admin-kpi-label">Сумма закупки</div>
               <div className="admin-kpi-value text-gold-bold">
@@ -187,14 +279,28 @@ export default function TechAnalyticsPage() {
               </div>
             </Card>
           </Col>
-          <Col xs={12} sm={6}>
+          <Col xs={12} sm={6} md={4}>
             <Card variant="kpi">
               <div className="admin-kpi-icon"><WarningOutlined /></div>
               <div className="admin-kpi-label">Перерасход</div>
               <div className="admin-kpi-value">{summary?.audit_overspend ?? 0}</div>
             </Card>
           </Col>
-          <Col xs={12} sm={6}>
+          <Col xs={12} sm={6} md={4}>
+            <Card variant="kpi">
+              <div className="admin-kpi-icon"><ThunderboltOutlined /></div>
+              <div className="admin-kpi-label">Аномалии</div>
+              <div className="admin-kpi-value">{summary?.anomaly_count ?? 0}</div>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} md={3}>
+            <Card variant="kpi">
+              <div className="admin-kpi-icon"><AuditOutlined /></div>
+              <div className="admin-kpi-label">Журнал</div>
+              <div className="admin-kpi-value">{summary?.open_audit_logs ?? 0}</div>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} md={4}>
             <Card variant="stats">
               <div className="admin-kpi-label">Δ факт − норма</div>
               <div className="admin-kpi-value text-gold-bold">
@@ -203,6 +309,51 @@ export default function TechAnalyticsPage() {
             </Card>
           </Col>
         </Row>
+
+        <Card variant="admin" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <ThunderboltOutlined className="text-gold" />
+            <Text className="text-gold-bold">Аномалии</Text>
+          </div>
+          {anomalies.length === 0 ? (
+            <Empty description={<Text className="text-titanium">Аномалий не найдено</Text>} />
+          ) : (
+            <Table
+              dataSource={anomalies}
+              rowKey="fingerprint"
+              pagination={{ pageSize: 6, showSizeChanger: false }}
+              columns={[
+                {
+                  title: <Text className="text-gold">Уровень</Text>,
+                  dataIndex: 'severity',
+                  width: 100,
+                  render: (v: string) => severityBadge(v),
+                },
+                {
+                  title: <Text className="text-gold">Событие</Text>,
+                  render: (_, r) => (
+                    <div>
+                      <Text className="text-white">{r.title}</Text>
+                      <div><Text className="text-titanium text-13">{r.message}</Text></div>
+                    </div>
+                  ),
+                },
+                {
+                  title: <Text className="text-gold">Код</Text>,
+                  dataIndex: 'code',
+                  render: (v: string) => <Badge variant="neutral" size="sm">{v}</Badge>,
+                },
+                {
+                  title: <Text className="text-gold">Влияние</Text>,
+                  dataIndex: 'cost_impact',
+                  render: (v: number) => (
+                    <Text className="text-gold-bold">{formatCurrency(v)}</Text>
+                  ),
+                },
+              ]}
+            />
+          )}
+        </Card>
 
         <Card variant="admin" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -241,13 +392,6 @@ export default function TechAnalyticsPage() {
                   ),
                 },
                 {
-                  title: <Text className="text-gold">Расход/день</Text>,
-                  dataIndex: 'avg_daily_consumption',
-                  render: (v: number, r) => (
-                    <Text className="text-titanium">{v} {r.unit}</Text>
-                  ),
-                },
-                {
                   title: <Text className="text-gold">Купить</Text>,
                   dataIndex: 'recommend_qty',
                   render: (v: number, r) => (
@@ -269,26 +413,11 @@ export default function TechAnalyticsPage() {
                   ),
                 },
               ]}
-              components={{
-                header: {
-                  cell: (props: React.ThHTMLAttributes<HTMLTableCellElement>) => (
-                    <th {...props} className="table-header-cell" />
-                  ),
-                },
-                body: {
-                  row: (props: React.HTMLAttributes<HTMLTableRowElement>) => (
-                    <tr {...props} className="table-body-row" />
-                  ),
-                  cell: (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
-                    <td {...props} className="table-body-cell" />
-                  ),
-                },
-              }}
             />
           )}
         </Card>
 
-        <Card variant="admin">
+        <Card variant="admin" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <AuditOutlined className="text-gold" />
             <Text className="text-gold-bold">Аудит расхода: норма vs факт</Text>
@@ -372,21 +501,69 @@ export default function TechAnalyticsPage() {
                   ),
                 },
               ]}
-              components={{
-                header: {
-                  cell: (props: React.ThHTMLAttributes<HTMLTableCellElement>) => (
-                    <th {...props} className="table-header-cell" />
+            />
+          )}
+        </Card>
+
+        <Card variant="admin">
+          <div style={{ marginBottom: 12 }}>
+            <Text className="text-gold-bold">Журнал AuditLog</Text>
+            <div>
+              <Text className="text-titanium text-13">
+                Открытые записи после синхронизации (рекомендации, аудит, аномалии).
+              </Text>
+            </div>
+          </div>
+          {logs.length === 0 ? (
+            <Empty description={<Text className="text-titanium">Журнал пуст — нажмите «Синхронизировать»</Text>} />
+          ) : (
+            <Table
+              dataSource={logs}
+              rowKey="id"
+              pagination={{ pageSize: 8, showSizeChanger: false }}
+              columns={[
+                {
+                  title: <Text className="text-gold">Тип</Text>,
+                  dataIndex: 'kind',
+                  width: 110,
+                  render: (v: string) => kindBadge(v),
+                },
+                {
+                  title: <Text className="text-gold">Уровень</Text>,
+                  dataIndex: 'severity',
+                  width: 100,
+                  render: (v: string) => severityBadge(v),
+                },
+                {
+                  title: <Text className="text-gold">Запись</Text>,
+                  render: (_, r) => (
+                    <div>
+                      <Text className="text-white">{r.title}</Text>
+                      <div><Text className="text-titanium text-13">{r.message || ''}</Text></div>
+                    </div>
                   ),
                 },
-                body: {
-                  row: (props: React.HTMLAttributes<HTMLTableRowElement>) => (
-                    <tr {...props} className="table-body-row" />
-                  ),
-                  cell: (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
-                    <td {...props} className="table-body-cell" />
+                {
+                  title: <Text className="text-gold">Дата</Text>,
+                  dataIndex: 'created_at',
+                  width: 140,
+                  render: (v: string) => <Text className="text-titanium">{formatDate(v)}</Text>,
+                },
+                {
+                  title: '',
+                  width: 90,
+                  render: (_, r) => (
+                    <Button
+                      size="small"
+                      icon={<CheckOutlined />}
+                      className="btn-gold-secondary"
+                      onClick={() => resolveLog(r.id)}
+                    >
+                      OK
+                    </Button>
                   ),
                 },
-              }}
+              ]}
             />
           )}
         </Card>

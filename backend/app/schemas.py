@@ -1360,5 +1360,45 @@ class TechAnalyticsSummaryOut(BaseModel):
     audit_overspend: int = 0
     audit_underspend: int = 0
     audit_variance_cost: float = 0
+    anomaly_count: int = 0
+    open_audit_logs: int = 0
+
+
+class AnomalyOut(BaseModel):
+    code: str
+    severity: str
+    material_id: int
+    material_name: str
+    unit: str
+    title: str
+    message: str
+    metric_value: float = 0
+    cost_impact: float = 0
+    fingerprint: str
+
+
+class AuditLogOut(BaseModel):
+    id: int
+    kind: str
+    severity: str
+    material_id: Optional[int] = None
+    material_name: Optional[str] = None
+    title: str
+    message: Optional[str] = None
+    payload: dict = {}
+    status: str
+    fingerprint: str
+    created_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+
+
+class AuditSyncResultOut(BaseModel):
+    created: int = 0
+    updated: int = 0
+    resolved: int = 0
+    open_total: int = 0
+    recommendations: int = 0
+    audit_rows: int = 0
+    anomalies: int = 0
 
 

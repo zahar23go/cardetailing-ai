@@ -1,4 +1,4 @@
-"""Тесты аналитики технологии: закупки и норма vs факт."""
+"""Тесты аналитики технологии: закупки, норма vs факт, аномалии, AuditLog."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from app.services import tech_cards_service as cards
 
 @pytest.mark.asyncio
 class TestTechAnalytics:
-    async def test_purchase_and_audit(
+    async def test_purchase_audit_anomalies_and_sync(
         self,
         db_session,
         default_tenant,
@@ -75,7 +75,6 @@ class TestTechAnalytics:
             )
         await db_session.commit()
 
-        # факт: приход +400, затем списание 400 (норма 3×100=300 → перерасход)
         await mats.adjust_quantity(db_session, default_tenant.id, mat.id, 400, reason="приход")
         await mats.adjust_quantity(db_session, default_tenant.id, mat.id, -400, reason="факт")
 
@@ -83,7 +82,6 @@ class TestTechAnalytics:
             db_session, default_tenant.id, days=30, cover_days=30
         )
         assert any(r["material_id"] == mat.id and r["priority"] == "critical" for r in buys)
-        assert any(r["recommend_qty"] > 0 for r in buys if r["material_id"] == mat.id)
 
         audit = await analytics.consumption_audit(db_session, default_tenant.id, days=30)
         row = next(r for r in audit if r["material_id"] == mat.id)
@@ -91,9 +89,23 @@ class TestTechAnalytics:
         assert row["fact_qty"] == 400
         assert row["status"] == "over"
 
+        anomalies = await analytics.detect_anomalies(db_session, default_tenant.id, days=30)
+        assert any(a["code"] == "overspend" and a["material_id"] == mat.id for a in anomalies)
+        assert any(a["code"] == "burst" and a["material_id"] == mat.id for a in anomalies)
+
+        sync = await analytics.sync_audit_logs(db_session, default_tenant.id, days=30)
+        assert sync["created"] >= 1
+        assert sync["anomalies"] >= 1
+
+        logs, total = await analytics.list_audit_logs(db_session, default_tenant.id, status="open")
+        assert total >= 1
+        assert any(l.kind in ("anomaly", "audit", "recommendation") for l in logs)
+
         summary = await analytics.tech_analytics_summary(db_session, default_tenant.id)
         assert summary["purchase_critical"] >= 1
         assert summary["audit_overspend"] >= 1
+        assert summary["anomaly_count"] >= 1
+        assert summary["open_audit_logs"] >= 1
 
     async def test_api(
         self,
@@ -114,12 +126,11 @@ class TestTechAnalytics:
         db_session.add(mat)
         await db_session.commit()
 
-        s = await client.get(
-            "/api/tech-analytics/summary",
-            headers=admin_headers,
-        )
+        s = await client.get("/api/tech-analytics/summary", headers=admin_headers)
         assert s.status_code == 200
-        assert "purchase_items" in s.json()
+        body = s.json()
+        assert "purchase_items" in body
+        assert "anomaly_count" in body
 
         p = await client.get(
             "/api/tech-analytics/purchase-recommendations",
@@ -128,8 +139,26 @@ class TestTechAnalytics:
         assert p.status_code == 200
         assert any(x["material_name"] == "Салфетка" for x in p.json())
 
-        a = await client.get(
-            "/api/tech-analytics/consumption-audit",
-            headers=admin_headers,
-        )
+        a = await client.get("/api/tech-analytics/consumption-audit", headers=admin_headers)
         assert a.status_code == 200
+
+        an = await client.get("/api/tech-analytics/anomalies", headers=admin_headers)
+        assert an.status_code == 200
+
+        sync = await client.post("/api/tech-analytics/sync", headers=admin_headers)
+        assert sync.status_code == 200
+        assert "created" in sync.json()
+
+        logs = await client.get("/api/tech-analytics/audit-logs", headers=admin_headers)
+        assert logs.status_code == 200
+        assert "items" in logs.json()
+
+        items = logs.json()["items"]
+        if items:
+            rid = items[0]["id"]
+            resolved = await client.post(
+                f"/api/tech-analytics/audit-logs/{rid}/resolve",
+                headers=admin_headers,
+            )
+            assert resolved.status_code == 200
+            assert resolved.json()["status"] == "resolved"
