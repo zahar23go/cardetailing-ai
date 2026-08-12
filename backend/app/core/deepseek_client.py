@@ -62,7 +62,8 @@ async def get_financier_response(question: str, business_context: str) -> str:
             temperature=0.7,
             max_tokens=1000
         )
-        return response.choices[0].message.content
+        content = response.choices[0].message.content if response.choices else None
+        return content or "Сейчас не удалось получить ответ AI. Попробуйте ещё раз."
     except Exception as e:
         return f"❌ Ошибка при обращении к AI: {str(e)}"
 

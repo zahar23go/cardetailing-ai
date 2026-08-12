@@ -1,5 +1,7 @@
 """Тесты AI-эндпоинтов (консультант, финансист)."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import AsyncClient
 
@@ -15,15 +17,21 @@ class TestAIConsultant:
         client: AsyncClient,
         auth_headers: dict,
     ):
-        """✅ POST /api/ai/consultant возвращает 200 с ответом."""
-        resp = await client.post("/api/ai/consultant", json={
-            "question": "Какие услуги вы предлагаете?",
-        }, headers=auth_headers)
+        """✅ POST /api/ai/consultant возвращает 200 с ответом (DeepSeek замокан)."""
+        fake = "Рекомендуем комплексную мойку и покрытие керамикой."
+        with patch(
+            "app.main.get_consultant_response",
+            new_callable=AsyncMock,
+            return_value=fake,
+        ):
+            resp = await client.post("/api/ai/consultant", json={
+                "question": "Какие услуги вы предлагаете?",
+            }, headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert "response" in data
-        # Ответ не должен быть пустым
         assert len(data["response"]) > 0
+        assert data["response"] == fake
 
     # ------------------------------------------------------------------
     # 2. Вопрос без авторизации
