@@ -294,8 +294,7 @@ export default function WarehousePage() {
     <>
       <div className="admin-section-head">
         <div>
-          <div className="admin-overview-kicker">Технология</div>
-          <h3>Склад</h3>
+          <h3>Технология / Склад</h3>
         </div>
         <Space wrap>
           <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={() => fetchMaterials(page)}>
@@ -324,7 +323,7 @@ export default function WarehousePage() {
         </Col>
         <Col xs={24} sm={8}>
           <Card variant="stats">
-            <div className="admin-kpi-label">Стоимость на странице</div>
+            <div className="admin-kpi-label">Стоимость склада</div>
             <div className="admin-kpi-value text-gold-bold">{formatCurrency(kpi.value)}</div>
           </Card>
         </Col>
@@ -405,7 +404,7 @@ export default function WarehousePage() {
                       {Number(record.quantity).toLocaleString('ru-RU')} {unitLabel(record.unit)}
                     </Text>
                     {record.is_low_stock ? (
-                      <Badge variant="warning" size="sm">мало</Badge>
+                      <Badge variant="danger" size="sm">мало</Badge>
                     ) : (
                       <Badge variant="success" size="sm">норма</Badge>
                     )}

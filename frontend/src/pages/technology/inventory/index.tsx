@@ -173,8 +173,7 @@ export default function InventoryPage() {
     <>
       <div className="admin-section-head">
         <div>
-          <div className="admin-overview-kicker">Технология</div>
-          <h3>Учёт</h3>
+          <h3>Технология / Учёт</h3>
         </div>
         <Space wrap>
           <Select

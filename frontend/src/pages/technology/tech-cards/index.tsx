@@ -287,8 +287,7 @@ export default function TechCardsPage() {
     <>
       <div className="admin-section-head">
         <div>
-          <div className="admin-overview-kicker">Технология</div>
-          <h3>Техкарты</h3>
+          <h3>Технология / Техкарты</h3>
         </div>
         <Space wrap>
           <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={() => fetchCards(page)}>
@@ -317,7 +316,7 @@ export default function TechCardsPage() {
         </Col>
         <Col xs={24} sm={8}>
           <Card variant="stats">
-            <div className="admin-kpi-label">Себестоимость материалов (на стр.)</div>
+            <div className="admin-kpi-label">Стоимость материалов</div>
             <div className="admin-kpi-value text-gold-bold">{formatCurrency(kpi.costSum)}</div>
           </Card>
         </Col>
@@ -363,7 +362,7 @@ export default function TechCardsPage() {
                         <div>
                           <Text className="text-white">{row.material_name}</Text>
                           {row.is_low_stock ? (
-                            <div><Badge variant="warning" size="sm">мало на складе</Badge></div>
+                            <div><Badge variant="danger" size="sm">мало</Badge></div>
                           ) : null}
                         </div>
                       ),

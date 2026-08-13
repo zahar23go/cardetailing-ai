@@ -1,14 +1,14 @@
 /**
  * Аналитика технологии — /technology/analytics
- * Рекомендации, аудит норма vs факт, аномалии, журнал AuditLog.
+ * Рекомендации, аудит норма vs факт (ручной + период), аномалии, AuditLog.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Typography, Row, Col, Table, Button, Space, Spin, Empty, Select, message, Tooltip,
+  Typography, Row, Col, Table, Button, Space, Spin, Empty, Select, message, Tooltip, InputNumber, Alert,
 } from 'antd';
 import {
   ReloadOutlined, ShoppingCartOutlined, AuditOutlined, WarningOutlined,
-  ThunderboltOutlined, CheckOutlined,
+  ThunderboltOutlined, CheckOutlined, CalculatorOutlined,
 } from '@ant-design/icons';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
@@ -99,6 +99,22 @@ interface AuditLogRow {
   created_at?: string;
 }
 
+interface TechCardItem {
+  material_id: number;
+  material_name: string;
+  material_unit: string;
+  quantity: number;
+  purchase_price?: number;
+}
+
+interface TechCardOption {
+  id: number;
+  service_id: number;
+  service_name: string;
+  name?: string | null;
+  items: TechCardItem[];
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token');
   const res = await fetch(`${API_BASE}${path}`, {
@@ -129,9 +145,9 @@ function formatDate(iso?: string) {
 }
 
 function priorityBadge(p: string) {
-  if (p === 'critical') return <Badge variant="danger" size="sm">Критично</Badge>;
-  if (p === 'warn') return <Badge variant="warning" size="sm">Скоро</Badge>;
-  return <Badge variant="info" size="sm">План</Badge>;
+  if (p === 'critical') return <Badge variant="danger" size="sm">Срочно заказать</Badge>;
+  if (p === 'warn') return <Badge variant="warning" size="sm">Заказать</Badge>;
+  return <Badge variant="info" size="sm">Заказать</Badge>;
 }
 
 function auditBadge(status: string, label: string) {
@@ -164,10 +180,15 @@ export default function TechAnalyticsPage() {
   const [anomalies, setAnomalies] = useState<AnomalyRow[]>([]);
   const [logs, setLogs] = useState<AuditLogRow[]>([]);
 
+  const [techCards, setTechCards] = useState<TechCardOption[]>([]);
+  const [manualCardId, setManualCardId] = useState<number | undefined>();
+  const [manualServices, setManualServices] = useState<number>(1);
+  const [manualFacts, setManualFacts] = useState<Record<number, number>>({});
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [sum, buy, aud, anom, journal] = await Promise.all([
+      const [sum, buy, aud, anom, journal, cards] = await Promise.all([
         apiFetch<Summary>(`/api/tech-analytics/summary?days=${days}&cover_days=${coverDays}`),
         apiFetch<PurchaseRow[]>(
           `/api/tech-analytics/purchase-recommendations?days=${days}&cover_days=${coverDays}`,
@@ -175,12 +196,14 @@ export default function TechAnalyticsPage() {
         apiFetch<AuditRow[]>(`/api/tech-analytics/consumption-audit?days=${days}`),
         apiFetch<AnomalyRow[]>(`/api/tech-analytics/anomalies?days=${days}`),
         apiFetch<{ items: AuditLogRow[] }>('/api/tech-analytics/audit-logs?status=open&limit=50'),
+        apiFetch<{ items: TechCardOption[] }>('/api/tech-cards?skip=0&limit=200&is_active=true'),
       ]);
       setSummary(sum);
       setPurchases(buy || []);
       setAudit(aud || []);
       setAnomalies(anom || []);
       setLogs(journal.items || []);
+      setTechCards(cards.items || []);
     } catch {
       message.error('Ошибка загрузки аналитики');
     }
@@ -190,6 +213,35 @@ export default function TechAnalyticsPage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const selectedCard = useMemo(
+    () => techCards.find((c) => c.id === manualCardId),
+    [techCards, manualCardId],
+  );
+
+  const manualRows = useMemo(() => {
+    if (!selectedCard) return [];
+    const n = Math.max(0, Number(manualServices) || 0);
+    return (selectedCard.items || []).map((item) => {
+      const expected = Number(item.quantity || 0) * n;
+      const fact = Number(manualFacts[item.material_id] ?? 0);
+      const variance = fact - expected;
+      const pct = expected > 0 ? ((fact / expected) - 1) * 100 : (fact > 0 ? null : 0);
+      const warn = pct != null && Math.abs(pct) > 10;
+      return {
+        material_id: item.material_id,
+        material_name: item.material_name,
+        unit: item.material_unit,
+        expected,
+        fact,
+        variance,
+        pct: pct == null ? null : Math.round(pct * 10) / 10,
+        warn,
+      };
+    });
+  }, [selectedCard, manualServices, manualFacts]);
+
+  const hasManualWarn = manualRows.some((r) => r.warn);
 
   const runSync = async () => {
     setSyncing(true);
@@ -222,8 +274,7 @@ export default function TechAnalyticsPage() {
     <>
       <div className="admin-section-head">
         <div>
-          <div className="admin-overview-kicker">Технология</div>
-          <h3>Аналитика</h3>
+          <h3>Технология / Аналитика</h3>
         </div>
         <Space wrap>
           <Select
@@ -361,7 +412,7 @@ export default function TechAnalyticsPage() {
             <Text className="text-gold-bold">Рекомендации по закупкам</Text>
           </div>
           {purchases.length === 0 ? (
-            <Empty description={<Text className="text-titanium">Закупка не требуется</Text>} />
+            <Empty description={<Text className="text-titanium">Запас в норме</Text>} />
           ) : (
             <Table
               dataSource={purchases}
@@ -371,7 +422,7 @@ export default function TechAnalyticsPage() {
                 {
                   title: <Text className="text-gold">Приоритет</Text>,
                   dataIndex: 'priority',
-                  width: 110,
+                  width: 150,
                   render: (v: string) => priorityBadge(v),
                 },
                 {
@@ -419,13 +470,115 @@ export default function TechAnalyticsPage() {
 
         <Card variant="admin" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <AuditOutlined className="text-gold" />
+            <CalculatorOutlined className="text-gold" />
             <Text className="text-gold-bold">Аудит расхода: норма vs факт</Text>
           </div>
           <div style={{ marginBottom: 12 }}>
             <Text className="text-titanium text-13">
-              Норма = расход по техкарте × число завершённых услуг. Факт = списания со склада.
+              Выберите техкарту, укажите число услуг и фактический расход — система посчитает отклонение.
             </Text>
+          </div>
+          <Space wrap style={{ marginBottom: 14 }}>
+            <Select
+              allowClear
+              placeholder="Техкарта / услуга"
+              className="input-luxury"
+              style={{ minWidth: 280 }}
+              value={manualCardId}
+              onChange={(v) => {
+                setManualCardId(v);
+                setManualFacts({});
+              }}
+              options={techCards.map((c) => ({
+                value: c.id,
+                label: c.name || c.service_name,
+              }))}
+              showSearch
+              optionFilterProp="label"
+            />
+            <InputNumber
+              className="input-luxury"
+              min={0}
+              step={1}
+              value={manualServices}
+              onChange={(v) => setManualServices(Number(v || 0))}
+              addonBefore="Услуг"
+              style={{ width: 160 }}
+            />
+          </Space>
+
+          {!selectedCard ? (
+            <Empty description={<Text className="text-titanium">Выберите техкарту для расчёта</Text>} />
+          ) : (
+            <>
+              {hasManualWarn && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message="Отклонение больше 10%"
+                  description="Фактический расход заметно отличается от нормы по техкарте."
+                />
+              )}
+              <Table
+                dataSource={manualRows}
+                rowKey="material_id"
+                pagination={false}
+                size="small"
+                columns={[
+                  {
+                    title: <Text className="text-gold">Материал</Text>,
+                    dataIndex: 'material_name',
+                    render: (v: string) => <Text className="text-white">{v}</Text>,
+                  },
+                  {
+                    title: <Text className="text-gold">Норма</Text>,
+                    render: (_, r) => (
+                      <Text className="text-titanium">
+                        {Number(r.expected).toLocaleString('ru-RU')} {r.unit}
+                      </Text>
+                    ),
+                  },
+                  {
+                    title: <Text className="text-gold">Факт</Text>,
+                    render: (_, r) => (
+                      <InputNumber
+                        className="input-luxury"
+                        min={0}
+                        step={0.1}
+                        value={manualFacts[r.material_id] ?? 0}
+                        onChange={(v) => setManualFacts((prev) => ({
+                          ...prev,
+                          [r.material_id]: Number(v || 0),
+                        }))}
+                        addonAfter={r.unit}
+                        style={{ width: 160 }}
+                      />
+                    ),
+                  },
+                  {
+                    title: <Text className="text-gold">Δ %</Text>,
+                    render: (_, r) => (
+                      <Space>
+                        <Text className={r.warn ? 'text-gold-bold' : 'text-titanium'}>
+                          {r.pct == null ? '—' : `${r.pct > 0 ? '+' : ''}${r.pct}%`}
+                        </Text>
+                        {r.warn ? <Badge variant="danger" size="sm">&gt;10%</Badge> : null}
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+            </>
+          )}
+
+          <div style={{ marginTop: 20, marginBottom: 8 }}>
+            <Text className="text-gold-bold">Автоаудит за период</Text>
+            <div>
+              <Text className="text-titanium text-13">
+                Норма по завершённым услугам × техкарта; факт — списания со склада.
+              </Text>
+            </div>
           </div>
           {audit.length === 0 ? (
             <Empty description={<Text className="text-titanium">Нет данных для аудита за период</Text>} />
@@ -488,6 +641,9 @@ export default function TechAnalyticsPage() {
                     <Text className={v > 0 ? 'text-gold-bold' : 'text-titanium'}>
                       {v > 0 ? '+' : ''}{v} {r.unit}
                       {r.variance_percent != null ? ` (${r.variance_percent > 0 ? '+' : ''}${r.variance_percent}%)` : ''}
+                      {r.variance_percent != null && Math.abs(r.variance_percent) > 10
+                        ? ' ⚠'
+                        : ''}
                     </Text>
                   ),
                 },

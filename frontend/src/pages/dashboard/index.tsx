@@ -10,7 +10,7 @@ import {
 } from 'antd';
 import {
   TeamOutlined, ToolOutlined, CalendarOutlined, ClockCircleOutlined,
-  CheckCircleOutlined, SettingOutlined, ReloadOutlined,
+  CheckCircleOutlined, DollarOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -78,15 +78,13 @@ export default function DashboardPage() {
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [kpiLoading, setKpiLoading] = useState(false);
   const [pendingList, setPendingList] = useState<PendingAppt[]>([]);
-  const [servicesTotal, setServicesTotal] = useState(0);
 
   const refresh = useCallback(async () => {
     setKpiLoading(true);
     try {
-      const [kpiData, appts, services] = await Promise.all([
+      const [kpiData, appts] = await Promise.all([
         apiFetch<KpiData>('/api/analytics/kpi'),
         apiFetch<{ items: PendingAppt[] }>('/api/appointments?skip=0&limit=100'),
-        apiFetch<{ total: number }>('/api/services?skip=0&limit=1'),
       ]);
       setKpi(kpiData);
       setPendingList(
@@ -94,10 +92,12 @@ export default function DashboardPage() {
           .filter((a) => a.status === 'pending' || a.status === 'confirmed')
           .slice(0, 5),
       );
-      setServicesTotal(services.total || 0);
     } catch { /* ignore */ }
     setKpiLoading(false);
   }, []);
+
+  const formatRevenue = (val: number) =>
+    `${Number(val || 0).toLocaleString('ru-RU')} ₽`;
 
   useEffect(() => {
     refresh();
@@ -130,10 +130,10 @@ export default function DashboardPage() {
           {[
             { label: 'Клиенты', value: kpi?.total_clients || 0, icon: <TeamOutlined />, tone: 'gold' },
             { label: 'Мастера', value: kpi?.total_masters || 0, icon: <ToolOutlined />, tone: 'gold' },
-            { label: 'Записи сегодня', value: kpi?.today_appointments || 0, icon: <CalendarOutlined />, tone: 'gold' },
+            { label: 'Записи', value: kpi?.today_appointments || 0, icon: <CalendarOutlined />, tone: 'gold' },
+            { label: 'Выручка', value: formatRevenue(kpi?.month_revenue || 0), icon: <DollarOutlined />, tone: 'gold' },
             { label: 'Ожидают', value: kpi?.pending_appointments || 0, icon: <ClockCircleOutlined />, tone: 'warn' },
             { label: 'Закрыто за месяц', value: kpi?.completed_month || 0, icon: <CheckCircleOutlined />, tone: 'gold' },
-            { label: 'Услуг в каталоге', value: servicesTotal, icon: <SettingOutlined />, tone: 'gold' },
           ].map((m) => (
             <Col xs={12} sm={8} lg={8} key={m.label}>
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
