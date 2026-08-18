@@ -15,7 +15,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File, st
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -25,7 +25,7 @@ from app.core.deepseek_client import get_ai_response, get_financier_response, ge
 from app.core.image_service import validate_image, save_file_local, generate_filename, delete_file_local
 from app.models import Box, BoxService, Tenant, User, UserRole, AppointmentStatus, Service, Car, Appointment, Expense, DiscountRule, ClientDiscount, LoyaltyPoints, LoyaltyTierConfig, Photo, EntityType, Notification, UserNotificationSettings, WorkingHours, AppointmentHistory, Payment, ServiceDiscountRecommendation
 from app.schemas import (
-    RegisterRequest, LoginRequest, AuthResponse, UserOut,
+    RegisterRequest, LoginRequest, AuthResponse, UserOut, UserProfileUpdate,
     ServiceCreate, ServiceUpdate, ServiceOut,
     CarCreate, CarOut,
     AppointmentCreate, AppointmentStatusUpdate, AppointmentOut,
@@ -57,7 +57,7 @@ from app.schemas import (
     BoxCreate, BoxUpdate, BoxOut,
     CalendarResponse, CalendarDay, CalendarAppointment, HistoryEntryOut, HistoryResponse, ServiceTrendPoint, ServiceTrend, ServiceComparison, TopService, ForecastPoint, ServiceAnalyticsResponse, PaymentCreateRequest, PaymentOut, PaymentWebhookRequest, RevenueDetail, PeriodComparison, MasterRevenueSummary, ServiceRevenueSummary, RevenueReportResponse,
     MaterialCreate, MaterialUpdate, MaterialOut, MaterialCategoryItem,
-    TechCardCreate, TechCardUpdate, TechCardOut,
+    TechCardCreate, TechCardUpdate, TechCardOut, TechCardBlockIn, TechCardReorderIn, TechCardPhotoOut,
     MaterialMovementOut, StockHistoryPoint, AbcItemOut, CriticalItemOut, InventorySummaryOut,
     PurchaseRecommendOut, ConsumptionAuditOut, TechAnalyticsSummaryOut,
     AnomalyOut, AuditLogOut, AuditSyncResultOut,
@@ -404,6 +404,44 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def get_me(current_user: dict = Depends(_get_current_user)):
     return current_user
 
+
+@app.put("/api/me", response_model=UserOut)
+async def update_me(
+    request: UserProfileUpdate,
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.id == current_user["id"]))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if request.full_name:
+        user.full_name = request.full_name.strip()
+    await db.commit()
+    await db.refresh(user)
+    return UserOut.model_validate(user)
+
+
+@app.get("/api/masters")
+async def list_masters(
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Список мастеров салона для записи клиента."""
+    result = await db.execute(
+        select(User)
+        .where(
+            User.tenant_id == UUID(current_user["tenant_id"]),
+            User.role == UserRole.master.value,
+        )
+        .order_by(User.full_name)
+    )
+    masters = result.scalars().all()
+    return {
+        "items": [{"id": u.id, "full_name": u.full_name} for u in masters],
+        "total": len(masters),
+    }
+
 # ========== SERVICES ==========
 @app.get("/api/services")
 async def get_services(
@@ -663,10 +701,23 @@ async def create_appointment(
         if bs:
             box_id = bs.box_id
 
+    master_id = request.master_id
+    if master_id is not None:
+        master_result = await db.execute(
+            select(User).where(
+                User.id == master_id,
+                User.tenant_id == UUID(current_user["tenant_id"]),
+                User.role == UserRole.master.value,
+            )
+        )
+        if not master_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Мастер не найден")
+
     appointment = Appointment(
         client_id=current_user["id"],
         service_id=request.service_id,
         car_id=request.car_id,
+        master_id=master_id,
         start_time=start_time,
         end_time=end_time,
         total_price=service.price,
@@ -1722,6 +1773,26 @@ async def delete_material_endpoint(
 # ТЕХНОЛОГИЯ — Техкарты (услуга → материалы)
 # =============================================================================
 
+@app.post("/api/tech-cards/upload-photo", response_model=TechCardPhotoOut)
+async def upload_tech_card_photo(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(_require_admin),
+):
+    """Загрузить фото шага техкарты. URL сохраняется в блоке."""
+    contents = await file.read()
+    try:
+        validate_image(contents, file.filename or "image.jpg")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    filename = generate_filename(file.filename or "image.jpg")
+    url, thumb_url = save_file_local(
+        contents,
+        f"tech-cards/{current_user['tenant_id']}",
+        filename,
+    )
+    return TechCardPhotoOut(url=url, thumbnail_url=thumb_url)
+
+
 @app.get("/api/tech-cards")
 async def get_tech_cards(
     current_user: dict = Depends(_require_admin),
@@ -1732,7 +1803,7 @@ async def get_tech_cards(
     is_active: bool | None = Query(None),
     search: str | None = Query(None),
 ):
-    """Список техкарт с материалами."""
+    """Список техкарт с блоками и материалами."""
     from app.services.tech_cards_service import list_tech_cards, tech_card_to_out
     items, total = await list_tech_cards(
         db,
@@ -1787,7 +1858,7 @@ async def update_tech_card_endpoint(
     current_user: dict = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Обновить техкарту и состав материалов."""
+    """Обновить техкарту, блоки и состав материалов."""
     from app.services.tech_cards_service import update_tech_card, tech_card_to_out
     try:
         card = await update_tech_card(
@@ -1812,6 +1883,83 @@ async def delete_tech_card_endpoint(
     if not ok:
         raise HTTPException(status_code=404, detail="Tech card not found")
     return {"message": "Tech card deleted"}
+
+
+@app.post("/api/tech-cards/{card_id}/blocks", response_model=TechCardOut, status_code=201)
+async def add_tech_card_block(
+    card_id: int,
+    request: TechCardBlockIn,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Добавить шаг в техкарту."""
+    from app.services.tech_cards_service import add_block, tech_card_to_out
+    try:
+        card = await add_block(db, UUID(current_user["tenant_id"]), card_id, request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not card:
+        raise HTTPException(status_code=404, detail="Tech card not found")
+    return tech_card_to_out(card)
+
+
+@app.put("/api/tech-cards/{card_id}/blocks/reorder", response_model=TechCardOut)
+async def reorder_tech_card_blocks(
+    card_id: int,
+    request: TechCardReorderIn,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Изменить порядок шагов техкарты."""
+    from app.services.tech_cards_service import reorder_blocks, tech_card_to_out
+    try:
+        card = await reorder_blocks(
+            db, UUID(current_user["tenant_id"]), card_id, request.block_ids,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not card:
+        raise HTTPException(status_code=404, detail="Tech card not found")
+    return tech_card_to_out(card)
+
+
+@app.put("/api/tech-cards/{card_id}/blocks/{block_id}", response_model=TechCardOut)
+async def update_tech_card_block(
+    card_id: int,
+    block_id: int,
+    request: TechCardBlockIn,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Обновить шаг техкарты."""
+    from app.services.tech_cards_service import update_block, tech_card_to_out
+    try:
+        card = await update_block(
+            db, UUID(current_user["tenant_id"]), card_id, block_id, request,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not card:
+        raise HTTPException(status_code=404, detail="Tech card not found")
+    return tech_card_to_out(card)
+
+
+@app.delete("/api/tech-cards/{card_id}/blocks/{block_id}", response_model=TechCardOut)
+async def delete_tech_card_block(
+    card_id: int,
+    block_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Удалить шаг техкарты."""
+    from app.services.tech_cards_service import delete_block, tech_card_to_out
+    try:
+        card = await delete_block(db, UUID(current_user["tenant_id"]), card_id, block_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not card:
+        raise HTTPException(status_code=404, detail="Tech card not found")
+    return tech_card_to_out(card)
 
 
 # =============================================================================
@@ -3483,6 +3631,35 @@ async def get_discount_rules(
         "skip": skip,
         "limit": limit,
     }
+
+
+@app.get("/api/discounts/active")
+async def get_active_discounts(
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Активные скидки салона, доступные текущему клиенту."""
+    tenant_id = UUID(current_user["tenant_id"])
+    today = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(DiscountRule)
+        .options(selectinload(DiscountRule.service), selectinload(DiscountRule.client))
+        .where(
+            DiscountRule.tenant_id == tenant_id,
+            DiscountRule.is_active == True,
+            or_(
+                DiscountRule.client_id.is_(None),
+                DiscountRule.client_id == current_user["id"],
+            ),
+        )
+        .order_by(DiscountRule.created_at.desc())
+    )
+    items = []
+    for rule in result.scalars().all():
+        if rule.valid_until and rule.valid_until < today:
+            continue
+        items.append(_discount_rule_to_out(rule))
+    return {"items": items, "total": len(items)}
 
 
 @app.post("/api/discounts", response_model=DiscountRuleOut)

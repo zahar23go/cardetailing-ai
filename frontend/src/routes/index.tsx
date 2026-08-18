@@ -23,11 +23,19 @@ import ServicesPage from '../pages/crm/services';
 import DiscountsPage from '../pages/discounts';
 import WarehousePage from '../pages/technology/warehouse';
 import TechCardsPage from '../pages/technology/tech-cards';
+import TechCardViewPage from '../pages/technology/tech-cards/view';
 import InventoryPage from '../pages/technology/inventory';
 import TechAnalyticsPage from '../pages/technology/analytics';
 import NotificationsPage from '../pages/settings/notifications';
 import BrandingPage from '../pages/settings/branding';
 import ServiceAnalyticsPage from '../pages/analytics/service-analytics';
+import ClientLayout from '../pages/client/layout';
+import ClientHomePage from '../pages/client/home';
+import ClientBookingPage from '../pages/client/booking';
+import ClientPortfolioPage from '../pages/client/portfolio';
+import ClientChatPage from '../pages/client/chat';
+import ClientDiscountsPage from '../pages/client/discounts';
+import ClientSettingsPage from '../pages/client/settings';
 
 export interface AppUser {
   id: number;
@@ -96,7 +104,7 @@ export default function AppRoutes({
           ) : isMaster ? (
             <Navigate to="/" replace />
           ) : isClient ? (
-            <Navigate to="/concept" replace />
+            <Navigate to="/client" replace />
           ) : (
             loginEl
           )
@@ -131,12 +139,32 @@ export default function AppRoutes({
           <Route index element={<Navigate to="warehouse" replace />} />
           <Route path="warehouse" element={<WarehousePage />} />
           <Route path="tech-cards" element={<TechCardsPage />} />
+          <Route path="tech-cards/:id" element={<TechCardViewPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="analytics" element={<TechAnalyticsPage />} />
         </Route>
 
         <Route path="settings/notifications" element={<NotificationsPage />} />
         <Route path="settings/branding" element={<BrandingPage />} />
+      </Route>
+
+      <Route
+        element={
+          isAuthenticated && user && isClient ? (
+            <ClientLayout user={user} onLogout={onLogout} />
+          ) : !isAuthenticated ? (
+            loginEl
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      >
+        <Route path="client" element={<ClientHomePage />} />
+        <Route path="client/booking" element={<ClientBookingPage />} />
+        <Route path="client/portfolio" element={<ClientPortfolioPage />} />
+        <Route path="client/chat" element={<ClientChatPage />} />
+        <Route path="client/discounts" element={<ClientDiscountsPage />} />
+        <Route path="client/settings" element={<ClientSettingsPage />} />
       </Route>
 
       {/* Редиректы: старые → новые */}
@@ -161,7 +189,7 @@ export default function AppRoutes({
         element={
           isAuthenticated && user ? (
             isClient ? (
-              <Navigate to="/concept" replace />
+              <Navigate to="/client" replace />
             ) : isAdmin ? (
               <Navigate to="/dashboard" replace />
             ) : isMaster ? (
@@ -180,7 +208,9 @@ export default function AppRoutes({
         element={
           isAuthenticated && isAdmin
             ? <Navigate to="/dashboard" replace />
-            : <Navigate to="/" replace />
+            : isAuthenticated && isClient
+              ? <Navigate to="/client" replace />
+              : <Navigate to="/" replace />
         }
       />
     </Routes>

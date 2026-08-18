@@ -2800,6 +2800,12 @@
   font-size: 22px;
 }
 
+/* Светлый фон страницы: подзаголовок не белый на белом */
+[data-surface="light"] .admin-section-head .text-titanium,
+[data-surface="light"] .admin-section-head .ant-typography {
+  color: #1A1D23 !important;
+}
+
 /* admin-kpi-card / admin-panel-card — база в CARD SYSTEM (.card--kpi / .card--admin) */
 .admin-kpi-icon {
   color: var(--color-gold, #D4AF37);
@@ -3983,6 +3989,357 @@
   margin: 0;
   padding: 4px 12px;
   font-size: 12px;
+}
+
+/* ============================================================
+   TECH CARD VIEW — /technology/tech-cards/:id
+   Токены: theme.css (--color-gold, --color-titanium, --radius-*, --spacing-*)
+   ============================================================ */
+.tech-card-view {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.tech-card-view .card {
+  padding: var(--spacing-lg);
+}
+
+.tech-card-view .card--kpi {
+  min-height: 0;
+}
+
+.tech-card-view-head {
+  margin-bottom: var(--spacing-lg);
+}
+
+.tech-card-view-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.tech-card-view-title {
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--color-gold, #D4AF37);
+  line-height: 1.25;
+}
+
+.tech-card-view-price {
+  margin-top: var(--spacing-sm);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-gold, #D4AF37);
+}
+
+.tech-card-view-kpis {
+  margin-bottom: var(--spacing-lg);
+}
+
+.tech-card-field {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.08));
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.22));
+  border-radius: var(--radius-sm, 10px);
+}
+
+.tech-card-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--spacing-sm);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.tech-card-field-label .anticon {
+  color: var(--color-gold, #D4AF37);
+}
+
+.tech-card-field-text {
+  white-space: pre-wrap;
+  display: block;
+}
+
+.tech-card-materials {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.tech-card-materials li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.tech-card-step {
+  margin-bottom: var(--spacing-lg);
+}
+
+.tech-card-expand {
+  padding: 6px 2px 8px;
+}
+
+.tech-card-expand .tech-card-step {
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-lg);
+}
+
+.tech-card-expand-total {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 4px 2px;
+  font-weight: 800;
+}
+
+.tech-card-step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.tech-card-step-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tech-card-step-index {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-gold, #D4AF37);
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.15));
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.35));
+  border-radius: var(--radius-sm, 10px);
+}
+
+.tech-card-step-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-gold, #D4AF37);
+}
+
+.tech-card-step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tech-card-step-icon {
+  flex-shrink: 0;
+  width: 18px;
+  margin-top: 3px;
+  font-size: 15px;
+  color: var(--color-gold, #D4AF37);
+}
+
+.tech-card-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tech-card-marks .badge,
+.tech-card-marks .badge--sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 28px;
+  padding: 4px 8px;
+}
+
+.tech-card-marks .badge .anticon {
+  font-size: 13px;
+}
+
+.badge.badge--gold .anticon,
+.badge.badge--sm.badge--gold .anticon {
+  margin-right: 2px;
+}
+
+.tech-card-step-photo {
+  max-width: 100%;
+  max-height: 280px;
+  border-radius: var(--radius-card, 12px);
+  object-fit: cover;
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.25));
+}
+
+.tech-card-step-photo--sm {
+  max-height: 120px;
+}
+
+.tech-card-form-block {
+  margin: 0;
+  padding: 14px;
+}
+
+.tech-card-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tech-card-form-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tech-card-form-section--tight {
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+
+.tech-card-form-photo {
+  margin-top: 8px;
+}
+
+.tech-card-form-total {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tech-card-total {
+  margin-top: var(--spacing-sm);
+  text-align: center;
+}
+
+.tech-card-total .admin-kpi-value {
+  font-size: 32px;
+  font-weight: 800;
+}
+
+/* ============================================================
+   CLIENT APP — /client/*
+   Токены темы, те же .card / .badge / btn-gold, что в админке.
+   ============================================================ */
+.client-app-inner {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.client-header-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+
+.client-block.card {
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-lg);
+}
+
+.client-section-title {
+  margin: 8px 0 12px;
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-gold, #D4AF37);
+}
+
+.client-appt-row,
+.client-rec {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.client-appt-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-gold, #D4AF37);
+  margin-bottom: 4px;
+}
+
+.client-appt-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.client-service-hint {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.client-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.client-slot {
+  min-width: 64px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 10px);
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.3));
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.08));
+  color: var(--color-white, #F0F2F5);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.client-slot.is-active {
+  background: var(--color-gold, #D4AF37);
+  color: #1A1D23;
+  border-color: var(--color-gold, #D4AF37);
+  font-weight: 700;
+}
+
+.client-discount-terms {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--color-titanium, #9BA3B5);
+  font-size: 13px;
+}
+
+.client-app .financier-panel.card {
+  padding: var(--spacing-lg);
+}
+
+.client-app .bottom-nav-label {
+  font-size: 10px;
 }
 
 

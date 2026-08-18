@@ -135,3 +135,112 @@ class TestTechCardsAPI:
 
         deleted = await client.delete(f"/api/tech-cards/{card_id}", headers=admin_headers)
         assert deleted.status_code == 200
+
+    async def test_blocks_instruction_and_legacy_items(
+        self,
+        client: AsyncClient,
+        admin_headers: dict,
+        db_session,
+        default_tenant,
+        test_service,
+    ):
+        shampoo = Material(
+            name="Шампунь Koch",
+            category="chemistry",
+            unit="ml",
+            quantity=1000,
+            purchase_price=1,
+            tenant_id=default_tenant.id,
+        )
+        water = Material(
+            name="Вода",
+            category="other",
+            unit="l",
+            quantity=100,
+            purchase_price=0,
+            tenant_id=default_tenant.id,
+        )
+        db_session.add_all([shampoo, water])
+        await db_session.commit()
+        await db_session.refresh(shampoo)
+        await db_session.refresh(water)
+
+        created = await client.post(
+            "/api/tech-cards",
+            headers=admin_headers,
+            json={
+                "service_id": test_service.id,
+                "name": "Мойка кузова с воском",
+                "blocks": [
+                    {
+                        "title": "Подготовка шампуня",
+                        "description": "Развести 50 мл шампуня в 10 л воды",
+                        "duration_minutes": 1,
+                        "items": [
+                            {"material_id": shampoo.id, "quantity": 50},
+                            {"material_id": water.id, "quantity": 10},
+                        ],
+                    },
+                    {
+                        "title": "Нанесение пены",
+                        "description": "Нанести пену снизу вверх",
+                        "duration_minutes": 4,
+                        "items": [{"material_id": shampoo.id, "quantity": 200}],
+                    },
+                    {
+                        "title": "Смывка",
+                        "description": "Смыть пену сверху вниз",
+                        "duration_minutes": 2,
+                        "items": [{"material_id": water.id, "quantity": 20}],
+                    },
+                ],
+            },
+        )
+        assert created.status_code == 201, created.text
+        body = created.json()
+        card_id = body["id"]
+        assert body["blocks_count"] == 3
+        assert body["total_duration_minutes"] == 7
+        assert body["items_count"] == 2  # агрегат: шампунь + вода
+        shampoo_row = next(i for i in body["items"] if i["material_id"] == shampoo.id)
+        assert shampoo_row["quantity"] == 250.0  # 50 + 200
+
+        added = await client.post(
+            f"/api/tech-cards/{card_id}/blocks",
+            headers=admin_headers,
+            json={"title": "Сушка", "duration_minutes": 3, "items": []},
+        )
+        assert added.status_code == 201, added.text
+        assert added.json()["blocks_count"] == 4
+        assert added.json()["total_duration_minutes"] == 10
+
+        ids = [b["id"] for b in added.json()["blocks"]]
+        reordered = await client.put(
+            f"/api/tech-cards/{card_id}/blocks/reorder",
+            headers=admin_headers,
+            json={"block_ids": list(reversed(ids))},
+        )
+        assert reordered.status_code == 200, reordered.text
+        assert [b["id"] for b in reordered.json()["blocks"]] == list(reversed(ids))
+
+        first_id = reordered.json()["blocks"][0]["id"]
+        deleted_block = await client.delete(
+            f"/api/tech-cards/{card_id}/blocks/{first_id}",
+            headers=admin_headers,
+        )
+        assert deleted_block.status_code == 200
+        assert deleted_block.json()["blocks_count"] == 3
+
+        import io
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new("RGB", (2, 2), color="white").save(buf, format="PNG")
+        photo = await client.post(
+            "/api/tech-cards/upload-photo",
+            headers=admin_headers,
+            files={"file": ("step.png", buf.getvalue(), "image/png")},
+        )
+        assert photo.status_code == 200, photo.text
+        assert photo.json()["url"].startswith("/uploads/tech-cards/")
+
+        await client.delete(f"/api/tech-cards/{card_id}", headers=admin_headers)

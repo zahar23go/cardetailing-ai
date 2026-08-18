@@ -161,6 +161,10 @@ class CarOut(BaseModel):
 # APPOINTMENTS
 # =============================================================================
 
+class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=1, max_length=150)
+
+
 class AppointmentCreate(BaseModel):
     service_id: int
     car_id: int
@@ -168,6 +172,7 @@ class AppointmentCreate(BaseModel):
     notes: Optional[str] = Field(None, description="Client notes")
     client_notes: Optional[str] = None  # alias for notes
     box_id: Optional[int] = Field(None, description="ID бокса/зоны")
+    master_id: Optional[int] = Field(None, description="Выбранный мастер")
 
     @field_validator("start_time")
     @classmethod
@@ -1205,12 +1210,35 @@ class TechCardItemOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TechCardBlockIn(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    duration_minutes: int = Field(0, ge=0, le=24 * 60)
+    photo_url: Optional[str] = None
+    items: list[TechCardItemIn] = Field(default_factory=list)
+
+
+class TechCardBlockOut(BaseModel):
+    id: int
+    sort_order: int = 0
+    title: str
+    description: Optional[str] = None
+    duration_minutes: int = 0
+    photo_url: Optional[str] = None
+    items: list[TechCardItemOut] = []
+    items_count: int = 0
+    estimated_cost: float = 0
+
+    model_config = {"from_attributes": True}
+
+
 class TechCardCreate(BaseModel):
     service_id: int
     name: Optional[str] = Field(None, max_length=255)
     notes: Optional[str] = None
     is_active: bool = True
     items: list[TechCardItemIn] = Field(default_factory=list)
+    blocks: list[TechCardBlockIn] = Field(default_factory=list)
 
 
 class TechCardUpdate(BaseModel):
@@ -1218,6 +1246,7 @@ class TechCardUpdate(BaseModel):
     notes: Optional[str] = None
     is_active: Optional[bool] = None
     items: Optional[list[TechCardItemIn]] = None
+    blocks: Optional[list[TechCardBlockIn]] = None
 
 
 class TechCardOut(BaseModel):
@@ -1231,10 +1260,22 @@ class TechCardOut(BaseModel):
     items: list[TechCardItemOut] = []
     items_count: int = 0
     estimated_cost: float = 0
+    blocks: list[TechCardBlockOut] = []
+    blocks_count: int = 0
+    total_duration_minutes: int = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class TechCardReorderIn(BaseModel):
+    block_ids: list[int]
+
+
+class TechCardPhotoOut(BaseModel):
+    url: str
+    thumbnail_url: Optional[str] = None
 
 
 # =============================================================================

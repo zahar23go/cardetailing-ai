@@ -1,103 +1,40 @@
 /**
  * Техкарты — /technology/tech-cards
- * Привязка услуг к материалам склада (BOM на услугу).
+ * Пошаговые инструкции услуги: блоки, материалы, фото, длительность.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Typography, Row, Col, Table, Button, Space, message, Modal, Input,
-  Popconfirm, Empty, Spin, Tooltip, Select, InputNumber,
+  Typography, Row, Col, Table, Button, Space, message, Input,
+  Popconfirm, Empty, Spin, Tooltip,
 } from 'antd';
 import {
   DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined,
-  SearchOutlined, FileTextOutlined, ToolOutlined,
+  SearchOutlined, FileTextOutlined, ToolOutlined, EyeOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
+import TechCardForm from './TechCardForm';
+import { DurationMark, TechCardMarks, cardMarks } from './Marks';
+import {
+  DraftBlock,
+  MaterialOption,
+  ServiceOption,
+  TechCard,
+  apiFetch,
+  cardToDraftBlocks,
+  formatCurrency,
+  formatDuration,
+  newDraftBlock,
+} from './types';
 
 const { Text } = Typography;
-const { TextArea } = Input;
-
-const API_BASE = '';
 const PAGE_SIZE = 20;
 
-interface ServiceOption {
-  id: number;
-  name: string;
-  price: number;
-}
-
-interface MaterialOption {
-  id: number;
-  name: string;
-  unit: string;
-  sku?: string | null;
-  purchase_price: number;
-  quantity: number;
-}
-
-interface TechCardItem {
-  id?: number;
-  material_id: number;
-  material_name?: string;
-  material_unit?: string;
-  purchase_price?: number;
-  stock_quantity?: number;
-  quantity: number;
-  line_cost?: number;
-  notes?: string | null;
-  is_low_stock?: boolean;
-}
-
-interface TechCard {
-  id: number;
-  service_id: number;
-  service_name: string;
-  service_price: number;
-  name?: string | null;
-  notes?: string | null;
-  is_active: boolean;
-  items: TechCardItem[];
-  items_count: number;
-  estimated_cost: number;
-}
-
-type DraftItem = {
-  key: string;
-  material_id?: number;
-  quantity: number;
-  notes: string;
-};
-
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const detail = body.detail;
-    const msg = Array.isArray(detail)
-      ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join('; ')
-      : (detail || `Ошибка ${res.status}`);
-    throw new Error(msg);
-  }
-  return res.json();
-}
-
-function formatCurrency(val: number) {
-  return `${Number(val || 0).toLocaleString('ru-RU')} ₽`;
-}
-
-function newDraftItem(): DraftItem {
-  return { key: `${Date.now()}-${Math.random()}`, quantity: 1, notes: '' };
-}
-
 export default function TechCardsPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [cards, setCards] = useState<TechCard[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -112,14 +49,8 @@ export default function TechCardsPage() {
   const [serviceId, setServiceId] = useState<number | undefined>();
   const [cardName, setCardName] = useState('');
   const [cardNotes, setCardNotes] = useState('');
-  const [draftItems, setDraftItems] = useState<DraftItem[]>([newDraftItem()]);
+  const [draftBlocks, setDraftBlocks] = useState<DraftBlock[]>([newDraftBlock('Блок 1')]);
   const [saving, setSaving] = useState(false);
-
-  const materialMap = useMemo(() => {
-    const m = new Map<number, MaterialOption>();
-    materials.forEach((x) => m.set(x.id, x));
-    return m;
-  }, [materials]);
 
   const usedServiceIds = useMemo(
     () => new Set(cards.map((c) => c.service_id)),
@@ -162,10 +93,13 @@ export default function TechCardsPage() {
       setCards(data.items);
       setTotal(data.total);
       setPage(pageNum);
+      return data.items;
     } catch {
       message.error('Ошибка загрузки техкарт');
+      return [] as TechCard[];
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [page, search]);
 
   useEffect(() => {
@@ -177,20 +111,12 @@ export default function TechCardsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  const draftCost = useMemo(() => {
-    return draftItems.reduce((sum, row) => {
-      if (!row.material_id) return sum;
-      const mat = materialMap.get(row.material_id);
-      return sum + (Number(row.quantity) || 0) * (Number(mat?.purchase_price) || 0);
-    }, 0);
-  }, [draftItems, materialMap]);
-
   const openCreate = () => {
     setEditing(null);
     setServiceId(undefined);
     setCardName('');
     setCardNotes('');
-    setDraftItems([newDraftItem()]);
+    setDraftBlocks([newDraftBlock('Блок 1')]);
     setModalOpen(true);
   };
 
@@ -199,39 +125,48 @@ export default function TechCardsPage() {
     setServiceId(card.service_id);
     setCardName(card.name || card.service_name || '');
     setCardNotes(card.notes || '');
-    setDraftItems(
-      card.items.length
-        ? card.items.map((i) => ({
-            key: `e-${i.id || i.material_id}`,
-            material_id: i.material_id,
-            quantity: Number(i.quantity) || 1,
-            notes: i.notes || '',
-          }))
-        : [newDraftItem()],
-    );
+    setDraftBlocks(cardToDraftBlocks(card));
     setModalOpen(true);
   };
+
+  useEffect(() => {
+    const editId = (location.state as { editId?: number } | null)?.editId;
+    if (!editId || !cards.length) return;
+    const found = cards.find((c) => c.id === editId);
+    if (found) {
+      openEdit(found);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [cards, location.state, location.pathname, navigate]);
 
   const handleSave = async () => {
     if (!serviceId && !editing) {
       message.warning('Выберите услугу');
       return;
     }
-    const items = draftItems
-      .filter((r) => r.material_id && Number(r.quantity) > 0)
-      .map((r) => ({
-        material_id: r.material_id as number,
-        quantity: Number(r.quantity),
-        notes: r.notes.trim() || null,
-      }));
-    if (items.length === 0) {
-      message.warning('Добавьте хотя бы один материал');
+    const untitled = draftBlocks.find((b) => !b.title.trim());
+    if (untitled) {
+      message.warning('У каждого блока должно быть название');
       return;
     }
-    const ids = items.map((i) => i.material_id);
-    if (new Set(ids).size !== ids.length) {
-      message.warning('Материал указан дважды');
-      return;
+    const blocks = draftBlocks.map((b) => ({
+      title: b.title.trim(),
+      description: b.description.trim() || null,
+      duration_minutes: Number(b.duration_minutes) || 0,
+      photo_url: b.photo_url || null,
+      items: b.items
+        .filter((r) => r.material_id && Number(r.quantity) > 0)
+        .map((r) => ({
+          material_id: r.material_id as number,
+          quantity: Number(r.quantity),
+        })),
+    }));
+    for (const block of blocks) {
+      const ids = block.items.map((i) => i.material_id);
+      if (new Set(ids).size !== ids.length) {
+        message.warning(`В блоке «${block.title}» материал указан дважды`);
+        return;
+      }
     }
 
     setSaving(true);
@@ -242,7 +177,7 @@ export default function TechCardsPage() {
           body: JSON.stringify({
             name: cardName.trim() || null,
             notes: cardNotes.trim() || null,
-            items,
+            blocks,
           }),
         });
         message.success('Техкарта обновлена');
@@ -253,7 +188,7 @@ export default function TechCardsPage() {
             service_id: serviceId,
             name: cardName.trim() || null,
             notes: cardNotes.trim() || null,
-            items,
+            blocks,
           }),
         });
         message.success('Техкарта создана');
@@ -336,8 +271,9 @@ export default function TechCardsPage() {
 
       <Spin spinning={loading}>
         {cards.length === 0 && !loading ? (
-          <Empty description={<Text className="text-titanium">Нет техкарт — привяжите материалы к услугам</Text>} />
+          <Empty description={<Text className="text-titanium">Нет техкарт — соберите инструкцию из шагов</Text>} />
         ) : (
+          <Card variant="admin">
           <Table
             dataSource={cards}
             rowKey="id"
@@ -349,49 +285,55 @@ export default function TechCardsPage() {
               showSizeChanger: false,
             }}
             expandable={{
-              expandedRowRender: (record) => (
-                <Table
-                  size="small"
-                  pagination={false}
-                  rowKey={(r) => `${r.material_id}-${r.quantity}`}
-                  dataSource={record.items}
-                  columns={[
-                    {
-                      title: <Text className="text-gold">Материал</Text>,
-                      render: (_, row) => (
-                        <div>
-                          <Text className="text-white">{row.material_name}</Text>
-                          {row.is_low_stock ? (
-                            <div><Badge variant="danger" size="sm">мало</Badge></div>
-                          ) : null}
+              expandedRowRender: (record) => {
+                const blocks = record.blocks || [];
+                const totalMins = Number(record.total_duration_minutes)
+                  || blocks.reduce((s, b) => s + (Number(b.duration_minutes) || 0), 0);
+                if (blocks.length === 0) {
+                  return <Text className="text-titanium">Нет шагов</Text>;
+                }
+                return (
+                  <div className="tech-card-expand">
+                    {blocks.map((block, idx) => (
+                      <Card key={block.id || idx} variant="admin" className="tech-card-step">
+                        <div className="tech-card-step-head">
+                          <div className="tech-card-step-title">
+                            <span className="tech-card-step-index">{idx + 1}</span>
+                            <span className="tech-card-step-name">{block.title || 'Без названия'}</span>
+                          </div>
+                          <Space size={6} wrap>
+                            <TechCardMarks
+                              hasDescription={Boolean(block.description && block.description.trim())}
+                              hasPhoto={Boolean(block.photo_url)}
+                            />
+                            <DurationMark minutes={block.duration_minutes || 0} />
+                          </Space>
                         </div>
-                      ),
-                    },
-                    {
-                      title: <Text className="text-gold">Расход</Text>,
-                      render: (_, row) => (
-                        <Text className="text-white">
-                          {Number(row.quantity).toLocaleString('ru-RU')} {row.material_unit}
-                        </Text>
-                      ),
-                    },
-                    {
-                      title: <Text className="text-gold">Склад</Text>,
-                      render: (_, row) => (
-                        <Text className="text-titanium">
-                          {Number(row.stock_quantity || 0).toLocaleString('ru-RU')}
-                        </Text>
-                      ),
-                    },
-                    {
-                      title: <Text className="text-gold">Стоимость</Text>,
-                      render: (_, row) => (
-                        <Text className="text-gold-bold">{formatCurrency(row.line_cost || 0)}</Text>
-                      ),
-                    },
-                  ]}
-                />
-              ),
+                        {block.description ? (
+                          <div className="tech-card-step-row">
+                            <FileTextOutlined className="tech-card-step-icon" />
+                            <Text className="text-white">{block.description}</Text>
+                          </div>
+                        ) : null}
+                        {block.items?.length ? (
+                          <div className="tech-card-step-row">
+                            <ToolOutlined className="tech-card-step-icon" />
+                            <Text className="text-titanium text-13">
+                              {block.items.map((i) => `${i.material_name} (${i.quantity} ${i.material_unit})`).join(', ')}
+                            </Text>
+                          </div>
+                        ) : null}
+                      </Card>
+                    ))}
+                    <div className="tech-card-expand-total">
+                      <ClockCircleOutlined className="tech-card-step-icon" />
+                      <Text className="text-gold-bold">
+                        Общая длительность: {formatDuration(totalMins)}
+                      </Text>
+                    </div>
+                  </div>
+                );
+              },
             }}
             columns={[
               {
@@ -412,9 +354,33 @@ export default function TechCardsPage() {
                 render: (val: number) => <Text className="text-gold-bold">{formatCurrency(val)}</Text>,
               },
               {
+                title: <Text className="text-gold">Шагов</Text>,
+                dataIndex: 'blocks_count',
+                render: (val: number) => <Badge variant="gold" size="sm">{val || 0}</Badge>,
+              },
+              {
+                title: <Text className="text-gold">Время</Text>,
+                dataIndex: 'total_duration_minutes',
+                render: (val: number) => (
+                  <Space size={6}>
+                    <ClockCircleOutlined className="text-gold" />
+                    <Text className="text-white">{formatDuration(val || 0)}</Text>
+                  </Space>
+                ),
+              },
+              {
+                title: <Text className="text-gold">Метки</Text>,
+                key: 'marks',
+                width: 110,
+                render: (_, record) => {
+                  const { hasDescription, hasPhoto } = cardMarks(record);
+                  return <TechCardMarks hasDescription={hasDescription} hasPhoto={hasPhoto} />;
+                },
+              },
+              {
                 title: <Text className="text-gold">Материалов</Text>,
                 dataIndex: 'items_count',
-                render: (val: number) => <Badge variant="info" size="sm">{val}</Badge>,
+                render: (val: number) => <Badge variant="gold" size="sm">{val}</Badge>,
               },
               {
                 title: <Text className="text-gold">Себест. материалов</Text>,
@@ -433,9 +399,17 @@ export default function TechCardsPage() {
               {
                 title: '',
                 key: 'actions',
-                width: 120,
+                width: 150,
                 render: (_, record) => (
                   <Space>
+                    <Tooltip title="Инструкция">
+                      <Button
+                        size="small"
+                        icon={<EyeOutlined />}
+                        className="btn-action-gold"
+                        onClick={() => navigate(`/technology/tech-cards/${record.id}`)}
+                      />
+                    </Tooltip>
                     <Tooltip title="Редактировать">
                       <Button
                         size="small"
@@ -472,128 +446,27 @@ export default function TechCardsPage() {
               },
             }}
           />
+          </Card>
         )}
       </Spin>
 
-      <Modal
-        title={(
-          <Text className="text-gold-bold">
-            {editing ? 'Редактировать техкарту' : 'Новая техкарта'}
-          </Text>
-        )}
+      <TechCardForm
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        footer={null}
-        className="modal-command"
-        width={720}
-        destroyOnClose
-      >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <div>
-            <span className="label-field">Услуга *</span>
-            <Select
-              size="large"
-              className="input-luxury"
-              style={{ width: '100%' }}
-              placeholder="Выберите услугу"
-              value={serviceId}
-              disabled={!!editing}
-              onChange={setServiceId}
-              options={serviceOptions}
-              showSearch
-              optionFilterProp="label"
-            />
-          </div>
-          <div>
-            <span className="label-field">Название техкарты</span>
-            <Input
-              size="large"
-              className="input-luxury"
-              placeholder="По умолчанию — название услуги"
-              value={cardName}
-              onChange={(e) => setCardName(e.target.value)}
-            />
-          </div>
-          <div>
-            <span className="label-field">Заметки</span>
-            <TextArea
-              rows={2}
-              className="input-luxury"
-              value={cardNotes}
-              onChange={(e) => setCardNotes(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span className="label-field">Материалы</span>
-              <Button size="small" icon={<PlusOutlined />} onClick={() => setDraftItems((p) => [...p, newDraftItem()])}>
-                Строка
-              </Button>
-            </div>
-            <Space direction="vertical" style={{ width: '100%' }} size="small">
-              {draftItems.map((row, idx) => {
-                const mat = row.material_id ? materialMap.get(row.material_id) : undefined;
-                return (
-                  <Row key={row.key} gutter={8} align="middle">
-                    <Col span={12}>
-                      <Select
-                        className="input-luxury"
-                        style={{ width: '100%' }}
-                        placeholder="Материал"
-                        value={row.material_id}
-                        showSearch
-                        optionFilterProp="label"
-                        options={materials.map((m) => ({
-                          value: m.id,
-                          label: `${m.name}${m.sku ? ` (${m.sku})` : ''}`,
-                        }))}
-                        onChange={(v) => setDraftItems((prev) => prev.map((r, i) => (
-                          i === idx ? { ...r, material_id: v } : r
-                        )))}
-                      />
-                    </Col>
-                    <Col span={6}>
-                      <InputNumber
-                        className="input-luxury"
-                        style={{ width: '100%' }}
-                        min={0.001}
-                        step={0.1}
-                        value={row.quantity}
-                        addonAfter={mat?.unit || ''}
-                        onChange={(v) => setDraftItems((prev) => prev.map((r, i) => (
-                          i === idx ? { ...r, quantity: Number(v) || 0 } : r
-                        )))}
-                      />
-                    </Col>
-                    <Col span={4}>
-                      <Text className="text-titanium">
-                        {mat ? formatCurrency((Number(row.quantity) || 0) * Number(mat.purchase_price || 0)) : '—'}
-                      </Text>
-                    </Col>
-                    <Col span={2}>
-                      <Button
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        disabled={draftItems.length <= 1}
-                        onClick={() => setDraftItems((prev) => prev.filter((_, i) => i !== idx))}
-                      />
-                    </Col>
-                  </Row>
-                );
-              })}
-            </Space>
-            <Text className="text-gold-bold d-block" style={{ marginTop: 10 }}>
-              Итого материалов: {formatCurrency(draftCost)}
-            </Text>
-          </div>
-
-          <Button type="primary" size="large" className="btn-gold" loading={saving} onClick={handleSave}>
-            {editing ? 'Сохранить' : 'Создать'}
-          </Button>
-        </Space>
-      </Modal>
+        editing={editing}
+        materials={materials}
+        serviceOptions={serviceOptions}
+        draftBlocks={draftBlocks}
+        serviceId={serviceId}
+        cardName={cardName}
+        cardNotes={cardNotes}
+        saving={saving}
+        onClose={() => setModalOpen(false)}
+        onServiceId={setServiceId}
+        onCardName={setCardName}
+        onCardNotes={setCardNotes}
+        onBlocks={setDraftBlocks}
+        onSave={handleSave}
+      />
     </>
   );
 }

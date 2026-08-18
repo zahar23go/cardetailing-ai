@@ -179,7 +179,9 @@ export const ADMIN_NAV: NavEntry[] = [
 ];
 
 export function tabFromPath(pathname: string): AdminTabKey | 'branding' | null {
-  return PATH_TO_TAB[pathname] ?? null;
+  if (PATH_TO_TAB[pathname]) return PATH_TO_TAB[pathname];
+  if (pathname.startsWith('/technology/tech-cards/')) return 'tech-cards';
+  return null;
 }
 
 export function pathFromTab(key: string): string | null {
@@ -188,7 +190,8 @@ export function pathFromTab(key: string): string | null {
 
 export function groupIdForPath(pathname: string): string | null {
   for (const entry of ADMIN_NAV) {
-    if (entry.type === 'group' && entry.children.some((c) => c.path === pathname)) {
+    if (entry.type !== 'group') continue;
+    if (entry.children.some((c) => c.path === pathname || pathname.startsWith(`${c.path}/`))) {
       return entry.id;
     }
   }

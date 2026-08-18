@@ -1000,7 +1000,7 @@ class MaterialMovement(Base):
 
 class TechCard(Base):
     """
-    Техкарта: рецепт материалов на услугу.
+    Техкарта: пошаговая инструкция услуги (блоки) + расход материалов.
     Одна техкарта на услугу в рамках тенанта.
     """
     __tablename__ = "tech_cards"
@@ -1038,22 +1038,57 @@ class TechCard(Base):
 
     tenant = relationship("Tenant", back_populates="tech_cards")
     service = relationship("Service")
+    blocks = relationship(
+        "TechCardBlock",
+        back_populates="tech_card",
+        cascade="all, delete-orphan",
+        order_by="TechCardBlock.sort_order",
+    )
     items = relationship(
         "TechCardItem",
         back_populates="tech_card",
-        cascade="all, delete-orphan",
         order_by="TechCardItem.id",
+        viewonly=True,
     )
 
     def __repr__(self) -> str:
         return f"<TechCard(id={self.id}, service_id={self.service_id})>"
 
 
+class TechCardBlock(Base):
+    """Шаг техкарты: название, инструкция, длительность, фото, материалы."""
+    __tablename__ = "tech_card_blocks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tech_card_id = Column(
+        Integer,
+        ForeignKey("tech_cards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sort_order = Column(Integer, nullable=False, default=0)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    duration_minutes = Column(Integer, nullable=False, default=0)
+    photo_url = Column(Text, nullable=True)
+
+    tech_card = relationship("TechCard", back_populates="blocks")
+    items = relationship(
+        "TechCardItem",
+        back_populates="block",
+        cascade="all, delete-orphan",
+        order_by="TechCardItem.id",
+    )
+
+    def __repr__(self) -> str:
+        return f"<TechCardBlock(id={self.id}, card={self.tech_card_id}, title={self.title!r})>"
+
+
 class TechCardItem(Base):
-    """Строка техкарты: материал и расход на одну услугу."""
+    """Строка техкарты: материал и расход на шаг / услугу."""
     __tablename__ = "tech_card_items"
     __table_args__ = (
-        UniqueConstraint("tech_card_id", "material_id", name="uq_tech_card_items_card_material"),
+        UniqueConstraint("block_id", "material_id", name="uq_tech_card_items_block_material"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -1061,6 +1096,12 @@ class TechCardItem(Base):
         Integer,
         ForeignKey("tech_cards.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
+    )
+    block_id = Column(
+        Integer,
+        ForeignKey("tech_card_blocks.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     material_id = Column(
@@ -1073,11 +1114,12 @@ class TechCardItem(Base):
         Numeric(12, 3),
         nullable=False,
         default=0,
-        comment="Расход материала на одну услугу",
+        comment="Расход материала на одну услугу / шаг",
     )
     notes = Column(Text, nullable=True)
 
-    tech_card = relationship("TechCard", back_populates="items")
+    tech_card = relationship("TechCard", back_populates="items", viewonly=True)
+    block = relationship("TechCardBlock", back_populates="items")
     material = relationship("Material", back_populates="tech_card_items")
 
     def __repr__(self) -> str:

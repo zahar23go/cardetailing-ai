@@ -46,7 +46,7 @@ function App() {
       navigate('/');
       return;
     }
-    navigate('/concept');
+    navigate('/client');
   };
 
   const handleLogin = async (phone: string, password: string) => {
@@ -80,6 +80,7 @@ function App() {
     });
     setIsAuthenticated(true);
     message.success(`Аккаунт создан. Добро пожаловать, ${newUser.full_name}!`);
+    navigate('/client');
   };
 
   const handleLogout = () => {
