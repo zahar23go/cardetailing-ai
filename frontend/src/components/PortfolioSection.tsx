@@ -2,32 +2,48 @@
    PortfolioSection — портфолио мастера
    ============================================================ */
 
-import React, { useState, useEffect } from 'react';
-import {
-  Typography, Spin, Select, Button, Space, message, Row, Col, Card,
-} from 'antd';
-import { PlusOutlined, FilterOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Spin, Select, Button, Typography, message } from 'antd';
+import { ArrowLeftOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
 import { getPhotos, deletePhoto, setPrimaryPhoto, getPortfolioServices, getAllPortfolio } from '../api/photos';
 import type { Photo, PortfolioService } from '../api/photos';
 import Gallery from './Gallery';
 import PortfolioUploadModal from './PortfolioUploadModal';
+import Card from './Card';
+import Badge from './Badge';
 
 const { Text } = Typography;
-const { Option } = Select;
+
+const CATEGORY_CHIPS = [
+  { key: 'all', label: 'Все' },
+  { key: 'wash', label: 'Мойка', match: /мойк/i },
+  { key: 'polish', label: 'Полировка', match: /полир/i },
+  { key: 'chem', label: 'Химчистка', match: /химчист|салон/i },
+] as const;
+
+type CategoryKey = typeof CATEGORY_CHIPS[number]['key'];
 
 interface PortfolioSectionProps {
-  /** ID мастера */
   masterId: number;
-  /** Режим только для чтения */
+  masterName?: string;
+  masterPhone?: string;
+  completedCount?: number;
   readonly?: boolean;
-  /** Список всех услуг для селектора */
   allServices?: { id: number; name: string }[];
-  /** Показывать все фото салона (а не только мастера) */
   showAllSalon?: boolean;
+}
+
+function matchesCategory(name: string, key: CategoryKey) {
+  const chip = CATEGORY_CHIPS.find((c) => c.key === key);
+  if (!chip || chip.key === 'all' || !('match' in chip)) return true;
+  return chip.match.test(name || '');
 }
 
 export default function PortfolioSection({
   masterId,
+  masterName,
+  masterPhone,
+  completedCount,
   readonly = false,
   allServices = [],
   showAllSalon = false,
@@ -35,13 +51,18 @@ export default function PortfolioSection({
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [serviceFilter, setServiceFilter] = useState<number | undefined>(undefined);
+  const [serviceFilter, setServiceFilter] = useState<number | undefined>();
+  const [category, setCategory] = useState<CategoryKey>('all');
   const [servicesWithPhotos, setServicesWithPhotos] = useState<PortfolioService[]>([]);
+  const [scope, setScope] = useState<'salon' | 'mine'>('mine');
+  const [salonMaster, setSalonMaster] = useState<string | undefined>();
 
   const fetchPhotos = async () => {
     setLoading(true);
     try {
-      const data = showAllSalon ? await getAllPortfolio() : await getPhotos('portfolio', masterId);
+      const data = scope === 'salon'
+        ? await getAllPortfolio()
+        : await getPhotos('portfolio', masterId);
       setPhotos(data);
     } catch {
       message.error('Ошибка загрузки портфолио');
@@ -59,7 +80,7 @@ export default function PortfolioSection({
   useEffect(() => {
     fetchPhotos();
     fetchServices();
-  }, [masterId]);
+  }, [masterId, scope]);
 
   const handleDelete = async (photoId: number) => {
     try {
@@ -82,83 +103,200 @@ export default function PortfolioSection({
     }
   };
 
-  // Фильтрация по услуге
-  const filteredPhotos = serviceFilter
-    ? photos.filter((p) => p.service_id === serviceFilter)
-    : photos;
+  const uniqueServices = useMemo(() => {
+    const serviceOptions = [
+      ...allServices.map((s) => ({ id: s.id, name: s.name })),
+      ...servicesWithPhotos
+        .filter((s) => !allServices.find((as) => as.id === s.service_id))
+        .map((s) => ({ id: s.service_id, name: s.service_name })),
+    ];
+    return serviceOptions.filter(
+      (s, i, arr) => arr.findIndex((x) => x.id === s.id) === i,
+    );
+  }, [allServices, servicesWithPhotos]);
 
-  // Объединённый список услуг (из всех услуг системы + те, у кого есть фото)
-  const serviceOptions = [
-    ...allServices.map((s) => ({ id: s.id, name: s.name })),
-    ...servicesWithPhotos
-      .filter((s) => !allServices.find((as) => as.id === s.service_id))
-      .map((s) => ({ id: s.service_id, name: s.service_name })),
-  ];
-  // Уникальные
-  const uniqueServices = serviceOptions.filter(
-    (s, i, arr) => arr.findIndex((x) => x.id === s.id) === i,
+  const salonMasters = useMemo(() => {
+    const names = Array.from(new Set(photos.map((p) => p.uploader_name).filter(Boolean))) as string[];
+    return names.sort();
+  }, [photos]);
+
+  const filteredPhotos = useMemo(() => photos.filter((p) => {
+    if (serviceFilter && p.service_id !== serviceFilter) return false;
+    if (scope === 'salon' && salonMaster && p.uploader_name !== salonMaster) return false;
+    if (category !== 'all') {
+      const name = p.service_name
+        || uniqueServices.find((s) => s.id === p.service_id)?.name
+        || '';
+      return matchesCategory(name, category);
+    }
+    return true;
+  }), [photos, serviceFilter, category, uniqueServices, scope, salonMaster]);
+
+  const serviceCount = new Set(
+    photos.map((p) => p.service_id).filter(Boolean),
+  ).size;
+
+  const openSalon = () => {
+    setScope('salon');
+    setSalonMaster(undefined);
+    setServiceFilter(undefined);
+    setCategory('all');
+  };
+
+  const gallery = (
+    <Spin spinning={loading}>
+      {filteredPhotos.length === 0 && !loading ? (
+        <Card variant="admin" className="gallery-empty">
+          <Text className="text-titanium">
+            {serviceFilter || category !== 'all' || salonMaster
+              ? 'Нет фото для выбранной услуги'
+              : 'Нет фотографий в портфолио'}
+          </Text>
+        </Card>
+      ) : (
+        <Gallery
+          photos={filteredPhotos}
+          onPhotoDelete={scope === 'mine' && !readonly ? handleDelete : undefined}
+          onPhotoSetPrimary={scope === 'mine' && !readonly ? handleSetPrimary : undefined}
+          readonly={scope !== 'mine' || readonly}
+          columns={3}
+          justify={scope === 'mine' ? 'end' : 'start'}
+        />
+      )}
+    </Spin>
+  );
+
+  const filters = (
+    <Card variant="admin" className="master-portfolio-filters">
+      <div className="portfolio-chips">
+        {CATEGORY_CHIPS.map((chip) => (
+          <button
+            key={chip.key}
+            type="button"
+            className={`portfolio-chip${category === chip.key ? ' is-active' : ''}`}
+            onClick={() => setCategory(chip.key)}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+      {scope === 'salon' && salonMasters.length > 0 ? (
+        <Select
+          allowClear
+          size="large"
+          className="input-luxury client-filter"
+          placeholder="Все мастера"
+          value={salonMaster}
+          onChange={(v) => setSalonMaster(v)}
+          options={salonMasters.map((n) => ({ value: n, label: `Работы от ${n}` }))}
+        />
+      ) : null}
+      {uniqueServices.length > 0 ? (
+        <Select
+          allowClear
+          size="large"
+          className="input-luxury client-filter"
+          placeholder="Все услуги"
+          value={serviceFilter}
+          onChange={(v) => setServiceFilter(v)}
+          options={uniqueServices.map((s) => ({ value: s.id, label: s.name }))}
+        />
+      ) : null}
+    </Card>
   );
 
   return (
-    <div>
-      <div className="flex-space-between mb-12">
-        <Text className="title-gold text-16">Портфолио</Text>
-        {!readonly && (
-          <Button
-            size="small"
-            icon={<PlusOutlined />}
-            className="btn-action-gold"
-            onClick={() => setUploadModalOpen(true)}
-          >
-            Добавить фото
-          </Button>
-        )}
-      </div>
-
-      {/* Фильтр по услугам */}
-      {uniqueServices.length > 0 && (
-        <div className="mb-12">
-          <Space size="small">
-            <FilterOutlined className="text-titanium" />
-            <Select
-              size="small"
-              className="input-luxury"
-              placeholder="Все услуги"
-              value={serviceFilter}
-              onChange={setServiceFilter}
-              allowClear
-              style={{ minWidth: 180 }}
-              onClear={() => setServiceFilter(undefined)}
+    <div className="master-portfolio">
+      {scope === 'mine' ? (
+        <>
+          <div className="master-portfolio-toolbar">
+            <Button
+              type="primary"
+              className="btn-gold"
+              icon={<ArrowLeftOutlined />}
+              onClick={openSalon}
             >
-              {uniqueServices.map((s) => (
-                <Option key={s.id} value={s.id}>{s.name}</Option>
-              ))}
-            </Select>
-          </Space>
-        </div>
+              Назад ко всем портфолио
+            </Button>
+          </div>
+          <div className="master-portfolio-top">
+            {masterName ? (
+              <Card variant="admin" className="master-portfolio-hero">
+                <div className="master-portfolio-hero-row">
+                  <div className="master-portfolio-avatar" aria-hidden>
+                    <UserOutlined />
+                  </div>
+                  <div className="master-portfolio-who">
+                    <div className="master-portfolio-name">{masterName}</div>
+                    <Badge variant="gold" size="sm">Мастер-детейлер</Badge>
+                    {masterPhone ? (
+                      <Text className="text-titanium d-block">{masterPhone}</Text>
+                    ) : null}
+                  </div>
+                </div>
+                {!readonly ? (
+                  <Button
+                    type="primary"
+                    className="btn-gold master-portfolio-add"
+                    icon={<PlusOutlined />}
+                    onClick={() => setUploadModalOpen(true)}
+                  >
+                    + Добавить фото
+                  </Button>
+                ) : null}
+                <div className="master-portfolio-stats">
+                  <div className="master-portfolio-stat">
+                    <div className="admin-kpi-value">{photos.length}</div>
+                    <div className="admin-kpi-label">Фото</div>
+                  </div>
+                  <div className="master-portfolio-stat">
+                    <div className="admin-kpi-value">{serviceCount}</div>
+                    <div className="admin-kpi-label">Услуги</div>
+                  </div>
+                  <div className="master-portfolio-stat">
+                    <div className="admin-kpi-value">{completedCount ?? 0}</div>
+                    <div className="admin-kpi-label">Выполнено</div>
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <div className="admin-section-head">
+                <div>
+                  <h3>Портфолио</h3>
+                  <Badge variant="gold">Работы мастера</Badge>
+                </div>
+                {!readonly ? (
+                  <Button
+                    type="primary"
+                    className="btn-gold"
+                    icon={<PlusOutlined />}
+                    onClick={() => setUploadModalOpen(true)}
+                  >
+                    + Добавить фото
+                  </Button>
+                ) : null}
+              </div>
+            )}
+            <div className="master-portfolio-photos">{gallery}</div>
+          </div>
+          {filters}
+        </>
+      ) : (
+        <>
+          <div className="admin-section-head">
+            <div>
+              <h3>Портфолио салона</h3>
+              <Badge variant="gold">Работы всех мастеров</Badge>
+            </div>
+            <Button type="primary" className="btn-gold" onClick={() => setScope('mine')}>
+              Моё портфолио
+            </Button>
+          </div>
+          {filters}
+          {gallery}
+        </>
       )}
 
-      <Spin spinning={loading}>
-        {filteredPhotos.length === 0 && !loading ? (
-          <Card className="card-luxury">
-            <Text className="text-titanium d-block text-center">
-              {serviceFilter
-                ? 'Нет фото для выбранной услуги'
-                : 'Нет фотографий в портфолио'}
-            </Text>
-          </Card>
-        ) : (
-          <Gallery
-            photos={filteredPhotos}
-            onPhotoDelete={readonly ? undefined : handleDelete}
-            onPhotoSetPrimary={readonly ? undefined : handleSetPrimary}
-            readonly={readonly}
-            columns={3}
-          />
-        )}
-      </Spin>
-
-      {/* Модальное окно загрузки */}
       <PortfolioUploadModal
         open={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}

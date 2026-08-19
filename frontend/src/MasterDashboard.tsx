@@ -14,6 +14,7 @@ import {
   CrownOutlined, CameraOutlined, GiftOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PortfolioSection from './components/PortfolioSection';
 import NotificationBell from './components/NotificationBell';
@@ -95,6 +96,7 @@ const STATUS_LABELS: Record<string, string> = {
 const sidebarItems = [
   { key: 'overview', icon: <HomeOutlined />, label: 'Обзор' },
   { key: 'tasks', icon: <ToolOutlined />, label: 'Задания' },
+  { key: 'portfolio', icon: <CameraOutlined />, label: 'Портфолио' },
   { key: 'profile', icon: <UserOutlined />, label: 'Профиль' },
   { key: 'notifications', icon: <BellOutlined />, label: 'Уведомления' },
 ];
@@ -103,6 +105,7 @@ const sidebarItems = [
 const bottomNavItems = [
   { key: 'overview', icon: <HomeOutlined />, label: 'Главная' },
   { key: 'tasks', icon: <ToolOutlined />, label: 'Задания' },
+  { key: 'portfolio', icon: <CameraOutlined />, label: 'Портфолио' },
   { key: 'profile', icon: <UserOutlined />, label: 'Профиль' },
   { key: 'notifications', icon: <BellOutlined />, label: 'Уведом.' },
 ];
@@ -113,10 +116,12 @@ const bottomNavItems = [
 interface MasterDashboardProps {
   user: { id: number; phone: string; full_name: string; role: string };
   onLogout: () => void;
+  initialSection?: string;
 }
 
-export default function MasterDashboard({ user, onLogout }: MasterDashboardProps) {
-  const [activeSection, setActiveSection] = useState('overview');
+export default function MasterDashboard({ user, onLogout, initialSection = 'overview' }: MasterDashboardProps) {
+  const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState(initialSection);
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -142,9 +147,12 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
     fetchAppointments();
   }, []);
 
-  // Load services when Profile tab opens
   useEffect(() => {
-    if (activeSection === 'profile') {
+    setActiveSection(initialSection);
+  }, [initialSection]);
+
+  useEffect(() => {
+    if (activeSection === 'profile' || activeSection === 'portfolio') {
       fetchMasterServices();
     }
   }, [activeSection]);
@@ -208,6 +216,12 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
 
   const formatCurrency = (val: number) => `${val.toLocaleString()} ₽`;
 
+  const goSection = (key: string) => {
+    setActiveSection(key);
+    if (key === 'portfolio') navigate('/master/portfolio');
+    else if (window.location.pathname.startsWith('/master')) navigate('/');
+  };
+
   /* ============================================================
      RENDER: Overview
      ============================================================ */
@@ -219,194 +233,178 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
     const quickActions = [
       { icon: <ToolOutlined />, label: 'Мои задания', key: 'tasks' },
       { icon: <UserOutlined />, label: 'Профиль', key: 'profile' },
-      { icon: <CameraOutlined />, label: 'Портфолио', key: 'profile' },
+      { icon: <CameraOutlined />, label: 'Портфолио', key: 'portfolio' },
       { icon: <CrownOutlined />, label: 'Достижения', key: 'profile' },
     ];
 
     const aiServiceChips = ['Мойка', 'Полировка', 'Керамика', 'Химчистка'];
 
     return (
-      <Row gutter={[16, 16]}>
-        <Col xs={24} md={16}>
-          {/* Карточка авто клиента */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-            <Card className="card-luxury client-car-card">
-              {firstCar ? (
-                <>
-                  <Row justify="space-between" align="top">
-                    <Col>
-                      <Text className="text-white car-title">
-                        {firstCar.make} {firstCar.model}
-                      </Text>
-                      <div style={{ marginTop: 2 }}>
-                        <Text className="text-titanium car-subtitle">
-                          {firstCar.license_plate ? ` · ${firstCar.license_plate}` : ''}
+      <div className="master-overview">
+        <Row gutter={[16, 16]} align="stretch" className="master-overview-top">
+          <Col xs={24} md={16}>
+            <motion.div
+              className="master-overview-cell"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="card-luxury client-car-card">
+                {firstCar ? (
+                  <>
+                    <Row justify="space-between" align="top">
+                      <Col>
+                        <Text className="text-white car-title">
+                          {firstCar.make} {firstCar.model}
                         </Text>
-                      </div>
-                      <div style={{ marginTop: 8 }}>
-                        <Text className="car-status">✔ Автомобиль клиента</Text>
-                      </div>
-                    </Col>
-                    <Col>
-                      <Button
-                        size="small"
-                        className="btn-gold-secondary"
-                        onClick={() => setActiveSection('tasks')}
-                        style={{ width: 'auto', height: 32, fontSize: 12 }}
-                      >К заданию</Button>
-                    </Col>
-                  </Row>
-                  {/* Следующее задание */}
-                  {activeAppointments.length > 0 && (
-                    <>
-                      <Divider className="divider-dim" />
-                      <div>
-                        <Text className="text-titanium car-service-label">ТЕКУЩЕЕ ЗАДАНИЕ</Text>
-                        <div className="flex-space-between" style={{ marginTop: 6 }}>
-                          <div>
-                            <Text className="text-white car-service-date">
-                              {activeAppointments[0].service_name || `Услуга #${activeAppointments[0].service_id}`}
-                            </Text>
-                            <Text className="text-titanium d-block car-service-name">
-                              <ClockCircleOutlined /> {dayjs(activeAppointments[0].start_time).format('DD.MM HH:mm')}
-                            </Text>
-                          </div>
-                          <Tag color={STATUS_COLORS[activeAppointments[0].status]} className="tag-status">
-                            {STATUS_LABELS[activeAppointments[0].status]}
-                          </Tag>
+                        <div className="mt-4">
+                          <Text className="text-titanium car-subtitle">
+                            {firstCar.license_plate ? ` · ${firstCar.license_plate}` : ''}
+                          </Text>
                         </div>
-                      </div>
-                    </>
-                  )}
-                </>
-              ) : (
-                <div className="text-center">
-                  <ToolOutlined className="text-gold" style={{ fontSize: 40 }} />
-                  <Text className="text-titanium d-block text-13" style={{ marginTop: 8 }}>
-                    Нет активных заданий
-                  </Text>
+                        <div className="mt-8">
+                          <Text className="car-status">✔ Автомобиль клиента</Text>
+                        </div>
+                      </Col>
+                      <Col>
+                        <Button
+                          size="small"
+                          className="btn-gold-secondary"
+                          onClick={() => goSection('tasks')}
+                        >
+                          К заданию
+                        </Button>
+                      </Col>
+                    </Row>
+                    {activeAppointments.length > 0 && (
+                      <>
+                        <Divider className="divider-dim" />
+                        <div>
+                          <Text className="text-titanium car-service-label">ТЕКУЩЕЕ ЗАДАНИЕ</Text>
+                          <div className="flex-space-between mt-8">
+                            <div>
+                              <Text className="text-white car-service-date">
+                                {activeAppointments[0].service_name || `Услуга #${activeAppointments[0].service_id}`}
+                              </Text>
+                              <Text className="text-titanium d-block car-service-name">
+                                <ClockCircleOutlined /> {dayjs(activeAppointments[0].start_time).format('DD.MM HH:mm')}
+                              </Text>
+                            </div>
+                            <Tag color={STATUS_COLORS[activeAppointments[0].status]} className="tag-status">
+                              {STATUS_LABELS[activeAppointments[0].status]}
+                            </Tag>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center">
+                    <ToolOutlined className="text-gold" style={{ fontSize: 40 }} />
+                    <Text className="text-titanium d-block text-13 mt-8">
+                      Нет активных заданий
+                    </Text>
+                  </div>
+                )}
+              </Card>
+            </motion.div>
+          </Col>
+
+          <Col xs={24} md={8}>
+            <motion.div
+              className="master-overview-cell"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+            >
+              <div className="analytics-section master-overview-stats">
+                <Text className="text-white analytics-title">Статистика</Text>
+                <div className="mt-12">
+                  <Text className="text-titanium text-13">Активные задания</Text>
+                  <div>
+                    <Text className="stat-value-gold">{activeAppointments.length}</Text>
+                  </div>
                 </div>
-              )}
-            </Card>
-          </motion.div>
-
-          {/* Кнопка быстрого действия (только моб) */}
-          <div className="d-mobile-only" style={{ marginTop: 12 }}>
-            <Button
-              type="primary"
-              size="large"
-              className="btn-gold"
-              onClick={() => setActiveSection('tasks')}
-            >Мои задания</Button>
-          </div>
-
-          {/* AI Детейлер */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.15 }}
-            style={{ marginTop: 20 }}
-          >
-            <Card className="card-luxury">
-              <Row align="middle" style={{ marginBottom: 12 }}>
-                <Col flex="auto">
-                  <Text className="title-gold text-16">🤖 AI ДЕТЕЙЛЕР</Text>
-                  <Text className="text-titanium d-block text-13">
-                    Что хотите сделать с автомобилем?
-                  </Text>
-                </Col>
-                <Col>
-                  <BulbOutlined className="text-gold" style={{ fontSize: 28 }} />
-                </Col>
-              </Row>
-              <div className="ai-chips">
-                {aiServiceChips.map((chip) => (
-                  <Button
-                    key={chip}
-                    className="btn-gold-secondary"
-                    onClick={() => {}}
-                  >{chip}</Button>
-                ))}
+                <div className="mt-12">
+                  <Text className="text-titanium text-13">Выполнено сегодня</Text>
+                  <div>
+                    <Text className="stat-value-green">
+                      {completedAppointments.filter((a) => dayjs(a.start_time).isSame(dayjs(), 'day')).length}
+                    </Text>
+                  </div>
+                </div>
+                <div className="mt-12">
+                  <Text className="text-titanium text-13">Всего работ</Text>
+                  <div>
+                    <Text className="stat-value-white">{appointments.length}</Text>
+                  </div>
+                </div>
+                <Button
+                  type="primary"
+                  size="large"
+                  className="btn-gold master-overview-tasks-btn"
+                  onClick={() => goSection('tasks')}
+                >
+                  Мои задания
+                </Button>
               </div>
-            </Card>
-          </motion.div>
+            </motion.div>
+          </Col>
+        </Row>
 
-          {/* Быстрые действия */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-            style={{ marginTop: 16 }}
-          >
-            <Row gutter={[12, 12]}>
-              {quickActions.map((action) => (
-                <Col xs={12} key={action.key}>
-                  <Card
-                    className="card-luxury quick-action-card"
-                    hoverable
-                    onClick={() => setActiveSection(action.key)}
-                    styles={{ body: { padding: '16px 8px' } }}
-                  >
-                    <span className="quick-action-icon text-gold">{action.icon}</span>
-                    <span className="quick-action-label text-white d-block">{action.label}</span>
-                  </Card>
-                </Col>
-              ))}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.15 }}
+        >
+          <Card className="card-luxury master-overview-ai">
+            <Row align="middle" className="mb-12">
+              <Col flex="auto">
+                <Text className="title-gold text-16">AI ДЕТЕЙЛЕР</Text>
+                <Text className="text-titanium d-block text-13">
+                  Что хотите сделать с автомобилем?
+                </Text>
+              </Col>
+              <Col>
+                <BulbOutlined className="text-gold" style={{ fontSize: 28 }} />
+              </Col>
             </Row>
-          </motion.div>
-        </Col>
-
-        {/* Боковая панель (десктоп) */}
-        <Col xs={0} md={8}>
-          <motion.div
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.25 }}
-          >
-            <div className="analytics-section">
-              <Row align="middle" style={{ marginBottom: 16 }}>
-                <Col flex="auto">
-                  <Text className="text-white analytics-title">📊 Статистика</Text>
-                </Col>
-              </Row>
-              <div className="mb-12">
-                <Text className="text-titanium text-13">Активные задания</Text>
-                <div style={{ marginTop: 4 }}>
-                  <Text className="stat-value-gold">{activeAppointments.length}</Text>
-                </div>
-              </div>
-              <div className="mb-12">
-                <Text className="text-titanium text-13">Выполнено сегодня</Text>
-                <div style={{ marginTop: 4 }}>
-                  <Text className="stat-value-green">
-                    {completedAppointments.filter(a => dayjs(a.start_time).isSame(dayjs(), 'day')).length}
-                  </Text>
-                </div>
-              </div>
-              <div>
-                <Text className="text-titanium text-13">Всего работ</Text>
-                <div style={{ marginTop: 4 }}>
-                  <Text className="stat-value-white">{appointments.length}</Text>
-                </div>
-              </div>
+            <div className="ai-chips">
+              {aiServiceChips.map((chip) => (
+                <Button
+                  key={chip}
+                  className="btn-gold-secondary"
+                  onClick={() => {}}
+                >
+                  {chip}
+                </Button>
+              ))}
             </div>
-          </motion.div>
+          </Card>
+        </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-          >
-            <Button
-              type="primary"
-              size="large"
-              className="btn-gold"
-              onClick={() => setActiveSection('tasks')}
-              style={{ height: 52, fontSize: 16 }}
-            >Мои задания</Button>
-          </motion.div>
-        </Col>
-      </Row>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+        >
+          <Row gutter={[12, 12]} className="master-overview-actions">
+            {quickActions.map((action) => (
+              <Col xs={12} sm={6} key={action.label}>
+                <Card
+                  className="card-luxury quick-action-card"
+                  hoverable
+                  onClick={() => goSection(action.key)}
+                  styles={{ body: { padding: '16px 8px' } }}
+                >
+                  <span className="quick-action-icon text-gold">{action.icon}</span>
+                  <span className="quick-action-label text-white d-block">{action.label}</span>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </motion.div>
+      </div>
     );
   };
 
@@ -677,9 +675,26 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
         </div>
       </Card>
 
-      <div className="mt-4">
-        <PortfolioSection masterId={user.id} allServices={masterServices} />
-      </div>
+      <Button
+        type="primary"
+        className="btn-gold mt-4"
+        icon={<CameraOutlined />}
+        onClick={() => goSection('portfolio')}
+      >
+        Открыть портфолио
+      </Button>
+    </motion.div>
+  );
+
+  const renderPortfolio = () => (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+      <PortfolioSection
+        masterId={user.id}
+        masterName={user.full_name}
+        masterPhone={user.phone}
+        completedCount={completedAppointments.length}
+        allServices={masterServices}
+      />
     </motion.div>
   );
 
@@ -712,6 +727,7 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
     switch (activeSection) {
       case 'overview': return renderOverview();
       case 'tasks': return renderTasks();
+      case 'portfolio': return renderPortfolio();
       case 'profile': return renderProfile();
       case 'notifications': return renderNotifications();
       default: return renderOverview();
@@ -765,7 +781,7 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
             <button
               key={item.key}
               className={`sidebar-item${activeSection === item.key ? ' active' : ''}`}
-              onClick={() => setActiveSection(item.key)}
+              onClick={() => goSection(item.key)}
             >
               <span className="sidebar-icon">{item.icon}</span>
               <span>{item.label}</span>
@@ -785,7 +801,7 @@ export default function MasterDashboard({ user, onLogout }: MasterDashboardProps
           <button
             key={item.key}
             className={`bottom-nav-item${activeSection === item.key ? ' active' : ''}`}
-            onClick={() => setActiveSection(item.key)}
+            onClick={() => goSection(item.key)}
           >
             <span className="bottom-nav-icon">{item.icon}</span>
             <span className="bottom-nav-label">{item.label}</span>

@@ -13,11 +13,15 @@ function App() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      fetchUser(token).finally(() => setAuthReady(true));
-    } else {
+    if (!token) {
       setAuthReady(true);
+      return;
     }
+    const timer = window.setTimeout(() => setAuthReady(true), 4000);
+    fetchUser(token).finally(() => {
+      window.clearTimeout(timer);
+      setAuthReady(true);
+    });
   }, []);
 
   const fetchUser = async (token: string) => {

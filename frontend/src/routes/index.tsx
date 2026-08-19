@@ -185,6 +185,19 @@ export default function AppRoutes({
       <Route path="/warehouse" element={<Navigate to="/technology/warehouse" replace />} />
 
       <Route
+        path="/master/portfolio"
+        element={
+          isAuthenticated && user && isMaster ? (
+            <MasterDashboard user={user} onLogout={onLogout} initialSection="portfolio" />
+          ) : !isAuthenticated ? (
+            loginEl
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+
+      <Route
         path="/"
         element={
           isAuthenticated && user ? (
