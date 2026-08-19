@@ -51,7 +51,7 @@ export default function ClientPortfolioPage() {
       <div className="admin-section-head">
         <div>
           <h3>Портфолио</h3>
-          <Text className="text-titanium">Работы мастеров: полировка, мойка, химчистка</Text>
+          <Badge variant="gold">Работы мастеров: полировка, мойка, химчистка</Badge>
         </div>
       </div>
 
@@ -59,9 +59,9 @@ export default function ClientPortfolioPage() {
         <Space wrap>
           <Select
             allowClear
+            size="large"
             placeholder="Услуга"
-            className="input-luxury"
-            style={{ minWidth: 200 }}
+            className="input-luxury client-filter"
             value={serviceId}
             onChange={(v) => setServiceId(v)}
             options={services.map((s) => ({
@@ -71,9 +71,9 @@ export default function ClientPortfolioPage() {
           />
           <Select
             allowClear
+            size="large"
             placeholder="Мастер"
-            className="input-luxury"
-            style={{ minWidth: 200 }}
+            className="input-luxury client-filter"
             value={masterName}
             onChange={(v) => setMasterName(v)}
             options={masters.map((n) => ({ value: n, label: `Работы от ${n}` }))}
@@ -84,7 +84,9 @@ export default function ClientPortfolioPage() {
       {loading ? (
         <Spin />
       ) : filtered.length === 0 ? (
-        <Empty description={<Text className="text-titanium">Пока нет фото</Text>} />
+        <Card variant="admin" className="client-block">
+          <Empty description={<Text className="text-titanium">Пока нет фото</Text>} />
+        </Card>
       ) : (
         <>
           {masterName ? (

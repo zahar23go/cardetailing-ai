@@ -27,7 +27,7 @@ from app.models import Box, BoxService, Tenant, User, UserRole, AppointmentStatu
 from app.schemas import (
     RegisterRequest, LoginRequest, AuthResponse, UserOut, UserProfileUpdate,
     ServiceCreate, ServiceUpdate, ServiceOut,
-    CarCreate, CarOut,
+    CarCreate, CarUpdate, CarOut,
     AppointmentCreate, AppointmentStatusUpdate, AppointmentOut,
     MasterStatusUpdate, MasterNotesUpdate, ClientAppointmentEdit,
     UserListOut, UserRoleUpdate, UserDetailOut,
@@ -417,6 +417,14 @@ async def update_me(
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     if request.full_name:
         user.full_name = request.full_name.strip()
+    if request.phone:
+        phone = request.phone.strip()
+        taken = await db.execute(
+            select(User).where(User.phone == phone, User.id != user.id)
+        )
+        if taken.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Этот телефон уже занят")
+        user.phone = phone
     await db.commit()
     await db.refresh(user)
     return UserOut.model_validate(user)
@@ -4323,6 +4331,31 @@ async def create_car(
     await db.commit()
     await db.refresh(new_car)
     return CarOut.model_validate(new_car)
+
+@app.put("/api/cars/{car_id}", response_model=CarOut)
+async def update_car(
+    car_id: int,
+    car_data: CarUpdate,
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Обновить свой автомобиль."""
+    result = await db.execute(
+        select(Car).where(
+            Car.id == car_id,
+            Car.client_id == current_user["id"],
+            Car.tenant_id == UUID(current_user["tenant_id"]),
+        )
+    )
+    car = result.scalar_one_or_none()
+    if not car:
+        raise HTTPException(status_code=404, detail="Машина не найдена")
+    update_data = car_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(car, key, value)
+    await db.commit()
+    await db.refresh(car)
+    return CarOut.model_validate(car)
 
 @app.delete("/api/cars/{car_id}")
 async def delete_car(

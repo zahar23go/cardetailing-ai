@@ -3676,6 +3676,8 @@
 
 .financier-msg {
   display: flex;
+  align-items: flex-end;
+  gap: 10px;
   max-width: 86%;
 }
 
@@ -3703,6 +3705,29 @@
 
 .financier-msg.is-ai .financier-bubble {
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) 4px;
+}
+
+.chat-avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full, 999px);
+  font-size: 14px;
+}
+
+.chat-avatar--ai {
+  color: var(--color-gold, #D4AF37);
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.12));
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.35));
+}
+
+.chat-avatar--user {
+  color: var(--color-white, #F0F2F5);
+  background: var(--color-elevated, #161B22);
+  border: 1px solid var(--color-divider, #3B4049);
 }
 
 .financier-bubble-label {
@@ -4340,6 +4365,167 @@
 
 .client-app .bottom-nav-label {
   font-size: 10px;
+}
+
+.client-chat-toolbar {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+.client-chat-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.client-chat-offers .ant-btn {
+  width: 100%;
+}
+
+.client-stack {
+  width: 100%;
+}
+
+.client-field {
+  width: 100% !important;
+}
+
+.client-filter {
+  min-width: 200px;
+}
+
+/* Gallery — карточки фото на токенах, без локальных цветов */
+.gallery-empty.card {
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.gallery-item.card {
+  padding: 8px;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+}
+
+.gallery-item.is-primary {
+  border-color: var(--color-gold, #D4AF37);
+}
+
+.gallery-item-img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--radius-md, 10px);
+  cursor: pointer;
+  display: block;
+}
+
+.gallery-item-star {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  color: var(--color-gold, #D4AF37);
+  font-size: 16px;
+}
+
+.gallery-item-tag {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 8px);
+}
+
+.gallery-item-caption {
+  margin-top: 8px;
+  padding: 4px 4px 0;
+  font-family: var(--font-family);
+}
+
+.gallery-item-caption .ant-typography {
+  line-height: 1.3;
+  display: block;
+}
+
+.gallery-item-master {
+  margin-top: 2px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--color-titanium, #9BA3B5);
+  font-family: var(--font-family);
+}
+
+.gallery-item-actions {
+  margin-top: 8px;
+}
+
+.gallery-item-actions-inner {
+  justify-content: center;
+}
+
+.gallery-lightbox-img {
+  width: 100%;
+  border-radius: var(--radius-md, 12px);
+  display: block;
+}
+
+@media (max-width: 767px) {
+  .client-header-logo {
+    height: 22px;
+  }
+
+  .client-appt-row,
+  .client-rec {
+    flex-direction: column;
+  }
+
+  .client-appt-meta {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .client-slots {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .client-slot {
+    min-width: 0;
+    padding: 8px 4px;
+  }
+
+  .client-filter {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .client-app .financier-msg {
+    max-width: 100%;
+  }
+
+  .client-app .bottom-nav {
+    height: 60px;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .client-app .bottom-nav-item {
+    padding: 4px 2px;
+    flex: 1;
+  }
+
+  .client-app .bottom-nav-label {
+    font-size: 9px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 

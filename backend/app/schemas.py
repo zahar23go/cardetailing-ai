@@ -163,6 +163,16 @@ class CarOut(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=1, max_length=150)
+    phone: Optional[str] = Field(None, min_length=1, max_length=20)
+
+
+class CarUpdate(BaseModel):
+    make: Optional[str] = Field(None, min_length=1, max_length=50)
+    model: Optional[str] = Field(None, min_length=1, max_length=50)
+    year: Optional[int] = Field(None, ge=1990, le=2030)
+    license_plate: Optional[str] = Field(None, max_length=20)
+    color: Optional[str] = Field(None, max_length=30)
+    notes: Optional[str] = None
 
 
 class AppointmentCreate(BaseModel):

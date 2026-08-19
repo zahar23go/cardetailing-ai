@@ -25,6 +25,21 @@ export function formatCurrency(val: number) {
   return `${Number(val || 0).toLocaleString('ru-RU')} ₽`;
 }
 
+/** Услуги, которые ИИ назвал в ответе — для кнопки «Записаться на …». */
+export function matchServicesFromText(text: string, services: Service[]): Service[] {
+  const hay = (text || '').toLowerCase();
+  if (!hay) return [];
+  const ranked = [...services]
+    .filter((s) => s.name && hay.includes(s.name.toLowerCase()))
+    .sort((a, b) => b.name.length - a.name.length);
+  const seen = new Set<number>();
+  return ranked.filter((s) => {
+    if (seen.has(s.id)) return false;
+    seen.add(s.id);
+    return true;
+  }).slice(0, 3);
+}
+
 export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'gold';
 
 export const APPT_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {

@@ -85,7 +85,7 @@ export default function ClientHomePage() {
       <div className="admin-section-head">
         <div>
           <h3>Главная</h3>
-          <Text className="text-titanium">Ваши записи и рекомендации к ближайшим мойкам</Text>
+          <Badge variant="gold">Ваши записи и рекомендации к ближайшим мойкам</Badge>
         </div>
         <Button type="primary" className="btn-gold" onClick={() => navigate('/client/booking')}>
           Записаться
@@ -126,7 +126,7 @@ export default function ClientHomePage() {
         })
       )}
 
-      <div className="client-section-title">Что рекомендуется в ближайшие мойки</div>
+      <div className="client-section-title">Рекомендовано</div>
       {recs.length === 0 ? (
         <Card variant="admin" className="client-block">
           <Text className="text-titanium">

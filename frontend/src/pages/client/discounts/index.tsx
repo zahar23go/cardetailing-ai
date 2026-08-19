@@ -54,12 +54,14 @@ export default function ClientDiscountsPage() {
       <div className="admin-section-head">
         <div>
           <h3>Скидки</h3>
-          <Text className="text-titanium">Действующие акции и условия</Text>
+          <Badge variant="gold">Действующие акции и условия</Badge>
         </div>
       </div>
 
       {items.length === 0 ? (
-        <Empty description={<Text className="text-titanium">Сейчас нет активных скидок</Text>} />
+        <Card variant="admin" className="client-block">
+          <Empty description={<Text className="text-titanium">Сейчас нет активных скидок</Text>} />
+        </Card>
       ) : (
         items.map((rule) => {
           const cond = conditionsText(rule);

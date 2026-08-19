@@ -35,7 +35,14 @@ export default function ClientLayout({ user, onLogout }: Props) {
   return (
     <Layout className="admin-layout client-layout client-app">
       <Header className="header-mobile admin-header-mobile">
-        <Text className="admin-header-title">CAR DETAILING AI</Text>
+        <Space size="small" align="center">
+          <img
+            src="/images/logo-formula-sport.png"
+            alt=""
+            className="client-header-logo"
+          />
+          <Text className="admin-header-title">CAR DETAILING AI</Text>
+        </Space>
         <span className="admin-header-badge">Кабинет</span>
       </Header>
 

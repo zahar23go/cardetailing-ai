@@ -110,18 +110,17 @@ export default function ClientBookingPage() {
       <div className="admin-section-head">
         <div>
           <h3>Запись</h3>
-          <Text className="text-titanium">Услуга, мастер, дата и время</Text>
+          <Badge variant="gold">Услуга, мастер, дата и время</Badge>
         </div>
       </div>
 
       <Card variant="admin" className="client-block">
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Space direction="vertical" size="middle" className="client-stack">
           <div>
             <span className="label-field">Услуга</span>
             <Select
               size="large"
-              className="input-luxury"
-              style={{ width: '100%' }}
+              className="input-luxury client-field"
               placeholder="Выберите услугу"
               value={serviceId}
               onChange={setServiceId}
@@ -144,8 +143,7 @@ export default function ClientBookingPage() {
             <span className="label-field">Мастер</span>
             <Select
               size="large"
-              className="input-luxury"
-              style={{ width: '100%' }}
+              className="input-luxury client-field"
               allowClear
               placeholder="Любой свободный"
               value={masterId}
@@ -167,8 +165,7 @@ export default function ClientBookingPage() {
             ) : (
               <Select
                 size="large"
-                className="input-luxury"
-                style={{ width: '100%' }}
+                className="input-luxury client-field"
                 value={carId}
                 onChange={setCarId}
                 options={cars.map((c) => ({
@@ -183,8 +180,7 @@ export default function ClientBookingPage() {
             <span className="label-field">Дата</span>
             <DatePicker
               size="large"
-              className="input-luxury"
-              style={{ width: '100%' }}
+              className="input-luxury client-field"
               value={date}
               onChange={setDate}
               disabledDate={(d) => d && d.isBefore(dayjs().startOf('day'))}

@@ -1,23 +1,36 @@
 /**
  * Чат с ИИ-консультантом — /api/ai/consultant
+ * Кнопка «Записаться на {услугу}» ведёт на /client/booking с предзаполненной услугой.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Input } from 'antd';
-import { BulbOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, BulbOutlined, SendOutlined, UserOutlined } from '@ant-design/icons';
 import Card from '../../../components/Card';
-import { apiFetch } from '../api';
+import Badge from '../../../components/Badge';
+import { Service, apiFetch, matchServicesFromText } from '../api';
 
 const SUGGESTIONS = [
   'Какая мойка подойдёт к ближайшему визиту?',
   'Чем полировка отличается от керамики?',
-  'Подберите услугу под химчистку салона',
+  'Подберите услугу и запишите меня',
 ];
 
+type ChatMsg = { role: 'user' | 'ai'; text: string; offers?: Service[] };
+
 export default function ClientChatPage() {
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const navigate = useNavigate();
+  const [services, setServices] = useState<Service[]>([]);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+
+  useEffect(() => {
+    apiFetch<{ items: Service[] }>('/api/services?skip=0&limit=200')
+      .then((d) => setServices(d.items || []))
+      .catch(() => undefined);
+  }, []);
 
   const ask = async (preset?: string) => {
     const question = (preset ?? input).trim();
@@ -26,12 +39,17 @@ export default function ClientChatPage() {
     setMessages((prev) => [...prev, { role: 'user', text: question }]);
     setInput('');
     setLoading(true);
+    const catalog = services.length
+      ? services
+      : ((await apiFetch<{ items: Service[] }>('/api/services?skip=0&limit=200')).items || []);
+    if (!services.length && catalog.length) setServices(catalog);
     try {
       const data = await apiFetch<{ response: string }>('/api/ai/consultant', {
         method: 'POST',
         body: JSON.stringify({ question }),
       });
-      setMessages((prev) => [...prev, { role: 'ai', text: data.response }]);
+      const offers = matchServicesFromText(data.response, catalog);
+      setMessages((prev) => [...prev, { role: 'ai', text: data.response, offers }]);
     } catch (e: unknown) {
       setMessages((prev) => [
         ...prev,
@@ -41,29 +59,44 @@ export default function ClientChatPage() {
     setLoading(false);
   };
 
+  const bookService = (service: Service) => {
+    navigate('/client/booking', { state: { serviceId: service.id } });
+  };
+
+  const backToStart = () => {
+    setMessages([]);
+    setShowSuggestions(true);
+    setInput('');
+  };
+
   return (
     <>
       <div className="admin-section-head">
         <div>
-          <div className="admin-overview-kicker">AI-консультант</div>
           <h3>Чат с ИИ</h3>
+          <Badge variant="gold">AI-консультант</Badge>
         </div>
-        <Button icon={<PlusOutlined />} className="btn-gold-secondary" onClick={() => {
-          setMessages([]);
-          setShowSuggestions(true);
-        }}>
-          Новый диалог
-        </Button>
       </div>
 
       <Card variant="admin" className="financier-panel">
+        {!showSuggestions ? (
+          <div className="client-chat-toolbar">
+            <Button
+              icon={<ArrowLeftOutlined />}
+              className="btn-gold"
+              onClick={backToStart}
+            >
+              Назад к началу
+            </Button>
+          </div>
+        ) : null}
         <div className="financier-chat">
           {showSuggestions ? (
             <div className="financier-empty">
               <div className="financier-empty-icon"><BulbOutlined /></div>
               <div className="financier-empty-title">Спросите про технологию или подбор услуги</div>
               <div className="financier-empty-hint">
-                Консультант знает каталог салона и поможет записаться
+                Консультант знает каталог и предложит записаться кнопкой в чате
               </div>
               <div className="financier-suggests">
                 {SUGGESTIONS.map((q) => (
@@ -81,21 +114,45 @@ export default function ClientChatPage() {
           ) : (
             messages.map((msg, i) => (
               <div key={i} className={`financier-msg ${msg.role === 'user' ? 'is-user' : 'is-ai'}`}>
+                {msg.role === 'ai' ? (
+                  <div className="chat-avatar chat-avatar--ai" aria-hidden>
+                    <BulbOutlined />
+                  </div>
+                ) : null}
                 <div className="financier-bubble">
                   {msg.role === 'ai' && (
-                    <div className="financier-bubble-label">
-                      <BulbOutlined /> AI консультант
-                    </div>
+                    <div className="financier-bubble-label">AI консультант</div>
                   )}
                   <div className="financier-bubble-text">{msg.text}</div>
+                  {msg.offers?.length ? (
+                    <div className="client-chat-offers">
+                      {msg.offers.map((s) => (
+                        <Button
+                          key={s.id}
+                          className="btn-gold"
+                          onClick={() => bookService(s)}
+                        >
+                          Записаться на {s.name}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
+                {msg.role === 'user' ? (
+                  <div className="chat-avatar chat-avatar--user" aria-hidden>
+                    <UserOutlined />
+                  </div>
+                ) : null}
               </div>
             ))
           )}
           {loading ? (
             <div className="financier-msg is-ai">
+              <div className="chat-avatar chat-avatar--ai" aria-hidden>
+                <BulbOutlined />
+              </div>
               <div className="financier-bubble">
-                <div className="financier-bubble-label"><BulbOutlined /> AI консультант</div>
+                <div className="financier-bubble-label">AI консультант</div>
                 <div className="financier-bubble-text is-typing">Подбираю ответ…</div>
               </div>
             </div>
