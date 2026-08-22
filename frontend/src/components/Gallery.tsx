@@ -120,17 +120,17 @@ export default function Gallery({
 
                 <div className="gallery-item-meta">
                   <div className="gallery-item-service">{service}</div>
-                  {date ? <div className="gallery-item-date">{date}</div> : null}
-                  {extra ? (
-                    <Text className="text-titanium text-12 gallery-item-desc">
-                      {extra}
-                    </Text>
-                  ) : null}
                   {photo.uploader_name ? (
                     <div className="gallery-item-master">
                       <UserOutlined />
                       <span>{photo.uploader_name}</span>
                     </div>
+                  ) : null}
+                  {date ? <div className="gallery-item-date">{date}</div> : null}
+                  {extra ? (
+                    <Text className="text-titanium text-12 gallery-item-desc">
+                      {extra}
+                    </Text>
                   ) : null}
                 </div>
 
