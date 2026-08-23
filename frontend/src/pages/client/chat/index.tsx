@@ -48,7 +48,7 @@ export default function ClientChatPage() {
         method: 'POST',
         body: JSON.stringify({ question }),
       });
-      const offers = matchServicesFromText(data.response, catalog);
+      const offers = matchServicesFromText(`${question} ${data.response}`, catalog);
       setMessages((prev) => [...prev, { role: 'ai', text: data.response, offers }]);
     } catch (e: unknown) {
       setMessages((prev) => [
@@ -71,14 +71,14 @@ export default function ClientChatPage() {
 
   return (
     <>
-      <div className="admin-section-head">
+      <div className="client-section-head">
         <div>
           <h3>Чат с ИИ</h3>
           <Badge variant="gold">AI-консультант</Badge>
         </div>
       </div>
 
-      <Card variant="admin" className="financier-panel">
+      <Card variant="admin" className="client-chat-panel">
         {!showSuggestions ? (
           <div className="client-chat-toolbar">
             <Button
@@ -90,20 +90,20 @@ export default function ClientChatPage() {
             </Button>
           </div>
         ) : null}
-        <div className="financier-chat">
+        <div className="client-chat-thread">
           {showSuggestions ? (
-            <div className="financier-empty">
-              <div className="financier-empty-icon"><BulbOutlined /></div>
-              <div className="financier-empty-title">Спросите про технологию или подбор услуги</div>
-              <div className="financier-empty-hint">
+            <div className="client-chat-empty">
+              <div className="client-chat-empty-icon"><BulbOutlined /></div>
+              <div className="client-chat-empty-title">Спросите про технологию или подбор услуги</div>
+              <div className="client-chat-empty-hint">
                 Консультант знает каталог и предложит записаться кнопкой в чате
               </div>
-              <div className="financier-suggests">
+              <div className="client-chat-suggests">
                 {SUGGESTIONS.map((q) => (
                   <button
                     key={q}
                     type="button"
-                    className="financier-suggest"
+                    className="client-chat-suggest"
                     onClick={() => ask(q)}
                   >
                     {q}
@@ -113,17 +113,17 @@ export default function ClientChatPage() {
             </div>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className={`financier-msg ${msg.role === 'user' ? 'is-user' : 'is-ai'}`}>
+              <div key={i} className={`client-chat-msg ${msg.role === 'user' ? 'is-user' : 'is-ai'}`}>
                 {msg.role === 'ai' ? (
                   <div className="chat-avatar chat-avatar--ai" aria-hidden>
                     <BulbOutlined />
                   </div>
                 ) : null}
-                <div className="financier-bubble">
+                <div className="client-chat-bubble">
                   {msg.role === 'ai' && (
-                    <div className="financier-bubble-label">AI консультант</div>
+                    <div className="client-chat-bubble-label">AI консультант</div>
                   )}
-                  <div className="financier-bubble-text">{msg.text}</div>
+                  <div className="client-chat-bubble-text">{msg.text}</div>
                   {msg.offers?.length ? (
                     <div className="client-chat-offers">
                       {msg.offers.map((s) => (
@@ -147,20 +147,20 @@ export default function ClientChatPage() {
             ))
           )}
           {loading ? (
-            <div className="financier-msg is-ai">
+            <div className="client-chat-msg is-ai">
               <div className="chat-avatar chat-avatar--ai" aria-hidden>
                 <BulbOutlined />
               </div>
-              <div className="financier-bubble">
-                <div className="financier-bubble-label">AI консультант</div>
-                <div className="financier-bubble-text is-typing">Подбираю ответ…</div>
+              <div className="client-chat-bubble">
+                <div className="client-chat-bubble-label">AI консультант</div>
+                <div className="client-chat-bubble-text is-typing">Подбираю ответ…</div>
               </div>
             </div>
           ) : null}
         </div>
-        <div className="financier-composer">
+        <div className="client-chat-composer">
           <Input.TextArea
-            className="input-luxury financier-input"
+            className="input-luxury client-chat-input"
             placeholder="Вопрос о мойке, полировке, записи…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -174,7 +174,7 @@ export default function ClientChatPage() {
             autoSize={{ minRows: 1, maxRows: 4 }}
           />
           <Button
-            className="btn-gold financier-send"
+            className="btn-gold client-chat-send"
             icon={<SendOutlined />}
             loading={loading}
             onClick={() => ask()}

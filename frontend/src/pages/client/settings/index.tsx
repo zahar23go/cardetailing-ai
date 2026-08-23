@@ -155,7 +155,7 @@ export default function ClientSettingsPage() {
 
   return (
     <>
-      <div className="admin-section-head">
+      <div className="client-section-head">
         <div>
           <h3>Профиль</h3>
           <Badge variant="gold">Имя, телефон, автомобиль и история</Badge>

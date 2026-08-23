@@ -20,27 +20,9 @@ const CATEGORY_CHIPS = [
 ] as const;
 
 const DEMO_CARDS = [
-  {
-    key: 'wash',
-    label: 'Мойка',
-    icon: '🧽',
-    tone: 'blue',
-    image: '/images/bmw-x5-hero.jpg',
-  },
-  {
-    key: 'polish',
-    label: 'Полировка',
-    icon: '✨',
-    tone: 'gold',
-    image: '/images/bmw-x5-photo.jpg',
-  },
-  {
-    key: 'chem',
-    label: 'Химчистка',
-    icon: '🧴',
-    tone: 'green',
-    image: '/images/bmw-card.jpg',
-  },
+  { key: 'wash', label: 'Мойка', icon: '🧽', tone: 'blue', visual: 'is-wash' },
+  { key: 'polish', label: 'Полировка', icon: '✨', tone: 'gold', visual: 'is-polish' },
+  { key: 'chem', label: 'Химчистка', icon: '🧴', tone: 'green', visual: 'is-chem' },
 ] as const;
 
 type CategoryKey = typeof CATEGORY_CHIPS[number]['key'];
@@ -66,10 +48,7 @@ function padDemos(photoCount: number): DemoCard[] {
 function PlaceholderCard({ demo }: { demo: DemoCard }) {
   return (
     <Card variant="luxury" className={`gallery-item portfolio-ph is-${demo.tone}`}>
-      <div
-        className="portfolio-ph-visual"
-        style={{ backgroundImage: `url(${demo.image})` }}
-      >
+      <div className={`portfolio-ph-visual ${demo.visual}`}>
         <span className="portfolio-ph-icon" aria-hidden>{demo.icon}</span>
         <span className="portfolio-ph-label">{demo.label}</span>
       </div>
@@ -115,6 +94,12 @@ export default function ClientPortfolioPage() {
 
   const fillers = padDemos(filtered.length);
   const empty = filtered.length === 0;
+  const categoryLabel = CATEGORY_CHIPS.find((c) => c.key === category)?.label;
+  const masterCaption = masterName
+    ? (category !== 'all' && categoryLabel
+      ? `${categoryLabel} от ${masterName}`
+      : `Работы от ${masterName}`)
+    : null;
 
   const onAddPhoto = () => {
     message.info('Фото в портфолио добавляет мастер салона');
@@ -159,6 +144,9 @@ export default function ClientPortfolioPage() {
           onChange={(v) => setMasterName(v)}
           options={masters.map((n) => ({ value: n, label: `Работы от ${n}` }))}
         />
+        {masterCaption ? (
+          <Badge variant="gold">{masterCaption}</Badge>
+        ) : null}
       </Card>
 
       {loading ? (

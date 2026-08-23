@@ -51,7 +51,7 @@ export default function ClientDiscountsPage() {
 
   return (
     <>
-      <div className="admin-section-head">
+      <div className="client-section-head">
         <div>
           <h3>Скидки</h3>
           <Badge variant="gold">Действующие акции и условия</Badge>
@@ -82,7 +82,7 @@ export default function ClientDiscountsPage() {
                   )}
                 </div>
                 <div className="client-appt-meta">
-                  <div className="admin-kpi-value">−{rule.discount_percent}%</div>
+                  <div className="client-kpi-value">−{rule.discount_percent}%</div>
                 </div>
               </div>
             </Card>

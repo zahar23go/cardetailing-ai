@@ -82,10 +82,10 @@ export default function ClientHomePage() {
 
   return (
     <>
-      <div className="admin-section-head">
+      <div className="client-section-head">
         <div>
           <h3>Главная</h3>
-          <Badge variant="gold">Ваши записи и рекомендации к ближайшим мойкам</Badge>
+          <Badge variant="gold">Ваши записи и рекомендованные услуги</Badge>
         </div>
         <Button type="primary" className="btn-gold" onClick={() => navigate('/client/booking')}>
           Записаться
@@ -126,7 +126,7 @@ export default function ClientHomePage() {
         })
       )}
 
-      <div className="client-section-title">Рекомендовано</div>
+      <div className="client-section-title">Рекомендованные услуги</div>
       {recs.length === 0 ? (
         <Card variant="admin" className="client-block">
           <Text className="text-titanium">

@@ -107,7 +107,7 @@ export default function ClientBookingPage() {
 
   return (
     <>
-      <div className="admin-section-head">
+      <div className="client-section-head">
         <div>
           <h3>Запись</h3>
           <Badge variant="gold">Услуга, мастер, дата и время</Badge>
@@ -158,7 +158,7 @@ export default function ClientBookingPage() {
               <div>
                 <Text className="text-titanium">Сначала добавьте авто в профиле.</Text>
                 {' '}
-                <Button type="link" className="admin-link" onClick={() => navigate('/client/settings')}>
+                <Button type="link" className="client-link" onClick={() => navigate('/client/settings')}>
                   Перейти
                 </Button>
               </div>

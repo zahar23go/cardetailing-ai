@@ -2380,19 +2380,23 @@
   font-size: 11px;
 }
 /* ========== ADMIN COMMAND CENTER (graphite hierarchy) ========== */
-.admin-layout {
+.admin-layout,
+.client-layout.client-app {
   background: var(--color-graphite, #1A1D23) !important;
   min-height: 100vh;
   color: var(--color-white, #F0F2F5);
 }
 
 .admin-layout .ant-layout,
-.admin-layout .admin-body-layout {
+.admin-layout .admin-body-layout,
+.client-layout .ant-layout,
+.client-layout .client-body-layout {
   background: var(--color-graphite, #1A1D23) !important;
 }
 
 .admin-layout .ant-layout-content,
-.admin-content.client-content {
+.admin-content,
+.client-content {
   background: var(--color-graphite, #1A1D23) !important;
   color: var(--color-white, #F0F2F5);
 }
@@ -2403,7 +2407,8 @@
   backdrop-filter: blur(10px);
 }
 
-.admin-header-brand {
+.admin-header-brand,
+.client-header-brand {
   align-items: center !important;
 }
 
@@ -2444,7 +2449,8 @@
     0 4px 12px rgba(212, 168, 75, 0.22);
 }
 
-.admin-header-actions {
+.admin-header-actions,
+.client-header-actions {
   align-items: center !important;
 }
 
@@ -2475,17 +2481,20 @@
   box-shadow: 0 4px 12px rgba(212, 175, 55, 0.28);
 }
 
-.admin-header-btn-logout.ant-btn:hover {
+.admin-header-btn-logout.ant-btn:hover,
+.client-header-btn-logout.ant-btn:hover {
   filter: brightness(1.06);
   color: #1A1D23 !important;
   background: var(--color-gold-hover, #E5C04A) !important;
 }
 
-.admin-header-btn-logout.ant-btn .anticon {
+.admin-header-btn-logout.ant-btn .anticon,
+.client-header-btn-logout.ant-btn .anticon {
   color: #1a1610 !important;
 }
 
-.admin-header-user {
+.admin-header-user,
+.client-header-user {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2827,6 +2836,7 @@
 
 .admin-overview-hero h2,
 .admin-section-head h3,
+.client-section-head h3,
 .admin-panel-title {
   margin: 0;
   font-family: var(--font-display, Cinzel, Georgia, serif);
@@ -2855,11 +2865,13 @@
   box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
 }
 
-.admin-section-head {
+.admin-section-head,
+.client-section-head {
   margin-bottom: 16px;
 }
 
-.admin-section-head h3 {
+.admin-section-head h3,
+.client-section-head h3 {
   font-size: 22px;
 }
 
@@ -2882,7 +2894,8 @@
   margin-bottom: 4px;
 }
 
-.admin-kpi-value {
+.admin-kpi-value,
+.client-kpi-value {
   font-size: 32px;
   font-weight: 700;
   color: var(--color-gold, #D4AF37);
@@ -2907,7 +2920,8 @@
   -webkit-text-fill-color: transparent;
 }
 
-.admin-link {
+.admin-link,
+.client-link {
   color: var(--color-gold, #d4a84b) !important;
 }
 
@@ -4341,6 +4355,232 @@
   margin: 0 auto;
 }
 
+.client-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.client-section-head h3 {
+  margin: 0 0 8px;
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  color: var(--color-gold, #D4AF37);
+}
+
+.client-header-title.ant-typography,
+.client-header-title {
+  margin: 0 !important;
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 50%, #a67c2d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+}
+
+.client-header-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(240, 217, 160, 0.85);
+  background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 55%, #a67c2d 100%);
+  color: #1a1610;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.client-header-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-gold, #D4AF37);
+  color: var(--color-white, #F0F2F5);
+}
+
+.client-header-btn.ant-btn {
+  height: auto !important;
+  padding: 6px 14px !important;
+  border-radius: var(--radius-full) !important;
+}
+
+.client-header-btn-logout.ant-btn {
+  background: var(--color-gold, #D4AF37) !important;
+  border-color: var(--color-gold, #D4AF37) !important;
+  color: #1A1D23 !important;
+}
+
+.client-sidebar.sidebar {
+  background: var(--color-sidebar, #0B0D10) !important;
+}
+
+.client-kpi-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-gold, #D4AF37);
+  line-height: 1.15;
+}
+
+.client-link {
+  color: var(--color-gold, #d4a84b) !important;
+}
+
+.client-chat-panel.card {
+  padding: var(--spacing-lg);
+}
+
+.client-chat-thread {
+  min-height: 360px;
+  max-height: 480px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 4px 16px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--color-divider, #3B4049);
+}
+
+.client-chat-empty {
+  margin: auto;
+  text-align: center;
+  padding: 40px 16px 24px;
+  max-width: 520px;
+}
+
+.client-chat-empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: var(--color-gold, #D4AF37);
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.12));
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.35));
+}
+
+.client-chat-empty-title {
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 18px;
+  letter-spacing: 0.03em;
+  color: var(--color-gold, #D4AF37);
+  margin-bottom: 8px;
+}
+
+.client-chat-empty-hint {
+  font-size: 13px;
+  color: var(--color-titanium, #9BA3B5);
+  margin-bottom: 20px;
+}
+
+.client-chat-suggests {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.client-chat-suggest {
+  appearance: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 18px;
+  border-radius: var(--radius-full);
+  color: var(--color-gold, #D4AF37);
+  background: transparent;
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.45));
+}
+
+.client-chat-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 86%;
+}
+
+.client-chat-msg.is-user { align-self: flex-end; }
+.client-chat-msg.is-ai { align-self: flex-start; }
+
+.client-chat-bubble {
+  padding: 12px 16px;
+  border-radius: var(--radius-xl, 16px);
+  border: 1px solid var(--color-divider, #3B4049);
+  background: var(--color-elevated, #161B22);
+}
+
+.client-chat-msg.is-user .client-chat-bubble {
+  border-color: var(--color-gold-border, rgba(212, 175, 55, 0.4));
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.14));
+}
+
+.client-chat-bubble-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-gold, #D4AF37);
+  margin-bottom: 6px;
+}
+
+.client-chat-bubble-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-white, #F0F2F5);
+  white-space: pre-wrap;
+}
+
+.client-chat-bubble-text.is-typing {
+  color: var(--color-gold, #D4AF37);
+}
+
+.client-chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.client-chat-composer .client-chat-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.client-chat-send.ant-btn {
+  width: 52px !important;
+  min-width: 52px !important;
+  height: 46px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+}
+
+.portfolio-ph-visual.is-wash {
+  background-image: url('/images/bmw-x5-hero.jpg');
+}
+
+.portfolio-ph-visual.is-polish {
+  background-image: url('/images/bmw-x5-photo.jpg');
+}
+
+.portfolio-ph-visual.is-chem {
+  background-image: url('/images/bmw-card.jpg');
+}
+
 .client-header-logo {
   height: 28px;
   width: auto;
@@ -4797,7 +5037,7 @@
   gap: var(--spacing-sm);
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
-  background-color: #11151b;
+  background-color: var(--color-sidebar, #11151b);
   background-size: cover;
   background-position: center;
 }
@@ -4993,7 +5233,7 @@
     width: 100%;
   }
 
-  .client-app .financier-msg {
+  .client-app .client-chat-msg {
     max-width: 100%;
   }
 

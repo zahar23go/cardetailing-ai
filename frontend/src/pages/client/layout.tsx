@@ -33,31 +33,31 @@ export default function ClientLayout({ user, onLogout }: Props) {
   const active = clientTabFromPath(pathname);
 
   return (
-    <Layout className="admin-layout client-layout client-app">
-      <Header className="header-mobile admin-header-mobile">
+    <Layout className="client-layout client-app">
+      <Header className="header-mobile client-header">
         <Space size="small" align="center">
           <img
             src="/images/logo-formula-sport.png"
             alt=""
             className="client-header-logo"
           />
-          <Text className="admin-header-title">CAR DETAILING AI</Text>
+          <Text className="client-header-title">CAR DETAILING AI</Text>
         </Space>
-        <span className="admin-header-badge">Кабинет</span>
+        <span className="client-header-badge">Кабинет</span>
       </Header>
 
-      <Header className="header-desktop admin-header">
-        <Space className="admin-header-brand" size="middle" align="center">
+      <Header className="header-desktop client-header">
+        <Space className="client-header-brand" size="middle" align="center">
           <img
             src="/images/logo-formula-sport.png"
             alt=""
             className="client-header-logo"
           />
-          <Text className="admin-header-title">CAR DETAILING AI</Text>
-          <span className="admin-header-badge">Кабинет</span>
+          <Text className="client-header-title">CAR DETAILING AI</Text>
+          <span className="client-header-badge">Кабинет</span>
         </Space>
-        <Space size="middle" className="admin-header-actions" wrap>
-          <span className="admin-header-user">
+        <Space size="middle" className="client-header-actions" wrap>
+          <span className="client-header-user">
             <UserOutlined />
             <span>{user.full_name}</span>
           </span>
@@ -65,16 +65,16 @@ export default function ClientLayout({ user, onLogout }: Props) {
             type="text"
             icon={<LogoutOutlined />}
             onClick={onLogout}
-            className="admin-header-btn admin-header-btn-logout"
+            className="client-header-btn client-header-btn-logout"
           >
             Выйти
           </Button>
         </Space>
       </Header>
 
-      <Layout className="admin-body-layout">
+      <Layout className="client-body-layout">
         <Sider
-          className="sidebar admin-sidebar"
+          className="sidebar client-sidebar"
           breakpoint="md"
           collapsedWidth={0}
           width={228}
@@ -93,7 +93,7 @@ export default function ClientLayout({ user, onLogout }: Props) {
           ))}
         </Sider>
 
-        <Content className="client-content admin-content">
+        <Content className="client-content">
           <div className="client-app-inner">
             <Outlet />
           </div>

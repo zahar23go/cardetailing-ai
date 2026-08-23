@@ -25,19 +25,60 @@ export function formatCurrency(val: number) {
   return `${Number(val || 0).toLocaleString('ru-RU')} ₽`;
 }
 
+function normalizeText(value: string) {
+  return (value || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^a-zа-я0-9]+/gi, ' ')
+    .trim();
+}
+
+const SERVICE_HINTS: { re: RegExp; needles: string[] }[] = [
+  { re: /полир|керамик|покрыт|лак/, needles: ['полир', 'керамик'] },
+  { re: /мойк|двухфаз|экспресс|wash/, needles: ['мойк'] },
+  { re: /химчист|салон|interior|кожа/, needles: ['химчист', 'салон'] },
+];
+
 /** Услуги, которые ИИ назвал в ответе — для кнопки «Записаться на …». */
 export function matchServicesFromText(text: string, services: Service[]): Service[] {
-  const hay = (text || '').toLowerCase();
-  if (!hay) return [];
-  const ranked = [...services]
-    .filter((s) => s.name && hay.includes(s.name.toLowerCase()))
-    .sort((a, b) => b.name.length - a.name.length);
+  const hay = normalizeText(text);
+  if (!hay || !services.length) return [];
   const seen = new Set<number>();
-  return ranked.filter((s) => {
-    if (seen.has(s.id)) return false;
-    seen.add(s.id);
-    return true;
-  }).slice(0, 3);
+  const add = (list: Service[], item: Service) => {
+    if (seen.has(item.id)) return;
+    seen.add(item.id);
+    list.push(item);
+  };
+
+  const ranked: Service[] = [];
+  const sorted = [...services]
+    .filter((s) => s.name)
+    .sort((a, b) => b.name.length - a.name.length);
+
+  for (const s of sorted) {
+    const name = normalizeText(s.name);
+    if (name && hay.includes(name)) add(ranked, s);
+  }
+
+  for (const s of sorted) {
+    const tokens = normalizeText(s.name).split(' ').filter((t) => t.length >= 4);
+    if (tokens.some((t) => hay.includes(t))) add(ranked, s);
+  }
+
+  for (const s of sorted) {
+    const cat = normalizeText(s.category || '');
+    if (cat && hay.includes(cat)) add(ranked, s);
+  }
+
+  for (const hint of SERVICE_HINTS) {
+    if (!hint.re.test(hay)) continue;
+    for (const s of sorted) {
+      const blob = `${normalizeText(s.name)} ${normalizeText(s.category || '')}`;
+      if (hint.needles.some((n) => blob.includes(n))) add(ranked, s);
+    }
+  }
+
+  return ranked.slice(0, 3);
 }
 
 export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'gold';
