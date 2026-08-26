@@ -48,8 +48,8 @@ body,
 .ant-tabs-tab-active { color: var(--color-gold) !important; }
 .ant-tabs-ink-bar { background-color: var(--color-gold) !important; }
 .ant-card { background-color: var(--color-carbon) !important; border-color: var(--color-divider) !important; border-radius: var(--radius-card) !important; box-shadow: var(--shadow-card); }
-.ant-btn-primary { background-color: var(--color-gold) !important; border-color: var(--color-gold) !important; color: var(--color-graphite) !important; box-shadow: var(--shadow-gold) !important; }
-.ant-btn-primary:hover { background-color: var(--color-gold-hover) !important; border-color: var(--color-gold-hover) !important; box-shadow: var(--shadow-gold-hover) !important; color: var(--color-graphite) !important; }
+.ant-btn-primary { background-color: var(--color-gold) !important; border-color: var(--color-gold) !important; color: var(--brand-gold-button-color, #1A1D23) !important; box-shadow: var(--shadow-gold) !important; }
+.ant-btn-primary:hover { background-color: var(--color-gold-hover) !important; border-color: var(--color-gold-hover) !important; box-shadow: var(--shadow-gold-hover) !important; color: var(--brand-gold-button-color, #1A1D23) !important; }
 .ant-select-dropdown { background-color: var(--color-carbon) !important; border: 1px solid rgba(255,255,255,0.06) !important; border-radius: var(--radius-md) !important; padding: 4px !important; }
 .ant-select-dropdown .ant-select-item { color: var(--color-titanium) !important; border-radius: var(--radius-xs) !important; }
 .ant-select-dropdown .ant-select-item-option-active { background-color: rgba(200,169,119,0.15) !important; }
@@ -57,3 +57,18 @@ body,
 .ant-select-selector { background-color: var(--color-elevated) !important; border: 1px solid rgba(255,255,255,0.06) !important; border-radius: var(--radius-md) !important; }
 .ant-select-selection-placeholder { color: var(--color-titanium) !important; opacity: 0.7 !important; }
 .ant-select-selection-item { color: var(--color-white) !important; }
+
+/* Тултипы: не белый пузырь с белым текстом на тёмных карточках */
+.ant-tooltip {
+  --antd-arrow-background-color: var(--color-carbon);
+}
+.ant-tooltip .ant-tooltip-inner {
+  background: var(--color-carbon) !important;
+  color: var(--color-gold) !important;
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.35));
+  box-shadow: var(--shadow-card);
+}
+.ant-tooltip .ant-tooltip-arrow::before,
+.ant-tooltip .ant-tooltip-arrow::after {
+  background: var(--color-carbon) !important;
+}

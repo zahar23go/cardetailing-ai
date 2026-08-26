@@ -22,7 +22,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.database import get_db, init_db, async_session_maker
 from app.core.deepseek_client import get_ai_response, get_financier_response, get_consultant_response
-from app.core.image_service import validate_image, save_file_local, generate_filename, delete_file_local
+from app.core.image_service import validate_image, save_file_local, generate_filename, delete_file_local, resolve_portfolio_url
 from app.models import Box, BoxService, Tenant, User, UserRole, AppointmentStatus, Service, Car, Appointment, Expense, DiscountRule, ClientDiscount, LoyaltyPoints, LoyaltyTierConfig, Photo, EntityType, Notification, UserNotificationSettings, WorkingHours, AppointmentHistory, Payment, ServiceDiscountRecommendation
 from app.schemas import (
     RegisterRequest, LoginRequest, AuthResponse, UserOut, UserProfileUpdate,
@@ -4559,6 +4559,9 @@ async def get_photos(
         if entity_type == "portfolio":
             po.service_name = p.service.name if p.service else None
             po.uploader_name = p.uploader.full_name if p.uploader else None
+            hay = f"{po.service_name or ''} {p.title or ''}"
+            po.url = resolve_portfolio_url(p.url, hay)
+            po.thumbnail_url = resolve_portfolio_url(p.thumbnail_url or p.url, hay)
         result_list.append(po)
     return result_list
 
@@ -4590,6 +4593,9 @@ async def get_all_portfolio(
         po = PhotoOut.model_validate(p)
         po.service_name = p.service.name if p.service else None
         po.uploader_name = p.uploader.full_name if p.uploader else None
+        hay = f"{po.service_name or ''} {p.title or ''}"
+        po.url = resolve_portfolio_url(p.url, hay)
+        po.thumbnail_url = resolve_portfolio_url(p.thumbnail_url or p.url, hay)
         result_list.append(po)
     return result_list
 

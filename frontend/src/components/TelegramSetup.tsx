@@ -71,7 +71,7 @@ export default function TelegramSetup({ settings, onUpdate }: TelegramSetupProps
               onChange={(e) => setCode(e.target.value)}
               onPressEnter={handleConnect}
             />
-            <Button type="primary" loading={connecting} onClick={handleConnect}>
+            <Button type="primary" className="btn-gold" loading={connecting} onClick={handleConnect}>
               Подключить
             </Button>
           </Space.Compact>

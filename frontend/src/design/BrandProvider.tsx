@@ -100,6 +100,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
               colorBgLayout: surface.page,
               colorBgContainer: surface.card,
               colorBgElevated: surface.elevated,
+              colorBgSpotlight: surface.card,
+              colorTextLightSolid: brand.colors.accent.solid,
               colorBorder: surface.divider,
               colorBorderSecondary: surface.divider,
               colorText: surface.textPrimary,

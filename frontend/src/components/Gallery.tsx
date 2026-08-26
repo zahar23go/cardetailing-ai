@@ -11,7 +11,13 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
-import type { Photo } from '../api/photos';
+import {
+  demoPortfolioImage,
+  looksLikeFilename,
+  portfolioCaption,
+  portfolioServiceLabel,
+  type Photo,
+} from '../api/photos';
 import Card from './Card';
 
 dayjs.locale('ru');
@@ -24,20 +30,13 @@ interface GalleryProps {
   readonly?: boolean;
   columns?: number;
   justify?: 'start' | 'end' | 'center';
+  /** «Услуга — мастер» вместо раздельных строк. */
+  captionFormat?: 'default' | 'service-master';
+  /** Не пересортировывать — порядок задаёт родитель. */
+  preserveOrder?: boolean;
 }
 
-type Lightbox = { url: string; service?: string; date?: string; description?: string };
-
-function looksLikeFilename(value?: string) {
-  if (!value) return false;
-  return /\.(jpe?g|png|webp|gif|bmp)$/i.test(value.trim());
-}
-
-function photoLabel(photo: Photo) {
-  if (photo.service_name) return photo.service_name;
-  if (photo.title && !looksLikeFilename(photo.title)) return photo.title;
-  return 'Работа';
-}
+type Lightbox = { url: string; caption: string; date?: string; description?: string };
 
 function photoDate(iso?: string) {
   if (!iso) return '';
@@ -52,17 +51,22 @@ export default function Gallery({
   readonly = false,
   columns = 4,
   justify = 'start',
+  captionFormat = 'default',
+  preserveOrder = false,
 }: GalleryProps) {
   const [lightbox, setLightbox] = useState<Lightbox | null>(null);
+  const unified = captionFormat === 'service-master';
 
   const openLightbox = (photo: Photo) => {
+    const caption = unified ? portfolioCaption(photo) : portfolioServiceLabel(photo);
+    const extra = photo.description && !looksLikeFilename(photo.description)
+      ? photo.description
+      : '';
     setLightbox({
       url: photo.url,
-      service: photoLabel(photo),
+      caption,
       date: photoDate(photo.created_at),
-      description: photo.description && !looksLikeFilename(photo.description)
-        ? photo.description
-        : '',
+      description: extra === 'Пример работы мастера' ? '' : extra,
     });
   };
 
@@ -74,7 +78,9 @@ export default function Gallery({
     );
   }
 
-  const sorted = [...photos].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  const sorted = preserveOrder
+    ? photos
+    : [...photos].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   const colCount = Math.max(1, Math.min(columns, 4));
   const mdSpan = Math.floor(24 / colCount);
 
@@ -83,10 +89,12 @@ export default function Gallery({
       <Row gutter={[16, 16]} className="gallery-grid" justify={justify}>
         {sorted.map((photo) => {
           const date = photoDate(photo.created_at);
-          const service = photoLabel(photo);
+          const service = portfolioServiceLabel(photo);
+          const caption = unified ? portfolioCaption(photo) : service;
           const extra = photo.description && !looksLikeFilename(photo.description)
             ? photo.description
             : '';
+          const showExtra = extra && extra !== 'Пример работы мастера';
           return (
             <Col
               key={photo.id}
@@ -96,18 +104,24 @@ export default function Gallery({
             >
               <Card
                 variant="luxury"
-                className={`gallery-item${photo.is_primary ? ' is-primary' : ''}`}
+                className={`gallery-item${photo.is_primary ? ' is-primary' : ''}${unified ? ' is-unified' : ''}`}
               >
                 <button
                   type="button"
                   className="gallery-item-preview"
                   onClick={() => openLightbox(photo)}
-                  aria-label={`Открыть ${service}`}
+                  aria-label={`Открыть ${caption}`}
                 >
                   <img
                     src={photo.thumbnail_url || photo.url}
-                    alt={photo.title || service}
+                    alt={caption}
                     className="gallery-item-img"
+                    onError={(e) => {
+                      const el = e.currentTarget;
+                      if (el.dataset.fallback === '1') return;
+                      el.dataset.fallback = '1';
+                      el.src = demoPortfolioImage(`${photo.service_name || ''} ${photo.title || ''}`);
+                    }}
                   />
                   <span className="gallery-item-zoom" aria-hidden>
                     <ZoomInOutlined />
@@ -119,15 +133,15 @@ export default function Gallery({
                 )}
 
                 <div className="gallery-item-meta">
-                  <div className="gallery-item-service">{service}</div>
-                  {photo.uploader_name ? (
+                  <div className="gallery-item-service">{caption}</div>
+                  {!unified && photo.uploader_name ? (
                     <div className="gallery-item-master">
                       <UserOutlined />
                       <span>{photo.uploader_name}</span>
                     </div>
                   ) : null}
                   {date ? <div className="gallery-item-date">{date}</div> : null}
-                  {extra ? (
+                  {showExtra ? (
                     <Text className="text-titanium text-12 gallery-item-desc">
                       {extra}
                     </Text>
@@ -184,13 +198,19 @@ export default function Gallery({
         {lightbox ? (
           <>
             <img
-              alt={lightbox.service || 'Фото'}
+              alt={lightbox.caption || 'Фото'}
               src={lightbox.url}
               className="gallery-lightbox-img"
+              onError={(e) => {
+                const el = e.currentTarget;
+                if (el.dataset.fallback === '1') return;
+                el.dataset.fallback = '1';
+                el.src = demoPortfolioImage(lightbox.caption);
+              }}
             />
             <div className="gallery-lightbox-meta">
-              {lightbox.service ? (
-                <div className="gallery-item-service">{lightbox.service}</div>
+              {lightbox.caption ? (
+                <div className="gallery-item-service">{lightbox.caption}</div>
               ) : null}
               {lightbox.date ? (
                 <div className="gallery-item-date">{lightbox.date}</div>

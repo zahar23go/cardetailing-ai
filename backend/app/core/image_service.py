@@ -104,6 +104,31 @@ def save_file_local(
     return url_path, thumb_url
 
 
+DEMO_PORTFOLIO_IMAGES = {
+    "wash": "/images/bmw-x5-hero.jpg",
+    "polish": "/images/bmw-x5-photo.jpg",
+    "chem": "/images/bmw-card.jpg",
+}
+
+
+def resolve_portfolio_url(url: str | None, haystack: str = "") -> str:
+    """If an uploaded file is missing, show a salon demo photo instead of a broken icon."""
+    raw = url or ""
+    if raw.startswith("/images/"):
+        return raw
+    if raw.startswith("/uploads/"):
+        root = Path(settings.STORAGE_PATH or "./uploads")
+        if (root / raw.lstrip("/uploads/")).exists():
+            return raw
+        hay = (haystack or "").lower()
+        if "химчист" in hay or "салон" in hay:
+            return DEMO_PORTFOLIO_IMAGES["chem"]
+        if "полир" in hay:
+            return DEMO_PORTFOLIO_IMAGES["polish"]
+        return DEMO_PORTFOLIO_IMAGES["wash"]
+    return raw
+
+
 def delete_file_local(url_path: str):
     """Delete a file from local storage."""
     upload_root = Path(settings.STORAGE_PATH or "./uploads")

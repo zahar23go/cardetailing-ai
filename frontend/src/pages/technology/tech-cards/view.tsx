@@ -11,11 +11,13 @@ import {
 } from '@ant-design/icons';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
+import StepPhoto from './StepPhoto';
 import {
   TechCard,
   apiFetch,
   formatCurrency,
   formatDuration,
+  formatUnit,
 } from './types';
 
 const { Text } = Typography;
@@ -143,11 +145,24 @@ export default function TechCardViewPage() {
                   <FileTextOutlined /> Описание
                 </div>
                 {block.description?.trim() ? (
-                  <Text className="text-white tech-card-field-text">{block.description}</Text>
+                  <Text className="text-gold tech-card-field-text">{block.description}</Text>
                 ) : (
                   <Text className="text-titanium">Нет описания</Text>
                 )}
               </div>
+
+              {block.photo_url ? (
+                <div className="tech-card-field">
+                  <div className="tech-card-field-label">
+                    <CameraOutlined /> Фото
+                  </div>
+                  <StepPhoto
+                    src={block.photo_url}
+                    alt={block.title || `Шаг ${idx + 1}`}
+                    size="full"
+                  />
+                </div>
+              ) : null}
 
               <div className="tech-card-field">
                 <div className="tech-card-field-label">
@@ -157,9 +172,9 @@ export default function TechCardViewPage() {
                   <ul className="tech-card-materials">
                     {block.items.map((item, iIdx) => (
                       <li key={`${block.id || idx}-${item.material_id || iIdx}`}>
-                        <Text className="text-white">{item.material_name || 'Материал'}</Text>
+                        <Text className="text-gold">{item.material_name || 'Материал'}</Text>
                         <Text className="text-gold-bold">
-                          {Number(item.quantity || 0).toLocaleString('ru-RU')} {item.material_unit || ''}
+                          {Number(item.quantity || 0).toLocaleString('ru-RU')} {formatUnit(item.material_unit)}
                         </Text>
                       </li>
                     ))}
@@ -175,19 +190,6 @@ export default function TechCardViewPage() {
                 </div>
                 <Text className="text-gold-bold">{formatDuration(block.duration_minutes || 0)}</Text>
               </div>
-
-              {block.photo_url ? (
-                <div className="tech-card-field">
-                  <div className="tech-card-field-label">
-                    <CameraOutlined /> Фото
-                  </div>
-                  <img
-                    src={block.photo_url}
-                    alt={block.title || `Шаг ${idx + 1}`}
-                    className="tech-card-step-photo"
-                  />
-                </div>
-              ) : null}
             </Card>
           ))}
 

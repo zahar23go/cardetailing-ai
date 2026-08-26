@@ -47,6 +47,44 @@ export interface PortfolioService {
   photo_count: number;
 }
 
+/** Демо-фото из frontend/public/images — если файл в /uploads отсутствует. */
+export const PORTFOLIO_DEMO_IMAGES = {
+  wash: '/images/bmw-x5-hero.jpg',
+  polish: '/images/bmw-x5-photo.jpg',
+  chem: '/images/bmw-card.jpg',
+} as const;
+
+export function demoPortfolioImage(haystack?: string) {
+  const hay = (haystack || '').toLowerCase();
+  if (/химчист|салон/.test(hay)) return PORTFOLIO_DEMO_IMAGES.chem;
+  if (/полир/.test(hay)) return PORTFOLIO_DEMO_IMAGES.polish;
+  return PORTFOLIO_DEMO_IMAGES.wash;
+}
+
+export function looksLikeFilename(value?: string) {
+  if (!value) return false;
+  return /\.(jpe?g|png|webp|gif|bmp)$/i.test(value.trim());
+}
+
+export function portfolioServiceLabel(photo: Photo) {
+  if (photo.service_name) return photo.service_name;
+  if (photo.title && !looksLikeFilename(photo.title)) return photo.title;
+  return 'Работа';
+}
+
+export function portfolioMasterLabel(name?: string) {
+  const n = (name || '').trim();
+  if (!n) return '';
+  return /^мастер\b/i.test(n) ? n : `мастер ${n}`;
+}
+
+/** Единый формат подписи: «Мойка кузова — мастер Zahar 1». */
+export function portfolioCaption(photo: Photo) {
+  const service = portfolioServiceLabel(photo);
+  const master = portfolioMasterLabel(photo.uploader_name);
+  return master ? `${service} — ${master}` : service;
+}
+
 /* ============================================================
    PHOTO API
    ============================================================ */

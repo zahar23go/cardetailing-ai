@@ -103,6 +103,21 @@ export function formatDuration(minutes: number) {
   return rest ? `${h} ч ${rest} мин` : `${h} ч`;
 }
 
+const UNIT_LABELS: Record<string, string> = {
+  pcs: 'шт',
+  ml: 'мл',
+  l: 'л',
+  g: 'г',
+  kg: 'кг',
+  m: 'м',
+  pack: 'упак.',
+};
+
+export function formatUnit(unit?: string | null) {
+  if (!unit) return '';
+  return UNIT_LABELS[unit] || unit;
+}
+
 export function newDraftItem(): DraftItem {
   return { key: `${Date.now()}-${Math.random()}`, quantity: 1 };
 }

@@ -228,6 +228,52 @@ const HomeBar = styled.div`
   flex-shrink: 0;
 `;
 
+const Accounts = styled.div`
+  margin-top: 12px;
+
+  .caption {
+    margin: 0 0 7px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: ${brand.colors.text.label};
+  }
+
+  select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border-radius: ${brand.radii.md};
+    border: 1px solid ${brand.colors.accent.border};
+    background: ${brand.colors.bg.input};
+    color: ${brand.colors.text.primary};
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    appearance: auto;
+
+    &:focus {
+      border-color: ${brand.colors.accent.solid};
+      box-shadow: ${brand.shadows.inputFocus};
+    }
+  }
+`;
+
+const DEMO_ACCOUNTS = [
+  { role: 'Админ', name: 'Супер администратор', phone: '+79999999999', password: 'admin123' },
+  { role: 'Клиент', name: 'Иван Петров', phone: '79501234501', password: 'password123' },
+  { role: 'Клиент', name: 'Мария Соколова', phone: '79501234502', password: 'password123' },
+  { role: 'Клиент', name: 'Алексей Кузнецов', phone: '79501234503', password: 'password123' },
+  { role: 'Клиент', name: 'Елена Новикова', phone: '79501234504', password: 'password123' },
+  { role: 'Клиент', name: 'Дмитрий Волков', phone: '79501234505', password: 'password123' },
+  { role: 'Клиент', name: 'Ольга Белова', phone: '79501234506', password: 'password123' },
+  { role: 'Клиент', name: 'Сергей Морозов', phone: '79501234507', password: 'password123' },
+  { role: 'Мастер', name: 'Андрей Смирнов', phone: '79501234550', password: 'password123' },
+  { role: 'Мастер', name: 'Максим Орлов', phone: '79501234551', password: 'password123' },
+] as const;
+
 interface LoginPageProps {
   onLogin?: (phone: string, password: string) => void;
   onRegister?: () => void;
@@ -238,6 +284,11 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
   const [phone, setPhone] = useState('+79999999999');
   const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
+
+  const fillAccount = (acc: typeof DEMO_ACCOUNTS[number]) => {
+    setPhone(acc.phone);
+    setPassword(acc.password);
+  };
 
   return (
     <Shell>
@@ -273,49 +324,89 @@ export default function LoginPage({ onLogin, onRegister }: LoginPageProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12, duration: 0.4 }}
             >
-              <GoldField $theme={brand}>
-                <span>Телефон</span>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+7 (999) 999-99-99"
-                />
-              </GoldField>
-
-              <GoldField $theme={brand}>
-                <span>Пароль</span>
-                <PasswordWrap>
+              <form
+                autoComplete="on"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  onLogin?.(phone, password);
+                }}
+              >
+                <GoldField $theme={brand}>
+                  <span>Телефон</span>
                   <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    type="tel"
+                    name="username"
+                    autoComplete="username"
+                    list="login-phones"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+7 (999) 999-99-99"
                   />
-                  <button type="button" onClick={() => setShowPassword((v) => !v)}>
-                    {showPassword ? 'Скрыть' : 'Показать'}
-                  </button>
-                </PasswordWrap>
-              </GoldField>
+                  <datalist id="login-phones">
+                    {DEMO_ACCOUNTS.map((acc) => (
+                      <option key={acc.phone} value={acc.phone}>
+                        {acc.role}: {acc.name}
+                      </option>
+                    ))}
+                  </datalist>
+                </GoldField>
 
-              <GoldButton
-                $theme={brand}
-                type="button"
-                style={{ marginTop: 6 }}
-                whileTap={{ scale: 0.975 }}
-                onClick={() => onLogin?.(phone, password)}
-              >
-                Войти
-              </GoldButton>
+                <GoldField $theme={brand}>
+                  <span>Пароль</span>
+                  <PasswordWrap>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                    <button type="button" onClick={() => setShowPassword((v) => !v)}>
+                      {showPassword ? 'Скрыть' : 'Показать'}
+                    </button>
+                  </PasswordWrap>
+                </GoldField>
 
-              <GhostGoldButton
-                $theme={brand}
-                type="button"
-                style={{ marginTop: 11 }}
-                onClick={() => onRegister?.()}
-              >
-                Зарегистрироваться
-              </GhostGoldButton>
+                <Accounts>
+                  <p className="caption">Телефоны и пароли</p>
+                  <select
+                    aria-label="Выбрать кабинет"
+                    value={DEMO_ACCOUNTS.some((acc) => acc.phone === phone) ? phone : ''}
+                    onChange={(e) => {
+                      const acc = DEMO_ACCOUNTS.find((item) => item.phone === e.target.value);
+                      if (acc) fillAccount(acc);
+                    }}
+                  >
+                    <option value="" disabled>
+                      Выберите кабинет…
+                    </option>
+                    {DEMO_ACCOUNTS.map((acc) => (
+                      <option key={acc.phone} value={acc.phone}>
+                        {acc.role} · {acc.phone} · {acc.password}
+                      </option>
+                    ))}
+                  </select>
+                </Accounts>
+
+                <GoldButton
+                  $theme={brand}
+                  type="submit"
+                  style={{ marginTop: 6 }}
+                  whileTap={{ scale: 0.975 }}
+                >
+                  Войти
+                </GoldButton>
+
+                <GhostGoldButton
+                  $theme={brand}
+                  type="button"
+                  style={{ marginTop: 11 }}
+                  onClick={() => onRegister?.()}
+                >
+                  Зарегистрироваться
+                </GhostGoldButton>
+              </form>
             </FormPad>
           </MainStack>
 

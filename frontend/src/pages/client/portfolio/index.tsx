@@ -1,6 +1,5 @@
 /**
- * Портфолио салона — галерея с фильтром по мастеру и услуге.
- * Неполный ряд дополняется заглушками, чтобы справа не оставалось пустого места.
+ * Портфолио салона — галерея с фильтром по мастеру, услуге и сортировкой.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Select, Spin, Typography, message } from 'antd';
@@ -8,9 +7,16 @@ import { PlusOutlined } from '@ant-design/icons';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
 import Gallery from '../../../components/Gallery';
-import { getAllPortfolio, type Photo } from '../../../api/photos';
+import {
+  getAllPortfolio,
+  portfolioServiceLabel,
+  type Photo,
+} from '../../../api/photos';
+import { apiFetch, type Master } from '../api';
 
 const { Text } = Typography;
+
+const ALL_MASTERS = 'all';
 
 const CATEGORY_CHIPS = [
   { key: 'all', label: 'Все' },
@@ -19,14 +25,8 @@ const CATEGORY_CHIPS = [
   { key: 'chem', label: 'Химчистка', match: /химчист|салон/i },
 ] as const;
 
-const DEMO_CARDS = [
-  { key: 'wash', label: 'Мойка', icon: '🧽', tone: 'blue', visual: 'is-wash' },
-  { key: 'polish', label: 'Полировка', icon: '✨', tone: 'gold', visual: 'is-polish' },
-  { key: 'chem', label: 'Химчистка', icon: '🧴', tone: 'green', visual: 'is-chem' },
-] as const;
-
 type CategoryKey = typeof CATEGORY_CHIPS[number]['key'];
-type DemoCard = typeof DEMO_CARDS[number];
+type SortKey = 'date' | 'service';
 
 function matchesCategory(photo: Photo, key: CategoryKey) {
   const chip = CATEGORY_CHIPS.find((c) => c.key === key);
@@ -35,35 +35,26 @@ function matchesCategory(photo: Photo, key: CategoryKey) {
   return chip.match.test(haystack);
 }
 
-function padDemos(photoCount: number): DemoCard[] {
-  const remainder = photoCount % 3;
-  const need = photoCount === 0 ? 3 : remainder === 0 ? 0 : 3 - remainder;
-  const cards: DemoCard[] = [];
-  for (let i = 0; i < need; i += 1) {
-    cards.push(DEMO_CARDS[i % DEMO_CARDS.length]);
+function sortPhotos(list: Photo[], sort: SortKey) {
+  const copy = [...list];
+  if (sort === 'service') {
+    copy.sort((a, b) => {
+      const byName = portfolioServiceLabel(a).localeCompare(portfolioServiceLabel(b), 'ru');
+      if (byName !== 0) return byName;
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+    return copy;
   }
-  return cards;
-}
-
-function PlaceholderCard({ demo }: { demo: DemoCard }) {
-  return (
-    <Card variant="luxury" className={`gallery-item portfolio-ph is-${demo.tone}`}>
-      <div className={`portfolio-ph-visual ${demo.visual}`}>
-        <span className="portfolio-ph-icon" aria-hidden>{demo.icon}</span>
-        <span className="portfolio-ph-label">{demo.label}</span>
-      </div>
-      <div className="gallery-item-meta">
-        <div className="gallery-item-service">{demo.label}</div>
-        <div className="gallery-item-date">Пример работы мастера</div>
-      </div>
-    </Card>
-  );
+  copy.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  return copy;
 }
 
 export default function ClientPortfolioPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [masterName, setMasterName] = useState<string | undefined>();
+  const [salonMasters, setSalonMasters] = useState<Master[]>([]);
+  const [masterName, setMasterName] = useState(ALL_MASTERS);
   const [category, setCategory] = useState<CategoryKey>('all');
+  const [sort, setSort] = useState<SortKey>('date');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -71,8 +62,14 @@ export default function ClientPortfolioPage() {
     (async () => {
       setLoading(true);
       try {
-        const data = await getAllPortfolio();
-        if (!cancelled) setPhotos(data);
+        const [data, mastersResp] = await Promise.all([
+          getAllPortfolio(),
+          apiFetch<{ items: Master[] }>('/api/masters').catch(() => ({ items: [] as Master[] })),
+        ]);
+        if (!cancelled) {
+          setPhotos(data);
+          setSalonMasters(mastersResp.items || []);
+        }
       } catch {
         if (!cancelled) message.error('Не удалось загрузить портфолио');
       }
@@ -82,24 +79,25 @@ export default function ClientPortfolioPage() {
   }, []);
 
   const masters = useMemo(() => {
-    const names = Array.from(new Set(photos.map((p) => p.uploader_name).filter(Boolean))) as string[];
-    return names.sort();
-  }, [photos]);
+    const fromPhotos = photos.map((p) => p.uploader_name).filter(Boolean) as string[];
+    const fromSalon = salonMasters.map((m) => m.full_name).filter(Boolean);
+    return Array.from(new Set([...fromSalon, ...fromPhotos])).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [photos, salonMasters]);
 
-  const filtered = useMemo(() => photos.filter((p) => {
-    if (masterName && p.uploader_name !== masterName) return false;
-    if (category !== 'all' && !matchesCategory(p, category)) return false;
-    return true;
-  }), [photos, masterName, category]);
+  const filtered = useMemo(() => {
+    const list = photos.filter((p) => {
+      if (masterName !== ALL_MASTERS && p.uploader_name !== masterName) return false;
+      if (category !== 'all' && !matchesCategory(p, category)) return false;
+      return true;
+    });
+    return sortPhotos(list, sort);
+  }, [photos, masterName, category, sort]);
 
-  const fillers = padDemos(filtered.length);
-  const empty = filtered.length === 0;
-  const categoryLabel = CATEGORY_CHIPS.find((c) => c.key === category)?.label;
-  const masterCaption = masterName
-    ? (category !== 'all' && categoryLabel
-      ? `${categoryLabel} от ${masterName}`
-      : `Работы от ${masterName}`)
-    : null;
+  const workCount = filtered.length;
+  const masterCount = useMemo(
+    () => new Set(filtered.map((p) => p.uploader_name).filter(Boolean)).size,
+    [filtered],
+  );
 
   const onAddPhoto = () => {
     message.info('Фото в портфолио добавляет мастер салона');
@@ -110,7 +108,7 @@ export default function ClientPortfolioPage() {
       <div className="client-portfolio-head">
         <div>
           <h3>Портфолио</h3>
-          <Badge variant="gold">Работы мастеров: полировка, мойка, химчистка</Badge>
+          <Badge variant="gold">{`Работ: ${workCount} | Мастеров: ${masterCount}`}</Badge>
         </div>
         <Button
           type="primary"
@@ -136,49 +134,54 @@ export default function ClientPortfolioPage() {
           ))}
         </div>
         <Select
-          allowClear
           size="large"
-          placeholder="Мастер"
           className="input-luxury client-filter"
           value={masterName}
           onChange={(v) => setMasterName(v)}
-          options={masters.map((n) => ({ value: n, label: `Работы от ${n}` }))}
+          options={[
+            { value: ALL_MASTERS, label: 'Все мастера' },
+            ...masters.map((n) => ({ value: n, label: n })),
+          ]}
         />
-        {masterCaption ? (
-          <Badge variant="gold">{masterCaption}</Badge>
-        ) : null}
+        <Select
+          size="large"
+          className="input-luxury client-filter client-filter-sort"
+          value={sort}
+          onChange={(v) => setSort(v)}
+          options={[
+            { value: 'date', label: 'По дате (сначала новые)' },
+            { value: 'service', label: 'По услуге (по алфавиту)' },
+          ]}
+        />
       </Card>
 
       {loading ? (
         <Spin />
+      ) : workCount === 0 ? (
+        <Card variant="luxury" className="client-portfolio-empty">
+          <div className="portfolio-empty-state" role="status">
+            <span className="portfolio-empty-icon" aria-hidden>🖼️</span>
+            <Text className="portfolio-empty-title">Нет работ. Добавьте первое фото!</Text>
+            <Button
+              type="primary"
+              className="btn-gold portfolio-add-cta"
+              icon={<PlusOutlined />}
+              onClick={onAddPhoto}
+            >
+              + Добавить фото
+            </Button>
+          </div>
+        </Card>
       ) : (
-        <div className="client-portfolio-photos">
-          {empty ? (
-            <div className="portfolio-add-wrap">
-              <Button
-                type="primary"
-                className="btn-gold portfolio-add-cta"
-                icon={<PlusOutlined />}
-                onClick={onAddPhoto}
-              >
-                + Добавить фото
-              </Button>
-              <Text className="text-titanium portfolio-empty-hint">
-                Пока мало фото — справа примеры услуг салона.
-              </Text>
-            </div>
-          ) : null}
-          {masterName ? (
-            <div className="client-section-title">
-              <Badge variant="gold">{`Работы от ${masterName}`}</Badge>
-            </div>
-          ) : null}
-          {filtered.length > 0 ? (
-            <Gallery photos={filtered} readonly columns={3} justify="start" />
-          ) : null}
-          {fillers.map((demo, index) => (
-            <PlaceholderCard key={`${demo.key}-${index}`} demo={demo} />
-          ))}
+        <div className="client-portfolio-photos is-large">
+          <Gallery
+            photos={filtered}
+            readonly
+            columns={2}
+            justify="start"
+            captionFormat="service-master"
+            preserveOrder
+          />
         </div>
       )}
     </div>

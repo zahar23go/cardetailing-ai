@@ -152,7 +152,7 @@ export default function ServicesPage() {
 
       <Spin spinning={servicesLoading}>
         <div className="toolbar-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openServiceModal()}>
+          <Button type="primary" icon={<PlusOutlined />} className="btn-gold" onClick={() => openServiceModal()}>
             Добавить услугу
           </Button>
         </div>

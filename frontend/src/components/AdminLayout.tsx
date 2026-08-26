@@ -6,7 +6,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Typography, Button, Space, Layout } from 'antd';
 import {
-  CrownOutlined,
   DollarOutlined,
   TeamOutlined,
   LogoutOutlined,
@@ -57,14 +56,15 @@ export default function AdminLayout({ user, onLogout }: AdminLayoutProps) {
   return (
     <Layout className="admin-layout client-layout">
       <Header className="header-mobile admin-header-mobile">
+        <img src="/images/logo-formula-sport.png" alt="" className="client-header-logo" />
         <Text className="admin-header-title">CAR DETAILING AI</Text>
         <span className="admin-header-badge">Command Center</span>
       </Header>
 
       <Header className="header-desktop admin-header">
         <Space className="admin-header-brand" size="middle" align="center">
-          <CrownOutlined className="admin-header-crown" />
-          <Text className="admin-header-title">CarDetailing AI</Text>
+          <img src="/images/logo-formula-sport.png" alt="" className="client-header-logo" />
+          <Text className="admin-header-title">CAR DETAILING AI</Text>
           <span className="admin-header-badge">Command Center</span>
         </Space>
         <Space size="middle" className="admin-header-actions" wrap>
@@ -76,7 +76,6 @@ export default function AdminLayout({ user, onLogout }: AdminLayoutProps) {
             Брендинг
           </Button>
           <span className="admin-header-user">
-            <CrownOutlined />
             <span>{user.full_name}</span>
           </span>
           <NotificationBell />

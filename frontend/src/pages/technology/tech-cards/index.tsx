@@ -16,7 +16,8 @@ import {
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
 import TechCardForm from './TechCardForm';
-import { DurationMark, TechCardMarks, cardMarks } from './Marks';
+import { DurationMark } from './Marks';
+import StepPhoto from './StepPhoto';
 import {
   DraftBlock,
   MaterialOption,
@@ -26,6 +27,7 @@ import {
   cardToDraftBlocks,
   formatCurrency,
   formatDuration,
+  formatUnit,
   newDraftBlock,
 } from './types';
 
@@ -120,13 +122,23 @@ export default function TechCardsPage() {
     setModalOpen(true);
   };
 
-  const openEdit = (card: TechCard) => {
+  const openEdit = async (card: TechCard) => {
     setEditing(card);
     setServiceId(card.service_id);
     setCardName(card.name || card.service_name || '');
     setCardNotes(card.notes || '');
     setDraftBlocks(cardToDraftBlocks(card));
     setModalOpen(true);
+    try {
+      const full = await apiFetch<TechCard>(`/api/tech-cards/${card.id}`);
+      setEditing(full);
+      setServiceId(full.service_id);
+      setCardName(full.name || full.service_name || '');
+      setCardNotes(full.notes || '');
+      setDraftBlocks(cardToDraftBlocks(full));
+    } catch {
+      /* список уже содержит карту */
+    }
   };
 
   useEffect(() => {
@@ -301,25 +313,28 @@ export default function TechCardsPage() {
                             <span className="tech-card-step-index">{idx + 1}</span>
                             <span className="tech-card-step-name">{block.title || 'Без названия'}</span>
                           </div>
-                          <Space size={6} wrap>
-                            <TechCardMarks
-                              hasDescription={Boolean(block.description && block.description.trim())}
-                              hasPhoto={Boolean(block.photo_url)}
-                            />
-                            <DurationMark minutes={block.duration_minutes || 0} />
-                          </Space>
+                          <DurationMark minutes={block.duration_minutes || 0} />
                         </div>
                         {block.description ? (
                           <div className="tech-card-step-row">
                             <FileTextOutlined className="tech-card-step-icon" />
-                            <Text className="text-white">{block.description}</Text>
+                            <span className="tech-card-step-desc">{block.description}</span>
+                          </div>
+                        ) : null}
+                        {block.photo_url ? (
+                          <div className="tech-card-step-row">
+                            <StepPhoto
+                              src={block.photo_url}
+                              alt={block.title || `Шаг ${idx + 1}`}
+                              size="thumb"
+                            />
                           </div>
                         ) : null}
                         {block.items?.length ? (
                           <div className="tech-card-step-row">
                             <ToolOutlined className="tech-card-step-icon" />
-                            <Text className="text-titanium text-13">
-                              {block.items.map((i) => `${i.material_name} (${i.quantity} ${i.material_unit})`).join(', ')}
+                            <Text className="text-gold text-13">
+                              {block.items.map((i) => `${i.material_name} (${i.quantity} ${formatUnit(i.material_unit)})`).join(', ')}
                             </Text>
                           </div>
                         ) : null}
@@ -341,7 +356,7 @@ export default function TechCardsPage() {
                 key: 'service',
                 render: (_, record) => (
                   <div>
-                    <Text className="text-white text-medium">{record.service_name}</Text>
+                    <Text className="text-gold text-medium">{record.service_name}</Text>
                     {record.name && record.name !== record.service_name ? (
                       <div><Text className="text-titanium text-13">{record.name}</Text></div>
                     ) : null}
@@ -364,18 +379,9 @@ export default function TechCardsPage() {
                 render: (val: number) => (
                   <Space size={6}>
                     <ClockCircleOutlined className="text-gold" />
-                    <Text className="text-white">{formatDuration(val || 0)}</Text>
+                    <Text className="text-gold">{formatDuration(val || 0)}</Text>
                   </Space>
                 ),
-              },
-              {
-                title: <Text className="text-gold">Метки</Text>,
-                key: 'marks',
-                width: 110,
-                render: (_, record) => {
-                  const { hasDescription, hasPhoto } = cardMarks(record);
-                  return <TechCardMarks hasDescription={hasDescription} hasPhoto={hasPhoto} />;
-                },
               },
               {
                 title: <Text className="text-gold">Материалов</Text>,
@@ -385,7 +391,7 @@ export default function TechCardsPage() {
               {
                 title: <Text className="text-gold">Себест. материалов</Text>,
                 dataIndex: 'estimated_cost',
-                render: (val: number) => <Text className="text-white">{formatCurrency(val)}</Text>,
+                render: (val: number) => <Text className="text-gold">{formatCurrency(val)}</Text>,
               },
               {
                 title: <Text className="text-gold">Статус</Text>,

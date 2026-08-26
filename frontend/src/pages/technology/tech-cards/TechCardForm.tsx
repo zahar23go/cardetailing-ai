@@ -11,12 +11,14 @@ import {
 import type { UploadProps } from 'antd';
 import Card from '../../../components/Card';
 import { DurationMark } from './Marks';
+import StepPhoto from './StepPhoto';
 import {
   DraftBlock,
   MaterialOption,
   TechCard,
   apiFetch,
   formatCurrency,
+  formatUnit,
   newDraftBlock,
   newDraftItem,
 } from './types';
@@ -262,11 +264,7 @@ export default function TechCardForm({
                   </Space>
                   {block.photo_url ? (
                     <div className="tech-card-form-photo">
-                      <img
-                        src={block.photo_url}
-                        alt={block.title}
-                        className="tech-card-step-photo tech-card-step-photo--sm"
-                      />
+                      <StepPhoto src={block.photo_url} alt={block.title} size="thumb" />
                     </div>
                   ) : null}
                 </Col>
@@ -300,7 +298,7 @@ export default function TechCardForm({
                         allowClear
                         options={materials.map((m) => ({
                           value: m.id,
-                          label: `${m.name}${m.sku ? ` (${m.sku})` : ''}`,
+                          label: `${m.name}${m.sku ? ` (${m.sku})` : ''} · ${formatUnit(m.unit)}`,
                         }))}
                         onChange={(v) => onBlocks((p) => {
                           const items = p[bIdx].items.map((r, i) => (
@@ -317,7 +315,7 @@ export default function TechCardForm({
                         min={0.001}
                         step={0.1}
                         value={row.quantity}
-                        addonAfter={mat?.unit || ''}
+                        addonAfter={formatUnit(mat?.unit)}
                         onChange={(v) => onBlocks((p) => {
                           const items = p[bIdx].items.map((r, i) => (
                             i === iIdx ? { ...r, quantity: Number(v) || 0 } : r

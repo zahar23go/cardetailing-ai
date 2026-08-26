@@ -76,8 +76,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
    ============================================================ */
 const STATUS_COLORS: Record<string, string> = {
   pending: 'gold',
-  confirmed: 'blue',
-  in_progress: 'cyan',
+  confirmed: 'gold',
+  in_progress: 'gold',
   completed: 'green',
   cancelled: 'red',
   no_show: 'default',
@@ -665,7 +665,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
           <PhoneOutlined /> {user.phone}
         </Text>
 
-        <div style={{ backgroundColor: '#1A1E23', borderRadius: 14, padding: 16, textAlign: 'center' }}>
+        <div className="master-stat-tile">
           <Text className="text-titanium text-13 d-block mb-4">
             Выполнено работ
           </Text>
@@ -745,36 +745,43 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
      MAIN RENDER
      ============================================================ */
   return (
-    <Layout className="client-layout">
-      {/* Мобильный хедер */}
-      <Header className="header-mobile">
-        <Text className="title-gold">CAR DETAİLİNG AI</Text>
-        <Text className="text-titanium">ВАШ ДЕТЕЙЛИНГ</Text>
+    <Layout className="client-layout master-layout">
+      <Header className="header-mobile admin-header-mobile">
+        <img src="/images/logo-formula-sport.png" alt="" className="client-header-logo" />
+        <Text className="admin-header-title">CAR DETAILING AI</Text>
+        <span className="admin-header-badge">Мастер</span>
       </Header>
 
-      {/* Десктоп хедер */}
-      <Header className="header-desktop">
-        <Space>
-          <ToolOutlined className="text-gold icon-command" />
-          <Text className="title-gold title-command">CarDetailing AI</Text>
-          <Tag color="gold" className="tag-category">Мастер</Tag>
+      <Header className="header-desktop admin-header">
+        <Space className="admin-header-brand" size="middle" align="center">
+          <img src="/images/logo-formula-sport.png" alt="" className="client-header-logo" />
+          <Text className="admin-header-title">CAR DETAILING AI</Text>
+          <span className="admin-header-badge">Мастер</span>
         </Space>
-        <Space size="middle">
-          <Text className="text-titanium">🔧 {user.full_name}</Text>
+        <Space size="middle" className="admin-header-actions" wrap>
+          <span className="admin-header-user">
+            <UserOutlined />
+            <span>{user.full_name}</span>
+          </span>
           <NotificationBell />
-          <Button type="text" icon={<LogoutOutlined />} onClick={onLogout} className="btn-logout">
+          <Button
+            type="text"
+            icon={<LogoutOutlined />}
+            onClick={onLogout}
+            className="admin-header-btn admin-header-btn-logout"
+          >
             Выйти
           </Button>
         </Space>
       </Header>
 
-      <Layout>
+      <Layout className="admin-body-layout">
         {/* Сайдбар (десктоп) */}
         <Sider
-          className="sidebar"
+          className="sidebar admin-sidebar"
           breakpoint="md"
           collapsedWidth={0}
-          width={220}
+          width={228}
           trigger={null}
         >
           {sidebarItems.map(item => (
@@ -790,7 +797,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
         </Sider>
 
         {/* Контент */}
-        <Content className="client-content">
+        <Content className="client-content admin-content">
           {renderContent()}
         </Content>
       </Layout>
