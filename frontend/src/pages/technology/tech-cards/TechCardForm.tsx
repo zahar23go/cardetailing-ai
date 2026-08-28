@@ -3,12 +3,13 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  Button, Col, Input, InputNumber, Modal, Row, Select, Space, Typography, Upload, message,
+  Col, Input, InputNumber, Modal, Row, Select, Space, Typography, Upload, message,
 } from 'antd';
 import {
   ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PictureOutlined, PlusOutlined,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
+import { Button } from '../../../components/ui';
 import Card from '../../../components/Card';
 import { DurationMark } from './Marks';
 import StepPhoto from './StepPhoto';
@@ -161,7 +162,7 @@ export default function TechCardForm({
           <Button
             size="small"
             icon={<PlusOutlined />}
-            className="btn-gold-secondary"
+            look="ghost"
             onClick={() => onBlocks((p) => [...p, newDraftBlock(`Блок ${p.length + 1}`)])}
           >
             Добавить блок
@@ -246,7 +247,7 @@ export default function TechCardForm({
                     >
                       <Button
                         icon={<PictureOutlined />}
-                        className="btn-gold-secondary"
+                        look="ghost"
                         loading={uploadingKey === block.key}
                       >
                         {block.photo_url ? 'Заменить фото' : 'Загрузить фото'}
@@ -255,7 +256,7 @@ export default function TechCardForm({
                     {block.photo_url ? (
                       <Button
                         size="small"
-                        className="btn-gold-secondary"
+                        look="ghost"
                         onClick={() => onBlocks((p) => patchBlock(p, bIdx, { photo_url: null }))}
                       >
                         Убрать
@@ -275,7 +276,7 @@ export default function TechCardForm({
                 <Button
                   size="small"
                   icon={<PlusOutlined />}
-                  className="btn-gold-secondary"
+                  look="ghost"
                   onClick={() => onBlocks((p) => patchBlock(p, bIdx, {
                     items: [...p[bIdx].items, newDraftItem()],
                   }))}
@@ -351,7 +352,7 @@ export default function TechCardForm({
           </Text>
         </div>
 
-        <Button type="primary" size="large" className="btn-gold" loading={saving} onClick={onSave}>
+        <Button type="primary" size="large" look="gold" loading={saving} onClick={onSave}>
           {editing ? 'Сохранить' : 'Создать'}
         </Button>
       </Space>

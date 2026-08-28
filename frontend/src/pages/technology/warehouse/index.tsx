@@ -4,15 +4,13 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Typography, Row, Col, Table, Button, Space, message, Modal, Input,
-  Popconfirm, Empty, Spin, Tooltip, Select, InputNumber,
+  Typography, Row, Col, Table, Space, message, Popconfirm, Empty, Spin, Tooltip, Select, InputNumber,
 } from 'antd';
 import {
   DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined,
   WarningOutlined, InboxOutlined, SearchOutlined,
 } from '@ant-design/icons';
-import Card from '../../../components/Card';
-import Badge from '../../../components/Badge';
+import { Button, Modal, Input, Card, Badge } from '../../../components/ui';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -297,10 +295,10 @@ export default function WarehousePage() {
           <h3>Технология / Склад</h3>
         </div>
         <Space wrap>
-          <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={() => fetchMaterials(page)}>
+          <Button icon={<ReloadOutlined />} look="ghost" onClick={() => fetchMaterials(page)}>
             Обновить
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} className="btn-gold" onClick={openCreate}>
+          <Button type="primary" icon={<PlusOutlined />} look="gold" onClick={openCreate}>
             Добавить
           </Button>
         </Space>
@@ -350,7 +348,7 @@ export default function WarehousePage() {
             options={categories.map((c) => ({ value: c.key, label: c.label }))}
           />
           <Button
-            className={lowStockOnly ? 'btn-gold' : 'btn-gold-secondary'}
+            look={lowStockOnly ? 'gold' : 'ghost'}
             type={lowStockOnly ? 'primary' : 'default'}
             icon={<WarningOutlined />}
             onClick={() => setLowStockOnly((v) => !v)}
@@ -603,7 +601,7 @@ export default function WarehousePage() {
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
             />
           </div>
-          <Button type="primary" size="large" className="btn-gold" loading={saving} onClick={handleSave}>
+          <Button type="primary" size="large" look="gold" loading={saving} onClick={handleSave}>
             {editing ? 'Сохранить' : 'Создать'}
           </Button>
         </Space>
@@ -638,7 +636,7 @@ export default function WarehousePage() {
               <Button onClick={() => setAdjustDelta(Math.abs(adjustDelta) || 1)}>+ Приход</Button>
               <Button onClick={() => setAdjustDelta(-Math.abs(adjustDelta || 1))}>- Расход</Button>
             </Space>
-            <Button type="primary" className="btn-gold" loading={adjusting} onClick={handleAdjust}>
+            <Button type="primary" look="gold" loading={adjusting} onClick={handleAdjust}>
               Применить
             </Button>
           </Space>

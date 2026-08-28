@@ -159,3 +159,47 @@ class TestPhotos:
             headers=auth_headers,
         )
         assert len(get_resp.json()) == 0
+
+    # ------------------------------------------------------------------
+    # 8. Загрузка фото в портфолио мастера
+    # ------------------------------------------------------------------
+    async def test_upload_portfolio_photo(
+        self,
+        client: AsyncClient,
+        master_headers: dict,
+        auth_headers: dict,
+        test_service,
+        test_master,
+    ):
+        """✅ Мастер загружает фото в портфолио; клиент — 403."""
+        files = {"file": ("portfolio.png", _TEST_PNG, "image/png")}
+
+        denied = await client.post(
+            "/api/upload/portfolio",
+            files=files,
+            headers=auth_headers,
+            params={"title": "До/после", "service_id": test_service.id},
+        )
+        assert denied.status_code == 403, denied.text
+
+        files = {"file": ("portfolio.png", _TEST_PNG, "image/png")}
+        response = await client.post(
+            "/api/upload/portfolio",
+            files=files,
+            headers=master_headers,
+            params={"title": "До/после", "service_id": test_service.id},
+        )
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        data = response.json()
+        assert "id" in data
+        assert data["url"].startswith("/uploads/")
+        assert data["title"] == "До/после"
+
+        listed = await client.get("/api/portfolio", headers=master_headers)
+        assert listed.status_code == 200, listed.text
+        photos = listed.json()
+        assert any(p["id"] == data["id"] for p in photos)
+        match = next(p for p in photos if p["id"] == data["id"])
+        assert match["entity_type"] == "portfolio"
+        assert match["service_id"] == test_service.id
+        assert match["uploaded_by_id"] == test_master.id

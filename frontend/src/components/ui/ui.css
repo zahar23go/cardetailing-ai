@@ -1,0 +1,26 @@
+/* Единые стили UI-библиотеки. Токены из theme.css / BrandProvider. Старые классы не удаляем. */
+.ui-modal .ant-modal-content {
+  background: var(--color-carbon);
+  border: 1px solid var(--glass-border, rgba(240, 217, 160, 0.12));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lux, var(--shadow-card));
+}
+
+.ui-modal .ant-modal-header {
+  background: transparent;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.ui-modal .ant-modal-title {
+  color: var(--color-gold);
+  font-family: var(--font-display, inherit);
+}
+
+.ui-modal .ant-modal-close {
+  color: var(--color-titanium);
+}
+
+.ant-modal-mask {
+  background: rgba(5, 5, 6, 0.62);
+  backdrop-filter: blur(8px);
+}

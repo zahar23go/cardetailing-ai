@@ -20,7 +20,7 @@ class TestAIConsultant:
         """✅ POST /api/ai/consultant возвращает 200 с ответом (DeepSeek замокан)."""
         fake = "Рекомендуем комплексную мойку и покрытие керамикой."
         with patch(
-            "app.main.get_consultant_response",
+            "app.modules.ai.router.get_consultant_response",
             new_callable=AsyncMock,
             return_value=fake,
         ):

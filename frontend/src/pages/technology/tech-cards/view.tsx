@@ -4,11 +4,12 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Col, Empty, Row, Space, Spin, Typography, message } from 'antd';
+import { Col, Empty, Row, Space, Spin, Typography, message } from 'antd';
 import {
   ArrowLeftOutlined, CameraOutlined, ClockCircleOutlined,
   EditOutlined, FileTextOutlined, ToolOutlined,
 } from '@ant-design/icons';
+import { Button } from '../../../components/ui';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
 import StepPhoto from './StepPhoto';
@@ -66,7 +67,7 @@ export default function TechCardViewPage() {
         <Space wrap>
           <Button
             icon={<ArrowLeftOutlined />}
-            className="btn-gold-secondary"
+            look="ghost"
             onClick={() => navigate('/technology/tech-cards')}
           >
             К списку
@@ -74,7 +75,7 @@ export default function TechCardViewPage() {
           <Button
             type="primary"
             icon={<EditOutlined />}
-            className="btn-gold"
+            look="gold"
             onClick={() => navigate('/technology/tech-cards', { state: { editId: card.id } })}
           >
             Редактировать

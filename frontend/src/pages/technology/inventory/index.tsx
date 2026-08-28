@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Typography, Row, Col, Table, Button, Space, Spin, Empty, Select, message,
+  Typography, Row, Col, Table, Space, Spin, Empty, Select, message,
 } from 'antd';
 import {
   ReloadOutlined, WarningOutlined, HistoryOutlined,
@@ -14,8 +14,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from 'recharts';
-import Card from '../../../components/Card';
-import Badge from '../../../components/Badge';
+import { Button, Card, Badge } from '../../../components/ui';
 
 const { Text } = Typography;
 

@@ -161,7 +161,7 @@ class TestClientCabinetE2E:
 
         fake_ai = f"Рекомендуем {test_service.name}. Можете записаться."
         with patch(
-            "app.main.get_consultant_response",
+            "app.modules.ai.router.get_consultant_response",
             new_callable=AsyncMock,
             return_value=fake_ai,
         ):

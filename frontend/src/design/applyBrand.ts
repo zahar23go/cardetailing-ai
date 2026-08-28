@@ -45,6 +45,7 @@ export function applyBrandCssVars(
   root.style.setProperty('--radius-card', brand.radii.xl);
   root.style.setProperty('--font-family', brand.fonts.ui);
   root.style.setProperty('--font-display', brand.fonts.display);
+  root.style.setProperty('--font-serif', brand.fonts.serif);
   root.style.setProperty('--font-header', brand.fonts.ui);
   root.style.setProperty('--font-body', brand.fonts.ui);
 
@@ -96,6 +97,7 @@ export function buildStyledTheme(brand: BrandTheme, surfaceMode?: SurfaceMode) {
     fonts: {
       primary: brand.fonts.ui,
       display: brand.fonts.display,
+      serif: brand.fonts.serif,
     },
     radii: {
       sm: brand.radii.sm,

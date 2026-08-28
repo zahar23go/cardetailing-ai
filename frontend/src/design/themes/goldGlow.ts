@@ -48,7 +48,8 @@ export const goldGlowTheme: BrandTheme = {
 
   fonts: {
     ui: '"Manrope", "Montserrat", -apple-system, BlinkMacSystemFont, sans-serif',
-    display: '"Cinzel", "Times New Roman", serif',
+    display: '"Cinzel", "Playfair Display", "Times New Roman", serif',
+    serif: '"Playfair Display", "Times New Roman", serif',
   },
 
   radii: {

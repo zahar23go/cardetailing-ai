@@ -8,6 +8,7 @@ import { BrandProvider } from './design';
 import './styles/global.css';
 import './styles/theme.css';
 import './styles/components.css';
+import './components/ui/ui.css';
 
 const queryClient = new QueryClient();
 

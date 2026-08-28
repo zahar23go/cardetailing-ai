@@ -2,7 +2,7 @@
    THEME — Цвета и переменные
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Montserrat:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Manrope:wght@400;500;600;700;800&family=Montserrat:wght@400;700&display=swap');
 
 :root {
   /* Основной режим: белый контент + тёмные chrome/карточки */
@@ -58,7 +58,7 @@
   --nd-muted: #9BA3B5;
   --font-header: 'Manrope', sans-serif;
   --font-body: 'Manrope', sans-serif;
-  --font-display: 'Cinzel', 'Times New Roman', serif;
+  --font-display: 'Cinzel', 'Playfair Display', 'Times New Roman', serif;
 
   /* Brand controls (перезаписываются BrandProvider) */
   --brand-gold-button-bg: #D4AF37;
@@ -87,4 +87,34 @@
   --color-gold-bg: rgba(212, 175, 55, 0.15);
   --color-gold-text: #D4AF37;
   --color-gold-border: rgba(212, 175, 55, 0.3);
+
+  /* ---------- Luxury overlay (Tesla / Champagne Gold) ----------
+     Только ДОБАВЛЕНИЕ. Старые --color-* / --font-* / --radius-* не удалять.
+     Компоненты начнут читать эти токены на шагах 2–5. */
+  --lux-void: #050506;
+  --lux-graphite: #0B0D10;
+  --lux-elevated: #12141A;
+  --lux-hairline: rgba(200, 169, 119, 0.22);
+  --lux-champagne: #C8A977;
+  --lux-champagne-soft: #E0C9A0;
+  --lux-gold-bright: #F0D9A0;
+  --lux-metal: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 50%, #a67c2d 100%);
+  --font-serif: 'Playfair Display', 'Times New Roman', serif;
+  --tracking-display: 0.18em;
+  --tracking-ui: 0.02em;
+  --ease-lux: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 180ms;
+  --duration-lux: 280ms;
+  --duration-slow: 480ms;
+  --shadow-lux: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(200, 169, 119, 0.08);
+  --shadow-lux-hover: 0 28px 72px rgba(0, 0, 0, 0.5), 0 0 40px rgba(212, 175, 55, 0.08);
+  --glass-bg: rgba(11, 13, 16, 0.72);
+  --glass-border: rgba(240, 217, 160, 0.12);
+}
+
+/* Типографика: кернинг без смены гарнитуры UI (Manrope остаётся --font-family) */
+html {
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1, 'liga' 1;
 }

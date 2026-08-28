@@ -5,16 +5,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Typography, Row, Col, Table, Button, Space, message, Input,
-  Popconfirm, Empty, Spin, Tooltip,
+  Typography, Row, Col, Table, Space, message, Popconfirm, Empty, Spin, Tooltip,
 } from 'antd';
 import {
   DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined,
   SearchOutlined, FileTextOutlined, ToolOutlined, EyeOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
-import Card from '../../../components/Card';
-import Badge from '../../../components/Badge';
+import { Button, Input, Card, Badge } from '../../../components/ui';
 import TechCardForm from './TechCardForm';
 import { DurationMark } from './Marks';
 import StepPhoto from './StepPhoto';
@@ -237,10 +235,10 @@ export default function TechCardsPage() {
           <h3>Технология / Техкарты</h3>
         </div>
         <Space wrap>
-          <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={() => fetchCards(page)}>
+          <Button icon={<ReloadOutlined />} look="ghost" onClick={() => fetchCards(page)}>
             Обновить
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} className="btn-gold" onClick={openCreate}>
+          <Button type="primary" icon={<PlusOutlined />} look="gold" onClick={openCreate}>
             Новая техкарта
           </Button>
         </Space>

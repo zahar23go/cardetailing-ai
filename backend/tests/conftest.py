@@ -233,6 +233,25 @@ async def admin_headers(admin_token: str) -> dict:
 
 
 @pytest_asyncio.fixture
+async def master_token(test_master: User) -> str:
+    """Generate a valid JWT token for the master user."""
+    from app.core.config import settings
+    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    payload = {
+        "sub": str(test_master.id),
+        "tenant_id": str(test_master.tenant_id),
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+
+@pytest_asyncio.fixture
+async def master_headers(master_token: str) -> dict:
+    """Return authorization headers with the master token."""
+    return {"Authorization": f"Bearer {master_token}"}
+
+
+@pytest_asyncio.fixture
 async def test_service(db_session: AsyncSession, default_tenant: Tenant) -> Service:
     """Create a test service."""
     service = Service(

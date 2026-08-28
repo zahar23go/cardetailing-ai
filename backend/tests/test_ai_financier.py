@@ -88,7 +88,7 @@ class TestFinancierEndpoint:
         )
 
         with patch(
-            "app.main.get_financier_response",
+            "app.modules.ai.router.get_financier_response",
             new_callable=AsyncMock,
             return_value=fake_answer,
         ) as mocked:

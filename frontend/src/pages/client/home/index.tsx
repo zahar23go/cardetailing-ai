@@ -3,12 +3,11 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Empty, Spin, Typography } from 'antd';
+import { Empty, Spin, Typography } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
-import Card from '../../../components/Card';
-import Badge from '../../../components/Badge';
+import { Button, Card, Badge } from '../../../components/ui';
 import {
   APPT_STATUS,
   Appointment,

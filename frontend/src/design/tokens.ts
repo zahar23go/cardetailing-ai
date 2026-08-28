@@ -50,6 +50,8 @@ export interface BrandTheme {
   fonts: {
     ui: string;
     display: string;
+    /** Editorial serif (Playfair) — заголовки люкса; не заменяет ui/display */
+    serif: string;
   };
 
   radii: {

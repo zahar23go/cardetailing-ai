@@ -120,6 +120,9 @@ class Settings(BaseSettings):
     # DeepSeek API
     DEEPSEEK_API_KEY: str = ""  # ← ДОБАВЛЕНО!
 
+    # Модули: "all" или список через запятую (materials,tech_cards,...)
+    ENABLED_MODULES: str = "all"
+
 
 @lru_cache
 def get_settings() -> Settings:
