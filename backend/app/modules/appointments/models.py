@@ -161,6 +161,12 @@ class Appointment(Base):
     box = relationship("Box", back_populates="appointments")
     tenant = relationship("Tenant", back_populates="appointments")
     photos = relationship("Photo", back_populates="appointment", cascade="all, delete-orphan")
+    invoice = relationship(
+        "AppointmentInvoice",
+        back_populates="appointment",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return (
@@ -226,4 +232,93 @@ class AppointmentHistory(Base):
 
     def __repr__(self) -> str:
         return f"<History(appt={self.appointment_id}, type='{self.change_type}', field='{self.field_name}')>"
+
+
+class AppointmentInvoice(Base):
+    """Снимок чека в момент закрытия заезда. Не пересчитывается при смене цен каталога."""
+    __tablename__ = "appointment_invoices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    appointment_id = Column(
+        Integer,
+        ForeignKey("appointments.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    box_id = Column(Integer, ForeignKey("boxes.id", ondelete="SET NULL"), nullable=True, index=True)
+    service_id = Column(Integer, ForeignKey("services.id", ondelete="SET NULL"), nullable=True)
+    service_name = Column(String(255), nullable=False, default="")
+    price = Column(Numeric(10, 2), nullable=False, default=0)
+    discount = Column(Numeric(10, 2), nullable=False, default=0)
+    material_cost = Column(Numeric(10, 2), nullable=False, default=0, comment="Себестоимость химии на момент закрытия")
+    catalog_material_cost = Column(Numeric(10, 2), nullable=False, default=0)
+    shortage_qty_cost = Column(Numeric(10, 2), nullable=False, default=0)
+    gross_profit = Column(Numeric(10, 2), nullable=False, default=0)
+    closed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    closed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    notes = Column(Text, nullable=True)
+
+    appointment = relationship("Appointment", back_populates="invoice")
+    box = relationship("Box")
+    steps = relationship(
+        "AppointmentCloseStep",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+        order_by="AppointmentCloseStep.sort_order",
+    )
+    materials = relationship(
+        "AppointmentCloseMaterial",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+    )
+
+
+class AppointmentCloseStep(Base):
+    """Отметка шага техкарты при закрытии."""
+    __tablename__ = "appointment_close_steps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(
+        Integer,
+        ForeignKey("appointment_invoices.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    block_id = Column(Integer, nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    title = Column(String(255), nullable=False, default="")
+    done = Column(Boolean, nullable=False, default=True)
+
+    invoice = relationship("AppointmentInvoice", back_populates="steps")
+
+
+class AppointmentCloseMaterial(Base):
+    """Норма / факт / списано по материалу на заезде."""
+    __tablename__ = "appointment_close_materials"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(
+        Integer,
+        ForeignKey("appointment_invoices.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    material_id = Column(Integer, ForeignKey("materials.id", ondelete="SET NULL"), nullable=True)
+    name = Column(String(255), nullable=False, default="")
+    unit = Column(String(20), nullable=False, default="pcs")
+    norm_qty = Column(Numeric(12, 3), nullable=False, default=0)
+    actual_qty = Column(Numeric(12, 3), nullable=False, default=0)
+    applied_qty = Column(Numeric(12, 3), nullable=False, default=0)
+    unit_cost = Column(Numeric(10, 2), nullable=False, default=0)
+    line_cost = Column(Numeric(10, 2), nullable=False, default=0)
+    shortage = Column(Numeric(12, 3), nullable=False, default=0)
+
+    invoice = relationship("AppointmentInvoice", back_populates="materials")
 

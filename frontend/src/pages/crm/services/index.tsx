@@ -4,9 +4,19 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  Typography, Row, Col, Table, Button, Tag, Space,
-  message, Modal, Input, Popconfirm, Empty, Spin, Tooltip,
+  Typography,
+  Row,
+  Col,
+  Table,
+  Tag,
+  Space,
+  message,
+  Popconfirm,
+  Empty,
+  Spin,
+  Tooltip,
 } from 'antd';
+import { Button, Modal, Input } from '../../../components/ui';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -152,7 +162,7 @@ export default function ServicesPage() {
 
       <Spin spinning={servicesLoading}>
         <div className="toolbar-right">
-          <Button type="primary" icon={<PlusOutlined />} className="btn-gold" onClick={() => openServiceModal()}>
+          <Button type="primary" icon={<PlusOutlined />} look="gold" onClick={() => openServiceModal()}>
             Добавить услугу
           </Button>
         </div>
@@ -369,7 +379,7 @@ export default function ServicesPage() {
             size="large"
             onClick={handleSaveService}
             loading={serviceSaving}
-            className="btn-gold"
+            look="gold"
           >
             {editingService ? 'Сохранить' : 'Создать'}
           </Button>

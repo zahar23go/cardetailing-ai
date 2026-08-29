@@ -5,9 +5,22 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Typography, Card, Row, Col, Button, Tag, Space, Select, Input, Popconfirm,
-  Empty, Spin, Tooltip, DatePicker, Modal, List, message,
+  Typography,
+  Card,
+  Row,
+  Col,
+  Tag,
+  Space,
+  Select,
+  Popconfirm,
+  Empty,
+  Spin,
+  Tooltip,
+  DatePicker,
+  List,
+  message,
 } from 'antd';
+import { Button, Modal, Input } from '../../../components/ui';
 import {
   ToolOutlined, CalendarOutlined, ClockCircleOutlined, ReloadOutlined,
   CarOutlined, UserOutlined, SearchOutlined, PlayCircleOutlined,
@@ -15,6 +28,7 @@ import {
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ru';
+import CloseVisitModal from '../../../components/CloseVisitModal';
 
 dayjs.locale('ru');
 
@@ -123,6 +137,7 @@ export default function RecordsPage() {
   const [apptNewStatus, setApptNewStatus] = useState('');
   const [apptMasterId, setApptMasterId] = useState<number | undefined>(undefined);
   const [apptBrief, setApptBrief] = useState('');
+  const [closeAppt, setCloseAppt] = useState<Appointment | null>(null);
 
   const fetchAppointments = useCallback(async () => {
     setApptsLoading(true);
@@ -516,10 +531,10 @@ export default function RecordsPage() {
             <Option value="status_asc">По статусу</Option>
             <Option value="price_desc">Цена ↓</Option>
           </Select>
-          <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={() => fetchAppointments()}>
+          <Button icon={<ReloadOutlined />} look="ghost" onClick={() => fetchAppointments()}>
             Обновить
           </Button>
-          <Button className="btn-gold-secondary" onClick={clearApptFilters}>
+          <Button look="ghost" onClick={clearApptFilters}>
             Сбросить
           </Button>
         </div>
@@ -611,7 +626,7 @@ export default function RecordsPage() {
                     {(item.status === 'pending' || item.status === 'confirmed') && (
                       <Button
                         size="small"
-                        className="btn-gold-secondary"
+                        look="ghost"
                         icon={<PlayCircleOutlined />}
                         onClick={() => quickUpdateApptStatus(item, 'in_progress')}
                       >
@@ -621,9 +636,9 @@ export default function RecordsPage() {
                     {(item.status === 'in_progress' || item.status === 'confirmed') && (
                       <Button
                         size="small"
-                        className="btn-gold"
+                        look="gold"
                         icon={<CheckCircleOutlined />}
-                        onClick={() => quickUpdateApptStatus(item, 'completed')}
+                        onClick={() => setCloseAppt(item)}
                       >
                         Завершить
                       </Button>
@@ -724,13 +739,24 @@ export default function RecordsPage() {
               type="primary"
               size="large"
               onClick={handleUpdateAppointment}
-              className="btn-gold"
+              look="gold"
             >
               Сохранить
             </Button>
           </Space>
         )}
       </Modal>
+
+      <CloseVisitModal
+        open={Boolean(closeAppt)}
+        appointmentId={closeAppt?.id ?? null}
+        role="admin"
+        onCancel={() => setCloseAppt(null)}
+        onClosed={() => {
+          setCloseAppt(null);
+          fetchAppointments();
+        }}
+      />
     </>
   );
 }

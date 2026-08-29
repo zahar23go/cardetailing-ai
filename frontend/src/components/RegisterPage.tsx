@@ -176,7 +176,26 @@ const HomeBar = styled.div`
 `;
 
 interface RegisterPageProps {
-  onRegistered?: (token: string, user: { id: number; phone: string; full_name: string; role: string }) => void;
+  onRegistered?: (token: string, user: {
+    id: number;
+    phone: string;
+    full_name: string;
+    role: 'client' | 'master' | 'admin' | 'super_admin';
+    enabled_modules?: string[];
+    plan?: string;
+    plan_label?: string;
+    features?: { financier?: boolean; branding?: boolean };
+    tenant_name?: string;
+    logo_url?: string | null;
+    pwa?: {
+      name: string;
+      short_name: string;
+      icon: string;
+      theme_color: string;
+      background_color: string;
+      white_label: boolean;
+    };
+  }) => void;
 }
 
 export default function RegisterPage({ onRegistered }: RegisterPageProps) {
@@ -225,7 +244,17 @@ export default function RegisterPage({ onRegistered }: RegisterPageProps) {
         return;
       }
       localStorage.setItem('token', data.token);
-      onRegistered?.(data.token, data.user);
+      onRegistered?.(data.token, {
+        ...data.user,
+        role: data.user.role,
+        enabled_modules: data.enabled_modules,
+        plan: data.plan,
+        plan_label: data.plan_label,
+        features: data.features,
+        tenant_name: data.tenant_name,
+        logo_url: data.logo_url,
+        pwa: data.pwa,
+      });
       navigate('/concept');
     } catch {
       setError('Нет связи с сервером. Проверьте, что backend запущен.');

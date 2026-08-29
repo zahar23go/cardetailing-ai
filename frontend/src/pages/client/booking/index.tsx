@@ -1,19 +1,23 @@
 /**
  * Запись — услуга, мастер, дата/время, автомобиль.
+ * Слоты учитывают загрузку боксов (GET /api/ai/detailer/slots), если сетка есть.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Button, DatePicker, Select, Space, Spin, Typography, message } from 'antd';
+import { DatePicker, Select, Space, Spin, Typography, message } from 'antd';
+import { Button } from '../../../components/ui';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ru';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
 import {
   Car,
+  DetailerSlot,
   Master,
   Service,
   apiFetch,
   formatCurrency,
+  tzOffsetMinutes,
 } from '../api';
 
 dayjs.locale('ru');
@@ -25,24 +29,36 @@ const SLOTS = Array.from({ length: 22 }, (_, i) => {
   return `${String(h).padStart(2, '0')}:${m}`;
 });
 
-type LocState = { serviceId?: number } | null;
+type LocState = {
+  serviceId?: number;
+  inspectId?: number;
+  startTime?: string;
+  boxId?: number;
+} | null;
 
 export default function ClientBookingPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const preset = (location.state as LocState)?.serviceId;
+  const preset = (location.state as LocState) || {};
 
   const [services, setServices] = useState<Service[]>([]);
   const [masters, setMasters] = useState<Master[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [floor, setFloor] = useState<DetailerSlot[]>([]);
 
-  const [serviceId, setServiceId] = useState<number | undefined>(preset);
+  const [serviceId, setServiceId] = useState<number | undefined>(preset.serviceId);
   const [masterId, setMasterId] = useState<number | undefined>();
   const [carId, setCarId] = useState<number | undefined>();
-  const [date, setDate] = useState<Dayjs | null>(dayjs().add(1, 'day'));
-  const [slot, setSlot] = useState<string | undefined>('10:00');
+  const [date, setDate] = useState<Dayjs | null>(
+    preset.startTime ? dayjs(preset.startTime) : dayjs().add(1, 'day'),
+  );
+  const [slot, setSlot] = useState<string | undefined>(
+    preset.startTime ? dayjs(preset.startTime).format('HH:mm') : '10:00',
+  );
+  const [boxId, setBoxId] = useState<number | undefined>(preset.boxId);
+  const inspectId = preset.inspectId;
 
   useEffect(() => {
     let cancelled = false;
@@ -70,16 +86,56 @@ export default function ClientBookingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!date) return;
+    let cancelled = false;
+    const qs = new URLSearchParams({
+      date: date.format('YYYY-MM-DD'),
+      tz_offset: String(tzOffsetMinutes()),
+    });
+    if (serviceId) qs.set('service_id', String(serviceId));
+    apiFetch<{ items: DetailerSlot[] }>(`/api/ai/detailer/slots?${qs.toString()}`)
+      .then((d) => {
+        if (!cancelled) setFloor(d.items || []);
+      })
+      .catch(() => {
+        if (!cancelled) setFloor([]);
+      });
+    return () => { cancelled = true; };
+  }, [date, serviceId]);
+
   const service = useMemo(
     () => services.find((s) => s.id === serviceId),
     [services, serviceId],
   );
 
+  const floorByTime = useMemo(() => {
+    const map = new Map<string, DetailerSlot>();
+    for (const item of floor) {
+      if (item.time) map.set(item.time, item);
+    }
+    return map;
+  }, [floor]);
+
+  const pickSlot = (time: string) => {
+    const info = floorByTime.get(time);
+    if (info && info.available === false) return;
+    setSlot(time);
+    if (info?.box_id) setBoxId(info.box_id);
+  };
+
   const handleBook = async () => {
     if (!serviceId) { message.warning('Выберите услугу'); return; }
     if (!carId) { message.warning('Добавьте автомобиль в профиле'); return; }
     if (!date || !slot) { message.warning('Выберите дату и время'); return; }
-    const start = dayjs(`${date.format('YYYY-MM-DD')}T${slot}:00`);
+    const info = floorByTime.get(slot);
+    if (info?.available === false) {
+      message.warning('Этот слот занят — выберите другой');
+      return;
+    }
+    const start = info?.start_time
+      ? dayjs(info.start_time)
+      : dayjs(`${date.format('YYYY-MM-DD')}T${slot}:00`);
     if (start.isBefore(dayjs())) {
       message.warning('Выберите время в будущем');
       return;
@@ -93,6 +149,8 @@ export default function ClientBookingPage() {
           car_id: carId,
           master_id: masterId || null,
           start_time: start.toISOString(),
+          box_id: info?.box_id || boxId || null,
+          inspect_id: inspectId || null,
         }),
       });
       message.success('Заявка отправлена');
@@ -110,7 +168,9 @@ export default function ClientBookingPage() {
       <div className="client-section-head">
         <div>
           <h3>Запись</h3>
-          <Badge variant="gold">Услуга, мастер, дата и время</Badge>
+          <Badge variant="gold">
+            {inspectId ? 'Сводка детейлера уйдёт мастеру' : 'Услуга, мастер, дата и время'}
+          </Badge>
         </div>
       </div>
 
@@ -191,23 +251,33 @@ export default function ClientBookingPage() {
           <div>
             <span className="label-field">Время</span>
             <div className="client-slots">
-              {SLOTS.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className={`client-slot${slot === t ? ' is-active' : ''}`}
-                  onClick={() => setSlot(t)}
-                >
-                  {t}
-                </button>
-              ))}
+              {SLOTS.map((t) => {
+                const info = floorByTime.get(t);
+                const busy = info?.available === false;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    disabled={busy}
+                    title={
+                      busy
+                        ? 'Боксы заняты'
+                        : (info?.box_name ? `${info.box_name} · свободно ${info.free_boxes}` : undefined)
+                    }
+                    className={`client-slot${slot === t ? ' is-active' : ''}${busy ? ' is-busy' : ''}`}
+                    onClick={() => pickSlot(t)}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <Button
             type="primary"
             size="large"
-            className="btn-gold"
+            look="gold"
             loading={saving}
             onClick={handleBook}
           >

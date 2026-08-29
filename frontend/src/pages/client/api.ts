@@ -122,6 +122,8 @@ export interface Appointment {
   total_price: number;
   discount_applied: number;
   client_notes: string | null;
+  master_brief?: string | null;
+  box_id?: number | null;
   service_name: string | null;
   master?: { id: number; full_name: string } | null;
   car?: { id: number; make: string; model: string; license_plate?: string };
@@ -157,3 +159,56 @@ export const DISCOUNT_TYPE_LABELS: Record<string, string> = {
   win_back: 'Возврат',
   cashback: 'Кэшбек',
 };
+
+export function tzOffsetMinutes() {
+  return -new Date().getTimezoneOffset();
+}
+
+export interface DetailerFinding {
+  tag: string;
+  area: string;
+  title: string;
+  detail: string;
+}
+
+export interface DetailerOffer {
+  service_id: number;
+  name: string;
+  price: number;
+  duration: number;
+  category?: string | null;
+  reason?: string | null;
+}
+
+export interface DetailerSlot {
+  start_time?: string | null;
+  end_time?: string | null;
+  label?: string | null;
+  time?: string | null;
+  date?: string | null;
+  box_id?: number | null;
+  box_name?: string | null;
+  free_boxes?: number;
+  duration?: number | null;
+  available?: boolean | null;
+}
+
+export interface DetailerInspect {
+  id: number;
+  tags: string[];
+  findings: DetailerFinding[];
+  primary: DetailerOffer | null;
+  upsells: DetailerOffer[];
+  slots: DetailerSlot[];
+  master_brief: string;
+  photo_count: number;
+}
+
+export const DETAILER_TAGS: { id: string; label: string }[] = [
+  { id: 'chips', label: 'Сколы / риски' },
+  { id: 'dull', label: 'Тусклый лак' },
+  { id: 'lights', label: 'Мутные фары' },
+  { id: 'interior', label: 'Салон / кожа' },
+  { id: 'bitumen', label: 'Битум / металлик' },
+  { id: 'wash', label: 'Грязный кузов' },
+];

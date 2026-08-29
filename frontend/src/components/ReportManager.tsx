@@ -4,8 +4,17 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Typography, Card, Row, Col, Select, Button, Space, Spin, Table, Empty,
+  Typography,
+  Card,
+  Row,
+  Col,
+  Select,
+  Space,
+  Spin,
+  Table,
+  Empty,
 } from 'antd';
+import { Button } from '../components/ui';
 import {
   DownloadOutlined, ReloadOutlined,
 } from '@ant-design/icons';
@@ -111,14 +120,14 @@ export default function ReportManager() {
           </Select>
           <Button
             icon={<ReloadOutlined />}
-            className="btn-gold-secondary"
+            look="ghost"
             onClick={() => fetchReport()}
           >
             Обновить
           </Button>
           <Button
             icon={<DownloadOutlined />}
-            className="btn-gold"
+            look="gold"
             onClick={downloadCSV}
           >
             CSV

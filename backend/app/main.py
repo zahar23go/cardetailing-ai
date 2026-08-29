@@ -24,6 +24,7 @@ from app.core.deepseek_client import (
 )
 from app.models import Tenant, User
 from app.modules.registry import include_modules
+from app.core.plan_gate import TenantPlanMiddleware
 
 __all__ = [
     "app",
@@ -77,6 +78,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TenantPlanMiddleware)
 
 uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
 if os.path.isdir(uploads_dir):

@@ -2,7 +2,8 @@
  * Портфолио салона — галерея с фильтром по мастеру, услуге и сортировкой.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Select, Spin, Typography, message } from 'antd';
+import { Select, Spin, Typography, message } from 'antd';
+import { Button } from '../../../components/ui';
 import { PlusOutlined } from '@ant-design/icons';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
@@ -112,7 +113,7 @@ export default function ClientPortfolioPage() {
         </div>
         <Button
           type="primary"
-          className="btn-gold portfolio-add-cta"
+          look="gold" className="portfolio-add-cta"
           icon={<PlusOutlined />}
           onClick={onAddPhoto}
         >
@@ -164,7 +165,7 @@ export default function ClientPortfolioPage() {
             <Text className="portfolio-empty-title">Нет работ. Добавьте первое фото!</Text>
             <Button
               type="primary"
-              className="btn-gold portfolio-add-cta"
+              look="gold" className="portfolio-add-cta"
               icon={<PlusOutlined />}
               onClick={onAddPhoto}
             >

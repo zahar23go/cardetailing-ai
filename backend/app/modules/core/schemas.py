@@ -37,6 +37,7 @@ class TenantOut(BaseModel):
     subdomain: str
     logo_url: Optional[str] = None
     config: Optional[dict] = None
+    plan: Optional[str] = "business"
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
@@ -62,6 +63,30 @@ class UserOut(BaseModel):
 class AuthResponse(BaseModel):
     token: str
     user: UserOut
+    enabled_modules: list[str] = Field(default_factory=list)
+    plan: Optional[str] = None
+    plan_label: Optional[str] = None
+    price: Optional[int] = None
+    appointment_limit: Optional[int] = None
+    appointments_this_month: Optional[int] = None
+    features: dict[str, bool] = Field(default_factory=dict)
+    tenant_name: Optional[str] = None
+    logo_url: Optional[str] = None
+    pwa: dict = Field(default_factory=dict)
+
+
+class PlanCatalogItem(BaseModel):
+    id: str
+    label: str
+    price: int
+    appointment_limit: Optional[int] = None
+    modules: list[str] = []
+    features: dict[str, bool] = {}
+    blurb: str = ""
+
+
+class TenantPlanUpdate(BaseModel):
+    plan: str = Field(..., min_length=3, max_length=20)
 
 class UserProfileUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=1, max_length=150)

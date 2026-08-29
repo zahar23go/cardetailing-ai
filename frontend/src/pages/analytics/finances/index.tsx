@@ -24,6 +24,18 @@ interface ServiceMargin {
   appointment_count: number;
 }
 
+interface BoxMargin {
+  box_id: number | null;
+  box_name: string;
+  total_revenue: number;
+  total_material_cost: number;
+  gross_profit: number;
+  margin_percent: number;
+  appointment_count: number;
+  allocated_expenses: number;
+  net_profit: number;
+}
+
 interface PLReport {
   total_revenue: number;
   completed_appointments: number;
@@ -36,6 +48,7 @@ interface PLReport {
   net_profit: number;
   net_margin_percent: number;
   service_margins: ServiceMargin[];
+  box_margins?: BoxMargin[];
   period: string;
 }
 
@@ -242,6 +255,82 @@ export default function FinancesPage() {
                           }}
                         >
                           {v}%
+                        </Text>
+                      ),
+                    },
+                  ]}
+                  components={{
+                    header: { cell: (p: any) => <th {...p} className="table-header-cell" /> },
+                    body: {
+                      row: (p: any) => <tr {...p} className="table-body-row" />,
+                      cell: (p: any) => <td {...p} className="table-body-cell" />,
+                    },
+                  }}
+                />
+              )}
+            </Card>
+
+            <Card className="card-luxury" style={{ marginBottom: '16px' }}>
+              <Text className="title-gold text-16 d-block mb-8">Маржа по боксам</Text>
+              {!(plReport.box_margins && plReport.box_margins.length) ? (
+                <Text className="text-titanium text-13">Нет данных за месяц</Text>
+              ) : (
+                <Table
+                  dataSource={plReport.box_margins}
+                  rowKey={(r) => String(r.box_id ?? 'none')}
+                  pagination={false}
+                  size="small"
+                  columns={[
+                    {
+                      title: <Text className="text-titanium text-12">Бокс</Text>,
+                      dataIndex: 'box_name',
+                      key: 'name',
+                      render: (v) => <Text className="text-white text-13">{v}</Text>,
+                    },
+                    {
+                      title: <Text className="text-titanium text-12">Заездов</Text>,
+                      dataIndex: 'appointment_count',
+                      key: 'cnt',
+                      width: 80,
+                      render: (v) => <Text className="text-white text-13">{v}</Text>,
+                    },
+                    {
+                      title: <Text className="text-titanium text-12">Выручка</Text>,
+                      dataIndex: 'total_revenue',
+                      key: 'rev',
+                      width: 100,
+                      render: (v) => (
+                        <Text className="text-gold-bold text-13">{v.toLocaleString()} ₽</Text>
+                      ),
+                    },
+                    {
+                      title: <Text className="text-titanium text-12">Химия</Text>,
+                      dataIndex: 'total_material_cost',
+                      key: 'mat',
+                      width: 90,
+                      render: (v) => (
+                        <Text className="text-titanium text-13">{v.toLocaleString()} ₽</Text>
+                      ),
+                    },
+                    {
+                      title: <Text className="text-titanium text-12">Валовая</Text>,
+                      dataIndex: 'gross_profit',
+                      key: 'gp',
+                      width: 90,
+                      render: (v) => (
+                        <Text className="text-13" style={{ color: v >= 0 ? '#4ECB71' : '#ff4d4f' }}>
+                          {v.toLocaleString()} ₽
+                        </Text>
+                      ),
+                    },
+                    {
+                      title: <Text className="text-titanium text-12">Чистая</Text>,
+                      dataIndex: 'net_profit',
+                      key: 'np',
+                      width: 90,
+                      render: (v) => (
+                        <Text className="text-13" style={{ color: v >= 0 ? '#4ECB71' : '#ff4d4f', fontWeight: 600 }}>
+                          {v.toLocaleString()} ₽
                         </Text>
                       ),
                     },

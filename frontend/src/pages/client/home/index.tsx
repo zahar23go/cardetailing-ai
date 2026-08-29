@@ -15,6 +15,7 @@ import {
   apiFetch,
   formatCurrency,
 } from '../api';
+import { APPT_OFFLINE_KEY } from '../../../pwa';
 
 dayjs.locale('ru');
 const { Text } = Typography;
@@ -42,6 +43,7 @@ export default function ClientHomePage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,9 +57,26 @@ export default function ClientHomePage() {
         if (!cancelled) {
           setAppointments(appts.items || []);
           setServices(svc.items || []);
+          setOffline(false);
+          try {
+            localStorage.setItem(APPT_OFFLINE_KEY, JSON.stringify(appts));
+          } catch {
+            /* quota */
+          }
         }
       } catch {
-        /* ignore */
+        if (!cancelled) {
+          try {
+            const raw = localStorage.getItem(APPT_OFFLINE_KEY);
+            if (raw) {
+              const cached = JSON.parse(raw) as { items?: Appointment[] };
+              setAppointments(cached.items || []);
+              setOffline(true);
+            }
+          } catch {
+            /* ignore */
+          }
+        }
       }
       if (!cancelled) setLoading(false);
     })();
@@ -84,11 +103,18 @@ export default function ClientHomePage() {
       <div className="client-section-head">
         <div>
           <h3>Главная</h3>
-          <Badge variant="gold">Ваши записи и рекомендованные услуги</Badge>
+          <Badge variant="gold">
+            {offline ? 'Нет сети · показаны сохранённые записи' : 'Ваши записи и рекомендованные услуги'}
+          </Badge>
         </div>
-        <Button type="primary" className="btn-gold" onClick={() => navigate('/client/booking')}>
-          Записаться
-        </Button>
+        <div className="client-section-actions">
+          <Button type="primary" look="gold" onClick={() => navigate('/client/booking')}>
+            Записаться
+          </Button>
+          <Button look="ghost" onClick={() => navigate('/client/chat', { state: { inspect: true } })}>
+            Оценить авто
+          </Button>
+        </div>
       </div>
 
       <div className="client-section-title">Текущие записи</div>
@@ -144,7 +170,7 @@ export default function ClientHomePage() {
               <Text className="text-gold-bold">{formatCurrency(s.price)}</Text>
               <Button
                 size="small"
-                className="btn-gold-secondary"
+                look="ghost"
                 onClick={() => navigate('/client/booking', { state: { serviceId: s.id } })}
               >
                 Записаться

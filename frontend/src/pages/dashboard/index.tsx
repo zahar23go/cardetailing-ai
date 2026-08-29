@@ -6,12 +6,24 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
-  Card, Row, Col, Button, Tag, Space, Badge, List, Empty, Spin,
+  Card,
+  Row,
+  Col,
+  Tag,
+  Space,
+  Badge,
+  List,
+  Empty,
+  Spin,
 } from 'antd';
+import { Button } from '../../components/ui';
 import {
   TeamOutlined, ToolOutlined, CalendarOutlined, ClockCircleOutlined,
-  CheckCircleOutlined, DollarOutlined, ReloadOutlined,
+  CheckCircleOutlined, DollarOutlined, ReloadOutlined, InsertRowAboveOutlined,
 } from '@ant-design/icons';
+import {
+  AreaChart, Area, ResponsiveContainer,
+} from 'recharts';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import { useBrand } from '../../design';
@@ -19,6 +31,11 @@ import { useBrand } from '../../design';
 dayjs.locale('ru');
 
 const API_BASE = '';
+
+interface SparkPoint {
+  date: string;
+  value: number;
+}
 
 interface KpiData {
   total_clients: number;
@@ -28,6 +45,9 @@ interface KpiData {
   month_revenue: number;
   pending_appointments: number;
   completed_month: number;
+  sparkline_revenue?: SparkPoint[];
+  sparkline_appointments?: SparkPoint[];
+  sparkline_completed?: SparkPoint[];
 }
 
 interface PendingAppt {
@@ -36,6 +56,14 @@ interface PendingAppt {
   status: string;
   service_name?: string;
   client?: { id: number; full_name: string; phone: string };
+}
+
+interface LiveBoxChip {
+  box_id: number;
+  name: string;
+  state: string;
+  state_label: string;
+  current?: { service_name: string } | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -55,6 +83,20 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Отменена',
   no_show: 'Не явился',
 };
+
+function KpiSpark({ data, warn }: { data?: SparkPoint[]; warn?: boolean }) {
+  if (!data || data.length < 2) return null;
+  const stroke = warn ? '#E8A54B' : '#C8A977';
+  return (
+    <div className="admin-kpi-spark">
+      <ResponsiveContainer width="100%" height={36}>
+        <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+          <Area type="monotone" dataKey="value" stroke={stroke} fill={stroke} fillOpacity={0.18} strokeWidth={1.5} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 async function apiFetch<T>(path: string): Promise<T> {
   const token = localStorage.getItem('token');
@@ -78,13 +120,15 @@ export default function DashboardPage() {
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [kpiLoading, setKpiLoading] = useState(false);
   const [pendingList, setPendingList] = useState<PendingAppt[]>([]);
+  const [liveBoxes, setLiveBoxes] = useState<LiveBoxChip[]>([]);
 
   const refresh = useCallback(async () => {
     setKpiLoading(true);
     try {
-      const [kpiData, appts] = await Promise.all([
+      const [kpiData, appts, live] = await Promise.all([
         apiFetch<KpiData>('/api/analytics/kpi'),
         apiFetch<{ items: PendingAppt[] }>('/api/appointments?skip=0&limit=100'),
+        apiFetch<{ boxes: LiveBoxChip[] }>('/api/boxes/live').catch(() => ({ boxes: [] })),
       ]);
       setKpi(kpiData);
       setPendingList(
@@ -92,6 +136,7 @@ export default function DashboardPage() {
           .filter((a) => a.status === 'pending' || a.status === 'confirmed')
           .slice(0, 5),
       );
+      setLiveBoxes(live.boxes || []);
     } catch { /* ignore */ }
     setKpiLoading(false);
   }, []);
@@ -116,11 +161,14 @@ export default function DashboardPage() {
           </p>
         </div>
         <Space wrap>
-          <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={refresh}>
+          <Button icon={<ReloadOutlined />} look="ghost" onClick={refresh}>
             Обновить
           </Button>
-          <Button type="primary" className="btn-gold" onClick={goRecords}>
+          <Button type="primary" look="gold" onClick={goRecords}>
             К записям
+          </Button>
+          <Button look="ghost" icon={<InsertRowAboveOutlined />} onClick={() => navigate('/upload/boxes')}>
+            Боксы
           </Button>
         </Space>
       </div>
@@ -128,12 +176,12 @@ export default function DashboardPage() {
       <Spin spinning={kpiLoading}>
         <Row gutter={[14, 14]} className="admin-kpi-row">
           {[
-            { label: 'Клиенты', value: kpi?.total_clients || 0, icon: <TeamOutlined />, tone: 'gold' },
-            { label: 'Мастера', value: kpi?.total_masters || 0, icon: <ToolOutlined />, tone: 'gold' },
-            { label: 'Записи', value: kpi?.today_appointments || 0, icon: <CalendarOutlined />, tone: 'gold' },
-            { label: 'Выручка', value: formatRevenue(kpi?.month_revenue || 0), icon: <DollarOutlined />, tone: 'gold' },
-            { label: 'Ожидают', value: kpi?.pending_appointments || 0, icon: <ClockCircleOutlined />, tone: 'warn' },
-            { label: 'Закрыто за месяц', value: kpi?.completed_month || 0, icon: <CheckCircleOutlined />, tone: 'gold' },
+            { label: 'Клиенты', value: kpi?.total_clients || 0, icon: <TeamOutlined />, tone: 'gold', spark: undefined as SparkPoint[] | undefined },
+            { label: 'Мастера', value: kpi?.total_masters || 0, icon: <ToolOutlined />, tone: 'gold', spark: undefined },
+            { label: 'Записи', value: kpi?.today_appointments || 0, icon: <CalendarOutlined />, tone: 'gold', spark: kpi?.sparkline_appointments },
+            { label: 'Выручка', value: formatRevenue(kpi?.month_revenue || 0), icon: <DollarOutlined />, tone: 'gold', spark: kpi?.sparkline_revenue },
+            { label: 'Ожидают', value: kpi?.pending_appointments || 0, icon: <ClockCircleOutlined />, tone: 'warn', spark: undefined },
+            { label: 'Закрыто за месяц', value: kpi?.completed_month || 0, icon: <CheckCircleOutlined />, tone: 'gold', spark: kpi?.sparkline_completed },
           ].map((m) => (
             <Col xs={12} sm={8} lg={8} key={m.label}>
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -141,12 +189,40 @@ export default function DashboardPage() {
                   <div className="admin-kpi-icon">{m.icon}</div>
                   <div className="admin-kpi-label">{m.label}</div>
                   <div className="admin-kpi-value">{m.value}</div>
+                  <KpiSpark data={m.spark} warn={m.tone === 'warn'} />
                 </Card>
               </motion.div>
             </Col>
           ))}
         </Row>
       </Spin>
+
+      {liveBoxes.length > 0 && (
+        <Card
+          className="admin-panel-card"
+          bordered={false}
+          style={{ marginTop: 16 }}
+          title={<span className="admin-panel-title">Боксы сейчас</span>}
+          extra={
+            <Button size="small" look="ghost" onClick={() => navigate('/upload/boxes')}>
+              Сетка
+            </Button>
+          }
+        >
+          <Space wrap>
+            {liveBoxes.map((b) => (
+              <Tag
+                key={b.box_id}
+                style={{ cursor: 'pointer', padding: '4px 10px' }}
+                onClick={() => navigate('/upload/boxes')}
+              >
+                {b.name}: {b.state_label}
+                {b.current?.service_name ? ` · ${b.current.service_name}` : ''}
+              </Tag>
+            ))}
+          </Space>
+        </Card>
+      )}
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={24}>

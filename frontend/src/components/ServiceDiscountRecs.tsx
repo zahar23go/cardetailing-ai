@@ -4,8 +4,19 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Button, Card, Col, Empty, InputNumber, Modal, Row, Space, Spin, Table, Tag, Typography, message,
+  Card,
+  Col,
+  Empty,
+  InputNumber,
+  Row,
+  Space,
+  Spin,
+  Table,
+  Tag,
+  Typography,
+  message,
 } from 'antd';
+import { Button, Modal } from '../components/ui';
 import {
   CheckOutlined, CloseOutlined, EditOutlined, ReloadOutlined, RiseOutlined,
 } from '@ant-design/icons';
@@ -164,7 +175,7 @@ export default function ServiceDiscountRecs() {
           <Button
             size="small"
             icon={<ReloadOutlined />}
-            className="btn-gold-secondary"
+            look="ghost"
             loading={loading}
             onClick={() => load(true)}
           >
@@ -214,7 +225,7 @@ export default function ServiceDiscountRecs() {
                   <p className="service-rec-reason">{r.reason}</p>
                   <Space wrap>
                     <Button
-                      className="btn-gold"
+                      look="gold"
                       size="small"
                       icon={<CheckOutlined />}
                       loading={decidingId === r.id}
@@ -223,7 +234,7 @@ export default function ServiceDiscountRecs() {
                       Утвердить
                     </Button>
                     <Button
-                      className="btn-gold-secondary"
+                      look="ghost"
                       size="small"
                       icon={<EditOutlined />}
                       onClick={() => {
@@ -382,7 +393,7 @@ export default function ServiceDiscountRecs() {
               />
             </div>
             <Button
-              className="btn-gold"
+              look="gold"
               loading={decidingId === adjustRec.id}
               onClick={() => decide(adjustRec.id, 'adjust', adjustPercent)}
             >

@@ -10,6 +10,11 @@ from app.modules.appointments.schemas import BoxOut
 
 T = TypeVar("T")
 
+class SparklinePoint(BaseModel):
+    date: str
+    value: float = 0
+
+
 class KpiOut(BaseModel):
     total_clients: int = 0
     total_masters: int = 0
@@ -18,6 +23,9 @@ class KpiOut(BaseModel):
     month_revenue: float = 0
     pending_appointments: int = 0
     completed_month: int = 0
+    sparkline_revenue: list[SparklinePoint] = []
+    sparkline_appointments: list[SparklinePoint] = []
+    sparkline_completed: list[SparklinePoint] = []
 
 class RevenuePoint(BaseModel):
     date: str
@@ -135,4 +143,39 @@ class RevenueReportResponse(BaseModel):
     by_service: list[ServiceRevenueSummary] = []
     by_master: list[MasterRevenueSummary] = []
     details: list[RevenueDetail] = []
+
+
+class CohortCell(BaseModel):
+    offset: int
+    clients: int = 0
+    rate: float = 0
+
+
+class CohortRow(BaseModel):
+    cohort: str
+    size: int = 0
+    cells: list[CohortCell] = []
+
+
+class TreemapNode(BaseModel):
+    name: str
+    value: float = 0
+    count: int = 0
+
+
+class LoadRow(BaseModel):
+    id: int
+    name: str
+    busy_minutes: int = 0
+    capacity_minutes: int = 0
+    occupancy_pct: float = 0
+    appointments: int = 0
+
+
+class AnalyticsSpecResponse(BaseModel):
+    cohorts: list[CohortRow] = []
+    treemap: list[TreemapNode] = []
+    masters: list[LoadRow] = []
+    boxes: list[LoadRow] = []
+    period_days: int = 7
 

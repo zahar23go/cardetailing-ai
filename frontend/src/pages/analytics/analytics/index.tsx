@@ -4,10 +4,23 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  Typography, Card, Row, Col, Statistic, Button, Tag, Space,
-  message, Modal, Select, Input, Popconfirm, List,
-  Spin, Tooltip, DatePicker, ColorPicker,
+  Typography,
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Tag,
+  Space,
+  message,
+  Select,
+  Popconfirm,
+  List,
+  Spin,
+  Tooltip,
+  DatePicker,
+  ColorPicker,
 } from 'antd';
+import { Button, Modal, Input } from '../../../components/ui';
 import {
   DeleteOutlined, EditOutlined, ReloadOutlined,
 } from '@ant-design/icons';
@@ -17,6 +30,7 @@ import {
 } from 'recharts';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
+import SpecPanels, { type SpecData } from './SpecPanels';
 
 dayjs.locale('ru');
 
@@ -211,6 +225,7 @@ export default function AnalyticsPage() {
 
   const [periodStart, setPeriodStart] = useState<string | null>(null);
   const [periodEnd, setPeriodEnd] = useState<string | null>(null);
+  const [specData, setSpecData] = useState<SpecData | null>(null);
 
   const fetchRevenueChart = async (start?: string, end?: string) => {
     setRevenueLoading(true);
@@ -285,6 +300,12 @@ export default function AnalyticsPage() {
     } catch { /* ignore */ }
   };
 
+  const fetchSpec = async () => {
+    try {
+      setSpecData(await apiFetch<SpecData>('/api/analytics/spec'));
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     fetchRevenueChart();
     fetchBoxes();
@@ -292,6 +313,7 @@ export default function AnalyticsPage() {
     fetchHeatmap();
     fetchFunnel();
     fetchServices();
+    fetchSpec();
   }, []);
 
   const handleSaveBoxSettings = async (boxId: number, serviceIds: number[]) => {
@@ -404,6 +426,8 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      <SpecPanels data={specData} />
+
       <Spin spinning={revenueLoading || heatmapLoading || funnelLoading}>
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={14}>
@@ -413,7 +437,8 @@ export default function AnalyticsPage() {
                 <Space size="small" wrap>
                   <Button
                     size="small"
-                    className={!periodStart ? 'btn-gold' : 'btn-logout'}
+                    look={!periodStart ? 'gold' : 'default'}
+                    className={!periodStart ? undefined : 'btn-logout'}
                     onClick={() => {
                       setPeriodStart(null);
                       setPeriodEnd(null);
@@ -424,7 +449,8 @@ export default function AnalyticsPage() {
                   </Button>
                   <Button
                     size="small"
-                    className={periodStart ? 'btn-gold' : 'btn-logout'}
+                    look={periodStart ? 'gold' : 'default'}
+                    className={periodStart ? undefined : 'btn-logout'}
                     onClick={() => {
                       const end = dayjs();
                       const start = end.subtract(7, 'day');
@@ -861,7 +887,7 @@ export default function AnalyticsPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <Button
-                  className="btn-gold"
+                  look="gold"
                   onClick={handleCreateBox}
                   loading={creatingBox}
                   style={{ width: 200 }}
@@ -947,7 +973,7 @@ export default function AnalyticsPage() {
                     </div>
                     <Button
                       size="small"
-                      className="btn-gold"
+                      look="gold"
                       style={{ alignSelf: 'flex-end' }}
                       onClick={() => handleSaveBoxSettings(box.id, boxEditServices[box.id] || [])}
                       loading={boxSettingsSaving}
@@ -1025,7 +1051,7 @@ export default function AnalyticsPage() {
             <Button
               type="primary"
               size="large"
-              className="btn-gold"
+              look="gold"
               onClick={handleEditBox}
               loading={boxSettingsSaving}
             >

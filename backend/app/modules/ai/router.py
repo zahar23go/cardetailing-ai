@@ -123,6 +123,8 @@ async def ai_financier(
         f"• Выручка за месяц: {month_revenue:.0f} руб.",
         f"• Выручка сегодня: {today_revenue:.0f} руб.",
     ]
+    from app.modules.ai.financier_service import season_context_line
+    ctx_lines.append(f"• {season_context_line(now)}")
 
     if master_stats:
         ctx_lines.append("\nЭффективность мастеров (за месяц):")
@@ -137,6 +139,18 @@ async def ai_financier(
     business_context = "\n".join(ctx_lines)
     response = await get_financier_response(request.question, business_context)
     return FinancierResponse(response=response)
+
+
+@router.get("/api/ai/financier/brief", response_model=FinancierBriefResponse)
+async def ai_financier_brief(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Сезон, погода и рекомендации причина → действие → эффект в ₽."""
+    from app.modules.ai.financier_service import build_financier_brief
+
+    tenant_id = UUID(current_user["tenant_id"])
+    return await build_financier_brief(db, tenant_id)
 
 @router.post("/api/ai/consultant", response_model=FinancierResponse)
 async def ai_consultant(
@@ -187,4 +201,165 @@ async def ai_consultant(
 
     response = await get_consultant_response(request.question, services_context)
     return FinancierResponse(response=response)
+
+
+async def _owned_photo_ids(
+    db: AsyncSession,
+    tenant_id: UUID,
+    user_id: int,
+    photo_ids: list[int],
+    car_id: int | None,
+) -> list[int]:
+    if not photo_ids:
+        return []
+    result = await db.execute(
+        select(Photo).where(Photo.id.in_(photo_ids), Photo.tenant_id == tenant_id)
+    )
+    owned = []
+    for photo in result.scalars():
+        if photo.uploaded_by_id == user_id or (car_id and photo.car_id == car_id):
+            owned.append(photo.id)
+    return owned
+
+
+@router.get("/api/ai/detailer/tags", response_model=list[DetailerTagOut])
+async def detailer_tags(current_user: dict = Depends(_get_current_user)):
+    from app.modules.ai.detailer_service import TAG_CATALOG
+    return [{"id": t["id"], "label": t["label"], "area": t["area"]} for t in TAG_CATALOG]
+
+
+@router.get("/api/ai/detailer/slots", response_model=DetailerSlotsResponse)
+async def detailer_slots(
+    date: str | None = Query(None, description="YYYY-MM-DD"),
+    service_id: int | None = Query(None),
+    tz_offset: int = Query(0, ge=-840, le=840),
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.modules.ai.detailer_service import day_slot_grid, load_catalog, suggest_slots
+
+    tenant_id = UUID(current_user["tenant_id"])
+    duration = 60
+    if service_id:
+        catalog = await load_catalog(db, tenant_id)
+        match = next((s for s in catalog if s.id == service_id), None)
+        if match and match.duration:
+            duration = int(match.duration)
+    if date:
+        items = await day_slot_grid(
+            db,
+            tenant_id,
+            date_str=date,
+            duration_min=duration,
+            service_id=service_id,
+            tz_offset_minutes=tz_offset,
+        )
+        return {"items": items, "date": date}
+    items = await suggest_slots(
+        db,
+        tenant_id,
+        duration_min=duration,
+        service_id=service_id,
+        tz_offset_minutes=tz_offset,
+    )
+    return {"items": items, "date": None}
+
+
+@router.post("/api/ai/detailer/inspect", response_model=DetailerInspectResponse)
+async def detailer_inspect(
+    request: DetailerInspectRequest,
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.modules.ai.detailer_service import inspect_car
+
+    tenant_id = UUID(current_user["tenant_id"])
+    car_id = request.car_id
+    if car_id is not None:
+        car_result = await db.execute(
+            select(Car).where(
+                Car.id == car_id,
+                Car.client_id == current_user["id"],
+                Car.tenant_id == tenant_id,
+            )
+        )
+        if not car_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Автомобиль не найден")
+
+    photo_ids = await _owned_photo_ids(
+        db, tenant_id, current_user["id"], request.photo_ids, car_id,
+    )
+    payload = await inspect_car(
+        db,
+        tenant_id,
+        tags=request.tags,
+        notes=request.notes,
+        photo_count=len(photo_ids),
+        service_id=request.service_id,
+        tz_offset_minutes=request.tz_offset,
+    )
+    slot0 = payload["slots"][0] if payload["slots"] else None
+    row = DetailerInspection(
+        tenant_id=tenant_id,
+        client_id=current_user["id"],
+        car_id=car_id,
+        primary_service_id=(payload["primary"] or {}).get("service_id") if payload["primary"] else None,
+        suggested_box_id=slot0["box_id"] if slot0 else None,
+        notes=request.notes,
+        master_brief=payload["master_brief"],
+        tags=payload["tags"],
+        findings=payload["findings"],
+        upsells=payload["upsells"],
+        slots=payload["slots"],
+        photo_ids=photo_ids,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return {**payload, "id": row.id, "photo_count": len(photo_ids)}
+
+
+@router.get("/api/ai/detailer/inspections/{inspect_id}", response_model=DetailerInspectResponse)
+async def get_detailer_inspection(
+    inspect_id: int,
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = UUID(current_user["tenant_id"])
+    result = await db.execute(
+        select(DetailerInspection).where(
+            DetailerInspection.id == inspect_id,
+            DetailerInspection.tenant_id == tenant_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Осмотр не найден")
+    is_staff = current_user["role"] in ("admin", "super_admin", "master")
+    if row.client_id != current_user["id"] and not is_staff:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    primary = None
+    if row.primary_service_id:
+        svc = await db.execute(select(Service).where(Service.id == row.primary_service_id))
+        service = svc.scalar_one_or_none()
+        if service:
+            primary = {
+                "service_id": service.id,
+                "name": service.name,
+                "price": float(service.price or 0),
+                "duration": int(service.duration or 60),
+                "category": service.category,
+                "reason": "Рекомендация детейлера",
+            }
+    return {
+        "id": row.id,
+        "tags": row.tags or [],
+        "findings": row.findings or [],
+        "primary": primary,
+        "upsells": row.upsells or [],
+        "slots": row.slots or [],
+        "master_brief": row.master_brief or "",
+        "photo_count": len(row.photo_ids or []),
+    }
+
 

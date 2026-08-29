@@ -24,3 +24,11 @@
   background: rgba(5, 5, 6, 0.62);
   backdrop-filter: blur(8px);
 }
+
+/* Полноширинная CTA (логин / регистрация) — тот же .btn-gold */
+.btn-gold-cta {
+  width: 100%;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-family: var(--font-display, inherit);
+}

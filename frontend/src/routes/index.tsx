@@ -18,6 +18,7 @@ import AnalyticsPage from '../pages/analytics/analytics';
 import ReportsPage from '../pages/analytics/reports';
 import RecordsPage from '../pages/upload/records';
 import CalendarPage from '../pages/upload/calendar';
+import BoxesFloorPage from '../pages/upload/boxes';
 import UsersPage from '../pages/crm/users';
 import ServicesPage from '../pages/crm/services';
 import DiscountsPage from '../pages/discounts';
@@ -28,6 +29,7 @@ import InventoryPage from '../pages/technology/inventory';
 import TechAnalyticsPage from '../pages/technology/analytics';
 import NotificationsPage from '../pages/settings/notifications';
 import BrandingPage from '../pages/settings/branding';
+import TariffsPage from '../pages/settings/tariffs';
 import ServiceAnalyticsPage from '../pages/analytics/service-analytics';
 import ClientLayout from '../pages/client/layout';
 import ClientHomePage from '../pages/client/home';
@@ -42,13 +44,30 @@ export interface AppUser {
   phone: string;
   full_name: string;
   role: 'client' | 'master' | 'admin' | 'super_admin';
+  tenant_id?: string;
+  enabled_modules?: string[];
+  plan?: string;
+  plan_label?: string;
+  features?: { financier?: boolean; branding?: boolean };
+  appointment_limit?: number | null;
+  appointments_this_month?: number;
+  tenant_name?: string;
+  logo_url?: string | null;
+  pwa?: {
+    name: string;
+    short_name: string;
+    icon: string;
+    theme_color: string;
+    background_color: string;
+    white_label: boolean;
+  };
 }
 
 export type AppRoutesProps = {
   isAuthenticated: boolean;
   user: AppUser | null;
   onLogin: (phone: string, password: string) => void | Promise<void>;
-  onRegistered: (token: string, user: { id: number; phone: string; full_name: string; role: string }) => void;
+  onRegistered: (token: string, user: AppUser) => void;
   onLogout: () => void;
   navigateToRegister: () => void;
 };
@@ -124,6 +143,7 @@ export default function AppRoutes({
         <Route path="upload">
           <Route index element={<Navigate to="records" replace />} />
           <Route path="records" element={<RecordsPage />} />
+          <Route path="boxes" element={<BoxesFloorPage />} />
           <Route path="calendar" element={<CalendarPage />} />
         </Route>
 
@@ -146,6 +166,7 @@ export default function AppRoutes({
 
         <Route path="settings/notifications" element={<NotificationsPage />} />
         <Route path="settings/branding" element={<BrandingPage />} />
+        <Route path="settings/tariffs" element={<TariffsPage />} />
       </Route>
 
       <Route
@@ -177,6 +198,7 @@ export default function AppRoutes({
       <Route path="/records" element={<Navigate to="/upload/records" replace />} />
       <Route path="/appointments" element={<Navigate to="/upload/records" replace />} />
       <Route path="/calendar" element={<Navigate to="/upload/calendar" replace />} />
+      <Route path="/boxes" element={<Navigate to="/upload/boxes" replace />} />
       <Route path="/users" element={<Navigate to="/crm/users" replace />} />
       <Route path="/services" element={<Navigate to="/crm/services" replace />} />
       <Route path="/notifications" element={<Navigate to="/settings/notifications" replace />} />

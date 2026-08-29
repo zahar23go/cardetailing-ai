@@ -3,7 +3,8 @@
    ============================================================ */
 
 import React, { useState, useEffect } from 'react';
-import { Drawer, Button, Typography, Spin, message, Space } from 'antd';
+import { Drawer, Typography, Spin, message, Space } from 'antd';
+import { Button } from '../components/ui';
 import { HistoryOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getHistory } from '../api/history';
 import type { HistoryEntry } from '../api/history';

@@ -302,3 +302,87 @@ class TestBoxServices:
         boxes = resp.json()
         # Хотя бы один бокс имеет service_ids
         assert any(b.get("service_ids") for b in boxes)
+
+
+class TestBoxLiveFloor:
+    async def test_live_empty(self, client, admin_headers):
+        resp = await client.get("/api/boxes/live", headers=admin_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["boxes"] == []
+        assert data["prep_minutes"] == 15
+
+    async def test_live_forbidden_for_client(self, client, auth_headers):
+        resp = await client.get("/api/boxes/live", headers=auth_headers)
+        assert resp.status_code == 403
+
+    async def test_live_occupied_and_list_unchanged(
+        self, client, admin_headers, auth_headers, test_service, test_car,
+    ):
+        box = (await client.post(
+            "/api/boxes",
+            json={"name": "Бокс живой", "color": "#C8A977"},
+            headers=admin_headers,
+        )).json()
+        start = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        created = await client.post(
+            "/api/appointments",
+            json={
+                "service_id": test_service.id,
+                "car_id": test_car.id,
+                "start_time": start,
+                "box_id": box["id"],
+            },
+            headers=auth_headers,
+        )
+        assert created.status_code == 200, created.text
+        appt_id = created.json()["id"]
+        put = await client.put(
+            f"/api/appointments/{appt_id}",
+            json={"status": "in_progress"},
+            headers=admin_headers,
+        )
+        assert put.status_code == 200
+
+        live = await client.get("/api/boxes/live", headers=admin_headers)
+        assert live.status_code == 200
+        rows = {r["box_id"]: r for r in live.json()["boxes"]}
+        assert rows[box["id"]]["state"] == "occupied"
+        assert rows[box["id"]]["current"]["id"] == appt_id
+        assert rows[box["id"]]["current"]["status"] == "in_progress"
+
+        listed = await client.get("/api/boxes", headers=admin_headers)
+        assert listed.status_code == 200
+        assert any(b["id"] == box["id"] for b in listed.json())
+
+    async def test_live_preparing_soon(
+        self, client, admin_headers, auth_headers, test_service, test_car,
+    ):
+        box = (await client.post(
+            "/api/boxes",
+            json={"name": "Бокс слот"},
+            headers=admin_headers,
+        )).json()
+        start = (datetime.now(timezone.utc) + timedelta(minutes=8)).isoformat()
+        created = await client.post(
+            "/api/appointments",
+            json={
+                "service_id": test_service.id,
+                "car_id": test_car.id,
+                "start_time": start,
+                "box_id": box["id"],
+            },
+            headers=auth_headers,
+        )
+        assert created.status_code == 200, created.text
+        await client.put(
+            f"/api/appointments/{created.json()['id']}",
+            json={"status": "confirmed"},
+            headers=admin_headers,
+        )
+
+        live = await client.get("/api/boxes/live", headers=admin_headers)
+        assert live.status_code == 200
+        row = next(r for r in live.json()["boxes"] if r["box_id"] == box["id"])
+        assert row["state"] == "preparing"
+        assert row["next"] is not None or row["current"] is not None

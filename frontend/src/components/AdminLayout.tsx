@@ -4,7 +4,8 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Typography, Button, Space, Layout } from 'antd';
+import { Typography, Space, Layout } from 'antd';
+import { Button } from '../components/ui';
 import {
   DollarOutlined,
   TeamOutlined,
@@ -15,13 +16,21 @@ import {
 } from '@ant-design/icons';
 import NotificationBell from './NotificationBell';
 import Sidebar from './Sidebar';
+import ModuleGate from '../ModuleGate';
 import { pathFromTab, tabFromPath } from '../admin/navConfig';
+import { usePlanFeatures } from '../ModulesContext';
 
 const { Text } = Typography;
 const { Header, Content, Sider } = Layout;
 
 interface AdminLayoutProps {
-  user: { id: number; phone: string; full_name: string; role: string };
+  user: {
+    id: number;
+    phone: string;
+    full_name: string;
+    role: string;
+    pwa?: { name: string; icon: string; white_label: boolean };
+  };
   onLogout: () => void;
 }
 
@@ -29,6 +38,10 @@ export default function AdminLayout({ user, onLogout }: AdminLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTabState] = useState('overview');
+  const features = usePlanFeatures();
+  const showBranding = features?.branding !== false;
+  const brandName = user.pwa?.white_label && user.pwa.name ? user.pwa.name : 'CAR DETAILING AI';
+  const brandIcon = user.pwa?.icon || '/images/logo-formula-sport.png';
 
   useEffect(() => {
     const tab = tabFromPath(location.pathname);
@@ -56,25 +69,27 @@ export default function AdminLayout({ user, onLogout }: AdminLayoutProps) {
   return (
     <Layout className="admin-layout client-layout">
       <Header className="header-mobile admin-header-mobile">
-        <img src="/images/logo-formula-sport.png" alt="" className="client-header-logo" />
-        <Text className="admin-header-title">CAR DETAILING AI</Text>
+        <img src={brandIcon} alt="" className="client-header-logo" />
+        <Text className="admin-header-title">{brandName}</Text>
         <span className="admin-header-badge">Command Center</span>
       </Header>
 
       <Header className="header-desktop admin-header">
         <Space className="admin-header-brand" size="middle" align="center">
-          <img src="/images/logo-formula-sport.png" alt="" className="client-header-logo" />
-          <Text className="admin-header-title">CAR DETAILING AI</Text>
+          <img src={brandIcon} alt="" className="client-header-logo" />
+          <Text className="admin-header-title">{brandName}</Text>
           <span className="admin-header-badge">Command Center</span>
         </Space>
         <Space size="middle" className="admin-header-actions" wrap>
-          <Button
-            type="text"
-            className="admin-header-btn"
-            onClick={() => navigate('/settings/branding')}
-          >
-            Брендинг
-          </Button>
+          {showBranding && (
+            <Button
+              type="text"
+              className="admin-header-btn"
+              onClick={() => navigate('/settings/branding')}
+            >
+              Брендинг
+            </Button>
+          )}
           <span className="admin-header-user">
             <span>{user.full_name}</span>
           </span>
@@ -102,7 +117,9 @@ export default function AdminLayout({ user, onLogout }: AdminLayoutProps) {
         </Sider>
 
         <Content className="client-content admin-content">
-          <Outlet />
+          <ModuleGate>
+            <Outlet />
+          </ModuleGate>
         </Content>
       </Layout>
 

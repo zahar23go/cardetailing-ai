@@ -4,7 +4,15 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Typography, Row, Col, Table, Space, Spin, Empty, Select, message,
+  Typography,
+  Row,
+  Col,
+  Table,
+  Space,
+  Spin,
+  Empty,
+  Select,
+  message,
 } from 'antd';
 import {
   ReloadOutlined, WarningOutlined, HistoryOutlined,
@@ -197,7 +205,7 @@ export default function InventoryPage() {
             showSearch
             optionFilterProp="label"
           />
-          <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={refresh}>
+          <Button icon={<ReloadOutlined />} look="ghost" onClick={refresh}>
             Обновить
           </Button>
         </Space>

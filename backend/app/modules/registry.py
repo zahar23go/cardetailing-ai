@@ -34,6 +34,18 @@ def _enabled() -> set[str] | None:
     return {x.strip() for x in raw.split(",") if x.strip()}
 
 
+def enabled_module_names() -> list[str]:
+    """Список доменов, которые монтируются при текущем ENABLED_MODULES."""
+    enabled = _enabled()
+    if enabled is None:
+        return list(MODULE_ORDER)
+    names = ["core"]
+    for name in MODULE_ORDER:
+        if name != "core" and name in enabled:
+            names.append(name)
+    return names
+
+
 def include_modules(app: FastAPI) -> None:
     enabled = _enabled()
     for name in MODULE_ORDER:

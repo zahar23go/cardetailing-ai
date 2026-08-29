@@ -1,9 +1,10 @@
 /**
  * ИИ Финансист — /analytics/ai-financier
- * Автономный чат, локальный state.
+ * Сводка сезон/погода + причина → действие → эффект ₽. Чат POST /api/ai/financier без изменений.
  */
-import React, { useState } from 'react';
-import { Card, Button, Input } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Card, Spin } from 'antd';
+import { Button, Input } from '../../../components/ui';
 import { BulbOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons';
 
 const API_BASE = '';
@@ -25,17 +26,74 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+function formatRub(val: number) {
+  return `${Number(val || 0).toLocaleString('ru-RU')} ₽`;
+}
+
+const KIND_LABEL: Record<string, string> = {
+  weather: 'Погода',
+  season: 'Сезон',
+  load: 'Загрузка',
+  box: 'Бокс',
+  pnl: 'P&L',
+};
+
 const SUGGESTIONS = [
   'Какая прибыль за месяц?',
   'Кто из мастеров эффективнее?',
-  'Прогноз выручки на неделю',
+  'Что делать с погодой на неделю?',
 ];
+
+interface WeatherDay {
+  date: string;
+  t_max: number;
+  t_min: number;
+  precip_mm: number;
+}
+
+interface FinancierRec {
+  id: string;
+  cause: string;
+  action: string;
+  effect_rub: number;
+  horizon: string;
+  kind: string;
+}
+
+interface FinancierBrief {
+  city: string;
+  source: string;
+  season: string;
+  season_label: string;
+  season_demand: string;
+  outlook: string;
+  days: WeatherDay[];
+  recommendations: FinancierRec[];
+}
 
 export default function AiFinancierPage() {
   const [financierMessages, setFinancierMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
   const [financierInput, setFinancierInput] = useState('');
   const [financierLoading, setFinancierLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [brief, setBrief] = useState<FinancierBrief | null>(null);
+  const [briefLoading, setBriefLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBriefLoading(true);
+    apiFetch<FinancierBrief>('/api/ai/financier/brief')
+      .then((data) => {
+        if (!cancelled) setBrief(data);
+      })
+      .catch(() => {
+        if (!cancelled) setBrief(null);
+      })
+      .finally(() => {
+        if (!cancelled) setBriefLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleNewDialog = () => {
     setFinancierMessages([]);
@@ -55,13 +113,20 @@ export default function AiFinancierPage() {
         body: JSON.stringify({ question }),
       });
       setFinancierMessages((prev) => [...prev, { role: 'ai', text: data.response }]);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Ошибка соединения';
       setFinancierMessages((prev) => [
         ...prev,
-        { role: 'ai', text: `❌ ${e.message || 'Ошибка соединения'}` },
+        { role: 'ai', text: `❌ ${msg}` },
       ]);
     }
     setFinancierLoading(false);
+  };
+
+  const askAboutRec = (rec: FinancierRec) => {
+    handleFinancierQuestion(
+      `Разбери рекомендацию. Причина: ${rec.cause} Действие: ${rec.action} Эффект: ${formatRub(rec.effect_rub)}.`,
+    );
   };
 
   return (
@@ -71,10 +136,68 @@ export default function AiFinancierPage() {
           <div className="admin-overview-kicker">AI-консультант</div>
           <h3>AI Финансист</h3>
           <p className="financier-lead">
-            Аналитика бизнеса, прогнозы и рекомендации
+            Сезон, погода и действие в ₽ — не только чат
           </p>
         </div>
       </div>
+
+      <Card className="admin-panel-card financier-brief-panel" bordered={false}>
+        {briefLoading ? (
+          <Spin />
+        ) : brief ? (
+          <>
+            <div className="financier-brief-head">
+              <div>
+                <div className="financier-brief-kicker">
+                  {brief.city} · {brief.season_label}
+                  {brief.source === 'season-only' ? ' · календарь' : ''}
+                </div>
+                <div className="financier-brief-outlook">{brief.outlook}</div>
+                <div className="financier-brief-demand">{brief.season_demand}</div>
+              </div>
+            </div>
+            {brief.days.length ? (
+              <div className="financier-weather-row">
+                {brief.days.slice(0, 5).map((d) => (
+                  <div key={d.date} className="financier-weather-day">
+                    <span>{d.date.slice(8, 10)}.{d.date.slice(5, 7)}</span>
+                    <strong>{Math.round(d.t_max)}°</strong>
+                    <em>{d.precip_mm >= 1 ? `${Math.round(d.precip_mm)} мм` : 'сухо'}</em>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div className="financier-rec-grid">
+              {brief.recommendations.map((rec) => (
+                <button
+                  key={rec.id}
+                  type="button"
+                  className="financier-rec-card"
+                  onClick={() => askAboutRec(rec)}
+                >
+                  <div className="financier-rec-meta">
+                    <span>{KIND_LABEL[rec.kind] || rec.kind}</span>
+                    <span>{rec.horizon}</span>
+                  </div>
+                  <div className="financier-rec-row">
+                    <span>Причина</span>
+                    <p>{rec.cause}</p>
+                  </div>
+                  <div className="financier-rec-row">
+                    <span>Действие</span>
+                    <p>{rec.action}</p>
+                  </div>
+                  <div className="financier-rec-effect">{formatRub(rec.effect_rub)}</div>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="financier-brief-demand">
+            Сводка недоступна — чат финансиста ниже работает как раньше.
+          </div>
+        )}
+      </Card>
 
       <Card className="admin-panel-card financier-panel" bordered={false}>
         <div className="financier-chat">
@@ -132,7 +255,7 @@ export default function AiFinancierPage() {
         <div className="financier-composer">
           <Button
             icon={<PlusOutlined />}
-            className="btn-gold-secondary financier-new-btn"
+            look="ghost" className="financier-new-btn"
             onClick={handleNewDialog}
           >
             + Новый диалог
@@ -152,7 +275,7 @@ export default function AiFinancierPage() {
             autoSize={{ minRows: 1, maxRows: 4 }}
           />
           <Button
-            className="btn-gold financier-send"
+            look="gold" className="financier-send"
             onClick={() => handleFinancierQuestion()}
             loading={financierLoading}
             icon={<SendOutlined />}

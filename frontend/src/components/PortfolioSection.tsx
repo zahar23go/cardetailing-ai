@@ -3,7 +3,8 @@
    ============================================================ */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Spin, Select, Button, Typography, message } from 'antd';
+import { Spin, Select, Typography, message } from 'antd';
+import { Button } from '../components/ui';
 import { ArrowLeftOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
 import { getPhotos, deletePhoto, setPrimaryPhoto, getPortfolioServices, getAllPortfolio } from '../api/photos';
 import type { Photo, PortfolioService } from '../api/photos';
@@ -212,7 +213,7 @@ export default function PortfolioSection({
           <div className="master-portfolio-toolbar">
             <Button
               type="primary"
-              className="btn-gold"
+              look="gold"
               icon={<ArrowLeftOutlined />}
               onClick={openSalon}
             >
@@ -237,7 +238,7 @@ export default function PortfolioSection({
                 {!readonly ? (
                   <Button
                     type="primary"
-                    className="btn-gold master-portfolio-add"
+                    look="gold" className="master-portfolio-add"
                     icon={<PlusOutlined />}
                     onClick={() => setUploadModalOpen(true)}
                   >
@@ -268,7 +269,7 @@ export default function PortfolioSection({
                 {!readonly ? (
                   <Button
                     type="primary"
-                    className="btn-gold"
+                    look="gold"
                     icon={<PlusOutlined />}
                     onClick={() => setUploadModalOpen(true)}
                   >
@@ -288,7 +289,7 @@ export default function PortfolioSection({
               <h3>Портфолио салона</h3>
               <Badge variant="gold">Работы всех мастеров</Badge>
             </div>
-            <Button type="primary" className="btn-gold" onClick={() => setScope('mine')}>
+            <Button type="primary" look="gold" onClick={() => setScope('mine')}>
               Моё портфолио
             </Button>
           </div>

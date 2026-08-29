@@ -147,10 +147,10 @@
 
 /* --- КНОПКИ (Buttons) --- */
 .btn-gold {
-  background: linear-gradient(180deg, #f0d9a0 0%, #d4a84b 55%, #a67c2d 100%);
+  background: var(--brand-gold-button-bg, linear-gradient(180deg, #f0d9a0 0%, #d4a84b 55%, #a67c2d 100%));
   border: 1px solid rgba(240, 217, 160, 0.85);
   border-radius: 999px;
-  color: #1a1610;
+  color: var(--brand-gold-button-color, #1a1610);
   font-weight: 700;
   font-size: 15px;
   height: 48px;
@@ -872,6 +872,25 @@
   margin-bottom: 0;
   display: flex;
   flex-direction: column;
+}
+
+.master-kpi-title {
+  margin-top: 16px;
+}
+
+.master-kpi-row {
+  margin-bottom: 4px;
+}
+
+.master-kpi-card .admin-kpi-value {
+  font-size: 22px;
+}
+
+.master-kpi-hint {
+  font-size: 11px;
+  color: var(--color-titanium, #9BA3B5);
+  margin-top: 4px;
+  line-height: 1.35;
 }
 
 .master-stat-tile {
@@ -2911,6 +2930,11 @@
   word-break: break-word;
 }
 
+.admin-kpi-spark {
+  height: 36px;
+  margin-top: 8px;
+}
+
 .admin-panel-title {
   display: inline-block;
   font-weight: 600;
@@ -3698,6 +3722,121 @@
 
 .financier-panel.ant-card .ant-card-body {
   padding: 18px 18px 16px !important;
+}
+
+.financier-brief-panel.ant-card {
+  margin-bottom: var(--spacing-lg, 20px);
+}
+
+.financier-brief-panel.ant-card .ant-card-body {
+  padding: 18px 18px 16px !important;
+}
+
+.financier-brief-kicker {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-gold, #D4AF37);
+  margin-bottom: 6px;
+}
+
+.financier-brief-outlook {
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 18px;
+  color: var(--color-white, #F0F2F5);
+  margin-bottom: 6px;
+}
+
+.financier-brief-demand {
+  font-size: 13px;
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.financier-weather-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 16px;
+}
+
+.financier-weather-day {
+  min-width: 72px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 10px);
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.3));
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.financier-weather-day strong {
+  color: var(--color-gold, #D4AF37);
+  font-size: 16px;
+}
+
+.financier-weather-day em {
+  font-style: normal;
+}
+
+.financier-rec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.financier-rec-card {
+  text-align: left;
+  padding: 14px;
+  border-radius: var(--radius-sm, 10px);
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.3));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.financier-rec-card:hover {
+  border-color: var(--color-gold, #D4AF37);
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.08));
+}
+
+.financier-rec-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-gold, #D4AF37);
+  margin-bottom: 10px;
+}
+
+.financier-rec-row {
+  margin-bottom: 8px;
+}
+
+.financier-rec-row span {
+  display: block;
+  font-size: 11px;
+  color: var(--color-titanium, #9BA3B5);
+  margin-bottom: 2px;
+}
+
+.financier-rec-row p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-white, #F0F2F5);
+  line-height: 1.4;
+}
+
+.financier-rec-effect {
+  margin-top: 10px;
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 18px;
+  color: var(--color-gold, #D4AF37);
 }
 
 .financier-chat {
@@ -4746,6 +4885,86 @@
   color: #1A1D23;
   border-color: var(--color-gold, #D4AF37);
   font-weight: 700;
+}
+
+.client-slot.is-busy {
+  opacity: 0.35;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.client-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detailer-inspect {
+  margin-bottom: var(--spacing-md);
+}
+
+.detailer-inspect-title {
+  font-size: 13px;
+  color: var(--color-titanium, #9BA3B5);
+  margin-bottom: 10px;
+}
+
+.detailer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.detailer-tag {
+  padding: 8px 12px;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.3));
+  background: var(--color-gold-bg, rgba(212, 175, 55, 0.08));
+  color: var(--color-white, #F0F2F5);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.detailer-tag.is-on {
+  background: var(--color-gold, #D4AF37);
+  color: #1A1D23;
+  border-color: var(--color-gold, #D4AF37);
+  font-weight: 700;
+}
+
+.detailer-car {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm, 10px);
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.3));
+  background: transparent;
+  color: var(--color-white, #F0F2F5);
+  font-family: inherit;
+}
+
+.detailer-hint {
+  font-size: 13px;
+  color: var(--color-titanium, #9BA3B5);
+  margin-bottom: 12px;
+}
+
+.detailer-files {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.detailer-brief {
+  white-space: pre-wrap;
+  color: var(--color-gold, #D4AF37);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .client-discount-terms {

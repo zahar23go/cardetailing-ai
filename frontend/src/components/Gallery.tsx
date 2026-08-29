@@ -4,8 +4,13 @@
 
 import React, { useState } from 'react';
 import {
-  Row, Col, Modal, Button, Space, Typography, Popconfirm,
+  Row,
+  Col,
+  Space,
+  Typography,
+  Popconfirm,
 } from 'antd';
+import { Button, Modal } from '../components/ui';
 import {
   DeleteOutlined, StarOutlined, ZoomInOutlined, StarFilled, UserOutlined,
 } from '@ant-design/icons';

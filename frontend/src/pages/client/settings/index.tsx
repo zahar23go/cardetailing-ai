@@ -3,8 +3,15 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  Button, Empty, Input, InputNumber, Space, Spin, Table, Typography, message,
+  Empty,
+  InputNumber,
+  Space,
+  Spin,
+  Table,
+  Typography,
+  message,
 } from 'antd';
+import { Button, Input } from '../../../components/ui';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -182,7 +189,7 @@ export default function ClientSettingsPage() {
               onChange={(e) => setPhone(e.target.value)}
             />
           </div>
-          <Button type="primary" className="btn-gold" loading={saving} onClick={saveProfile}>
+          <Button type="primary" look="gold" loading={saving} onClick={saveProfile}>
             Сохранить
           </Button>
         </Space>
@@ -199,8 +206,8 @@ export default function ClientSettingsPage() {
               <Input className="input-luxury" placeholder="Госномер" value={editDraft.license_plate} onChange={(e) => setEditDraft((p) => ({ ...p, license_plate: e.target.value }))} />
               <Input className="input-luxury" placeholder="Цвет" value={editDraft.color} onChange={(e) => setEditDraft((p) => ({ ...p, color: e.target.value }))} />
               <Space>
-                <Button className="btn-gold" loading={savingCar} onClick={() => saveCar(c.id)}>Сохранить</Button>
-                <Button className="btn-gold-secondary" onClick={() => setEditingId(null)}>Отмена</Button>
+                <Button look="gold" loading={savingCar} onClick={() => saveCar(c.id)}>Сохранить</Button>
+                <Button look="ghost" onClick={() => setEditingId(null)}>Отмена</Button>
               </Space>
             </Space>
           ) : (
@@ -213,7 +220,7 @@ export default function ClientSettingsPage() {
               </div>
               <Button
                 size="small"
-                className="btn-gold-secondary"
+                look="ghost"
                 onClick={() => { setEditingId(c.id); setEditDraft(carToDraft(c)); }}
               >
                 Изменить
@@ -230,7 +237,7 @@ export default function ClientSettingsPage() {
           <InputNumber className="input-luxury client-field" placeholder="Год" min={1990} max={2030} value={carForm.year} onChange={(v) => setCarForm((p) => ({ ...p, year: v || undefined }))} />
           <Input className="input-luxury" placeholder="Госномер" value={carForm.license_plate} onChange={(e) => setCarForm((p) => ({ ...p, license_plate: e.target.value }))} />
           <Input className="input-luxury" placeholder="Цвет" value={carForm.color} onChange={(e) => setCarForm((p) => ({ ...p, color: e.target.value }))} />
-          <Button icon={<PlusOutlined />} className="btn-gold-secondary" loading={addingCar} onClick={addCar}>
+          <Button icon={<PlusOutlined />} look="ghost" loading={addingCar} onClick={addCar}>
             Добавить
           </Button>
         </Space>

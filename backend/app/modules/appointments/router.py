@@ -154,13 +154,34 @@ async def create_appointment(
 
     end_time = start_time + timedelta(minutes=service.duration)
 
+    tenant_id = UUID(current_user["tenant_id"])
+    from app.modules.plans import ensure_appointment_quota
+    await ensure_appointment_quota(db, tenant_id, start_time)
+
+    inspect_row = None
+    master_brief = None
+    if request.inspect_id:
+        insp_result = await db.execute(
+            select(DetailerInspection).where(
+                DetailerInspection.id == request.inspect_id,
+                DetailerInspection.tenant_id == tenant_id,
+                DetailerInspection.client_id == current_user["id"],
+            )
+        )
+        inspect_row = insp_result.scalar_one_or_none()
+        if not inspect_row:
+            raise HTTPException(status_code=404, detail="Осмотр не найден")
+        master_brief = inspect_row.master_brief
+
     # Авто-назначение бокса по услуге, если не указан
     box_id = request.box_id
+    if box_id is None and inspect_row is not None and inspect_row.suggested_box_id:
+        box_id = inspect_row.suggested_box_id
     if box_id is None:
         bs_result = await db.execute(
             select(BoxService).where(
                 BoxService.service_id == request.service_id,
-                BoxService.tenant_id == UUID(current_user["tenant_id"]),
+                BoxService.tenant_id == tenant_id,
             ).limit(1)
         )
         bs = bs_result.scalar_one_or_none()
@@ -172,7 +193,7 @@ async def create_appointment(
         master_result = await db.execute(
             select(User).where(
                 User.id == master_id,
-                User.tenant_id == UUID(current_user["tenant_id"]),
+                User.tenant_id == tenant_id,
                 User.role == UserRole.master.value,
             )
         )
@@ -189,12 +210,27 @@ async def create_appointment(
         total_price=service.price,
         status="pending",
         client_notes=request.notes or request.client_notes,
+        master_brief=master_brief,
         box_id=box_id,
-        tenant_id=UUID(current_user["tenant_id"]),
+        tenant_id=tenant_id,
     )
     db.add(appointment)
     await db.commit()
     await db.refresh(appointment)
+
+    if inspect_row is not None:
+        inspect_row.appointment_id = appointment.id
+        photo_ids = list(inspect_row.photo_ids or [])
+        if photo_ids:
+            await db.execute(
+                update(Photo)
+                .where(
+                    Photo.id.in_(photo_ids),
+                    Photo.tenant_id == tenant_id,
+                )
+                .values(appointment_id=appointment.id)
+            )
+        await db.commit()
 
     # Автоматическое применение скидок
     await _auto_apply_discount(appointment.id, db)
@@ -246,13 +282,89 @@ async def update_appointment_status(
     if request.master_brief is not None:
         appointment.master_brief = request.master_brief
 
+    if request.status == "completed" and old_data["status"] != "completed":
+        from app.modules.appointments.close_service import ensure_invoice
+        await ensure_invoice(
+            db,
+            appointment,
+            UUID(current_user["tenant_id"]),
+            user_id=current_user["id"],
+        )
+
     await db.commit()
+
+    result = await db.execute(
+        select(Appointment).options(*_APPT_LOAD).where(Appointment.id == appointment_id)
+    )
+    appointment = result.scalar_one()
 
     # Начисляем баллы, если статус стал completed
     if request.status == "completed":
         await _award_loyalty_points(appointment.id, db)
 
     return _serialize_appointment(appointment)
+
+@router.get("/api/appointments/{appointment_id}/close-preview")
+async def get_appointment_close_preview(
+    appointment_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Превью закрытия заезда: шаги техкарты, норма/факт, оценка себестоимости."""
+    from app.modules.appointments.close_service import preview_close
+
+    result = await db.execute(
+        select(Appointment).options(*_APPT_LOAD).where(
+            Appointment.id == appointment_id,
+            Appointment.tenant_id == UUID(current_user["tenant_id"]),
+        )
+    )
+    appointment = result.scalar_one_or_none()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    return await preview_close(db, appointment, UUID(current_user["tenant_id"]))
+
+
+@router.post("/api/appointments/{appointment_id}/close")
+async def close_appointment(
+    appointment_id: int,
+    request: AppointmentCloseRequest = AppointmentCloseRequest(),
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Закрыть заезд: чек, списание склада, статус completed. Повтор безопасен."""
+    from app.modules.appointments.close_service import ensure_invoice, serialize_invoice
+
+    result = await db.execute(
+        select(Appointment).options(*_APPT_LOAD).where(
+            Appointment.id == appointment_id,
+            Appointment.tenant_id == UUID(current_user["tenant_id"]),
+        )
+    )
+    appointment = result.scalar_one_or_none()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    if appointment.status in ("cancelled", "no_show"):
+        raise HTTPException(status_code=400, detail="Нельзя закрыть отменённую запись")
+
+    body = request
+    became_completed = appointment.status != "completed"
+    if became_completed:
+        appointment.status = "completed"
+    inv = await ensure_invoice(
+        db,
+        appointment,
+        UUID(current_user["tenant_id"]),
+        user_id=current_user["id"],
+        steps_in=[s.model_dump() for s in body.steps],
+        materials_in=[m.model_dump() for m in body.materials],
+        notes=body.notes,
+    )
+    await db.commit()
+    if became_completed:
+        await _award_loyalty_points(appointment.id, db)
+    return serialize_invoice(inv)
+
 
 @router.put("/api/appointments/{appointment_id}/cancel")
 async def cancel_appointment(
@@ -381,6 +493,22 @@ async def get_my_master_appointments(
         "limit": limit,
     }
 
+
+@router.get("/api/masters/me/kpi", response_model=MasterKpiOut)
+async def get_my_master_kpi(
+    current_user: dict = Depends(_require_master),
+    db: AsyncSession = Depends(get_db),
+):
+    """Личные KPI мастера за месяц: выручка, повтор, техкарта, перерасход, оценка смены."""
+    from app.modules.appointments.kpi_service import build_master_kpi
+
+    return await build_master_kpi(
+        db,
+        UUID(current_user["tenant_id"]),
+        current_user["id"],
+    )
+
+
 @router.put("/api/masters/me/appointments/{appointment_id}/status")
 async def update_master_appointment_status(
     appointment_id: int,
@@ -418,7 +546,21 @@ async def update_master_appointment_status(
 
     appointment.status = new_status
 
+    if new_status == "completed":
+        from app.modules.appointments.close_service import ensure_invoice
+        await ensure_invoice(
+            db,
+            appointment,
+            UUID(current_user["tenant_id"]),
+            user_id=current_user["id"],
+        )
+
     await db.commit()
+
+    result = await db.execute(
+        select(Appointment).options(*_APPT_LOAD).where(Appointment.id == appointment_id)
+    )
+    appointment = result.scalar_one()
 
     # History: log status change
     from app.services.history_service import log_status_change as _log_sc
@@ -429,6 +571,84 @@ async def update_master_appointment_status(
         await _award_loyalty_points(appointment.id, db)
 
     return _serialize_appointment(appointment)
+
+@router.get("/api/masters/me/appointments/{appointment_id}/close-preview")
+async def get_master_appointment_close_preview(
+    appointment_id: int,
+    current_user: dict = Depends(_require_master),
+    db: AsyncSession = Depends(get_db),
+):
+    """Превью закрытия заезда для мастера."""
+    from app.modules.appointments.close_service import preview_close
+
+    result = await db.execute(
+        select(Appointment).options(*_APPT_LOAD).where(
+            Appointment.id == appointment_id,
+            Appointment.tenant_id == UUID(current_user["tenant_id"]),
+        )
+    )
+    appointment = result.scalar_one_or_none()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    if appointment.master_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Это не ваша запись")
+    return await preview_close(db, appointment, UUID(current_user["tenant_id"]))
+
+
+@router.post("/api/masters/me/appointments/{appointment_id}/close")
+async def close_master_appointment(
+    appointment_id: int,
+    request: AppointmentCloseRequest = AppointmentCloseRequest(),
+    current_user: dict = Depends(_require_master),
+    db: AsyncSession = Depends(get_db),
+):
+    """Мастер закрывает заезд: чек-лист, списание, completed. Повтор безопасен."""
+    from app.modules.appointments.close_service import ensure_invoice, serialize_invoice
+
+    result = await db.execute(
+        select(Appointment).options(*_APPT_LOAD).where(
+            Appointment.id == appointment_id,
+            Appointment.tenant_id == UUID(current_user["tenant_id"]),
+        )
+    )
+    appointment = result.scalar_one_or_none()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    if appointment.master_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Это не ваша запись")
+
+    if appointment.status == "completed":
+        inv = await ensure_invoice(
+            db,
+            appointment,
+            UUID(current_user["tenant_id"]),
+            user_id=current_user["id"],
+        )
+        return serialize_invoice(inv)
+
+    if appointment.status != "in_progress":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Нельзя закрыть запись в статусе '{appointment.status}'. Сначала возьмите в работу.",
+        )
+
+    body = request
+    appointment.status = "completed"
+    inv = await ensure_invoice(
+        db,
+        appointment,
+        UUID(current_user["tenant_id"]),
+        user_id=current_user["id"],
+        steps_in=[s.model_dump() for s in body.steps],
+        materials_in=[m.model_dump() for m in body.materials],
+        notes=body.notes,
+    )
+    await db.commit()
+
+    from app.services.history_service import log_status_change as _log_sc
+    await _log_sc(db, appointment.id, "in_progress", "completed", current_user["id"])
+    await _award_loyalty_points(appointment.id, db)
+    return serialize_invoice(inv)
 
 @router.put("/api/masters/me/appointments/{appointment_id}/notes")
 async def update_master_appointment_notes(
@@ -454,6 +674,43 @@ async def update_master_appointment_notes(
     appointment.master_brief = request.master_brief
     await db.commit()
     return _serialize_appointment(appointment)
+
+@router.get("/api/masters/me/appointments/{appointment_id}/detailer-brief", response_model=DetailerBriefResponse)
+async def get_master_detailer_brief(
+    appointment_id: int,
+    current_user: dict = Depends(_require_master),
+    db: AsyncSession = Depends(get_db),
+):
+    """Сводка детейлера к заезду: состояние, допродажи, фото."""
+    tenant_id = UUID(current_user["tenant_id"])
+    result = await db.execute(
+        select(Appointment).where(
+            Appointment.id == appointment_id,
+            Appointment.tenant_id == tenant_id,
+        )
+    )
+    appointment = result.scalar_one_or_none()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    is_admin = current_user["role"] in ("admin", "super_admin")
+    if appointment.master_id != current_user["id"] and not is_admin:
+        raise HTTPException(status_code=403, detail="Это не ваша запись")
+
+    insp_result = await db.execute(
+        select(DetailerInspection).where(
+            DetailerInspection.appointment_id == appointment.id,
+            DetailerInspection.tenant_id == tenant_id,
+        ).order_by(DetailerInspection.id.desc())
+    )
+    row = insp_result.scalars().first()
+    return {
+        "appointment_id": appointment.id,
+        "inspect_id": row.id if row else None,
+        "master_brief": (row.master_brief if row else None) or appointment.master_brief,
+        "findings": (row.findings if row else None) or [],
+        "upsells": (row.upsells if row else None) or [],
+        "photo_count": len(row.photo_ids or []) if row else 0,
+    }
 
 @router.get("/api/boxes", response_model=list[BoxOut])
 async def get_boxes(
@@ -487,6 +744,16 @@ async def get_boxes(
         bo.service_ids = box_services_map.get(b.id, [])
         out.append(bo)
     return out
+
+@router.get("/api/boxes/live", response_model=BoxLiveResponse)
+async def get_boxes_live(
+    current_user: dict = Depends(_require_master),
+    db: AsyncSession = Depends(get_db),
+):
+    """Сетка боксов сейчас: занятость, подготовка слота, ближайшая запись."""
+    from app.modules.appointments.live_service import build_live_floor
+
+    return await build_live_floor(db, UUID(current_user["tenant_id"]))
 
 @router.post("/api/boxes", response_model=BoxOut)
 async def create_box(

@@ -4,9 +4,22 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Button, Card, Col, DatePicker, Empty, Input, Modal, Popconfirm, Row, Select,
-  Space, Spin, Statistic, Table, Tag, Typography, message,
+  Card,
+  Col,
+  DatePicker,
+  Empty,
+  Popconfirm,
+  Row,
+  Select,
+  Space,
+  Spin,
+  Statistic,
+  Table,
+  Tag,
+  Typography,
+  message,
 } from 'antd';
+import { Button, Modal, Input } from '../components/ui';
 import {
   PlusOutlined, ReloadOutlined, DeleteOutlined, EditOutlined,
   WarningOutlined, BulbOutlined, RiseOutlined,
@@ -271,8 +284,8 @@ export default function ExpensesModule() {
       <div className="flex-space-between mb-12" style={{ flexWrap: 'wrap', gap: 10 }}>
         <Text className="admin-panel-title">Учёт постоянных затрат</Text>
         <Space wrap>
-          <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={refreshAll}>Обновить</Button>
-          <Button icon={<PlusOutlined />} className="btn-gold" onClick={openCreate}>Добавить затрату</Button>
+          <Button icon={<ReloadOutlined />} look="ghost" onClick={refreshAll}>Обновить</Button>
+          <Button icon={<PlusOutlined />} look="gold" onClick={openCreate}>Добавить затрату</Button>
         </Space>
       </div>
 
@@ -636,7 +649,7 @@ export default function ExpensesModule() {
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
             />
           </div>
-          <Button type="primary" size="large" className="btn-gold" loading={saving} onClick={save}>
+          <Button type="primary" size="large" look="gold" loading={saving} onClick={save}>
             {editing ? 'Сохранить' : 'Добавить'}
           </Button>
         </Space>

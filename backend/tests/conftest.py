@@ -105,6 +105,16 @@ async def setup_db():
         await conn.run_sync(Base.metadata.drop_all)
 
 
+@pytest.fixture(autouse=True)
+def plan_gate_uses_test_db():
+    """Middleware тарифа ходит в ту же SQLite, что и тесты."""
+    from app.core import plan_gate
+    prev = plan_gate.async_session_maker
+    plan_gate.async_session_maker = TestSessionLocal
+    yield
+    plan_gate.async_session_maker = prev
+
+
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a clean database session for each test."""

@@ -3,7 +3,8 @@
    ============================================================ */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Badge, Popover, List, Button, Typography, Space, Empty } from 'antd';
+import { Badge, Popover, List, Typography, Space, Empty } from 'antd';
+import { Button } from '../components/ui';
 import { BellOutlined, CheckOutlined } from '@ant-design/icons';
 import { getUnreadCount, markAllAsRead, getNotifications, markAsRead } from '../api/notifications';
 import type { Notification } from '../api/notifications';

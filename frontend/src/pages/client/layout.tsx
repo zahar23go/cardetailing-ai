@@ -3,12 +3,16 @@
  */
 import React from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Button, Layout, Space, Typography } from 'antd';
+import { Layout, Space, Typography } from 'antd';
+import { Button } from '../../components/ui';
 import {
   CalendarOutlined, CameraOutlined, CommentOutlined, GiftOutlined,
   HomeOutlined, LogoutOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { CLIENT_NAV, clientTabFromPath } from './navConfig';
+import { isModuleEnabled, type AppModuleName } from '../../modules';
+import { useEnabledModules } from '../../ModulesContext';
+import ModuleGate from '../../ModuleGate';
 
 const { Header, Content, Sider } = Layout;
 const { Text } = Typography;
@@ -23,7 +27,13 @@ const ICONS: Record<string, React.ReactNode> = {
 };
 
 type Props = {
-  user: { id: number; phone: string; full_name: string; role: string };
+  user: {
+    id: number;
+    phone: string;
+    full_name: string;
+    role: string;
+    pwa?: { name: string; icon: string; white_label: boolean };
+  };
   onLogout: () => void;
 };
 
@@ -31,17 +41,23 @@ export default function ClientLayout({ user, onLogout }: Props) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const active = clientTabFromPath(pathname);
+  const enabled = useEnabledModules();
+  const nav = CLIENT_NAV.filter((item) =>
+    isModuleEnabled(enabled, (item.module ?? 'core') as AppModuleName),
+  );
+  const brandName = user.pwa?.white_label && user.pwa.name ? user.pwa.name : 'CAR DETAILING AI';
+  const brandIcon = user.pwa?.icon || '/images/logo-formula-sport.png';
 
   return (
     <Layout className="client-layout client-app">
       <Header className="header-mobile client-header">
         <Space size="small" align="center">
           <img
-            src="/images/logo-formula-sport.png"
+            src={brandIcon}
             alt=""
             className="client-header-logo"
           />
-          <Text className="client-header-title">CAR DETAILING AI</Text>
+          <Text className="client-header-title">{brandName}</Text>
         </Space>
         <span className="client-header-badge">Кабинет</span>
       </Header>
@@ -49,11 +65,11 @@ export default function ClientLayout({ user, onLogout }: Props) {
       <Header className="header-desktop client-header">
         <Space className="client-header-brand" size="middle" align="center">
           <img
-            src="/images/logo-formula-sport.png"
+            src={brandIcon}
             alt=""
             className="client-header-logo"
           />
-          <Text className="client-header-title">CAR DETAILING AI</Text>
+          <Text className="client-header-title">{brandName}</Text>
           <span className="client-header-badge">Кабинет</span>
         </Space>
         <Space size="middle" className="client-header-actions" wrap>
@@ -80,7 +96,7 @@ export default function ClientLayout({ user, onLogout }: Props) {
           width={228}
           trigger={null}
         >
-          {CLIENT_NAV.map((item) => (
+          {nav.map((item) => (
             <button
               key={item.key}
               type="button"
@@ -95,13 +111,15 @@ export default function ClientLayout({ user, onLogout }: Props) {
 
         <Content className="client-content">
           <div className="client-app-inner">
-            <Outlet />
+            <ModuleGate>
+              <Outlet />
+            </ModuleGate>
           </div>
         </Content>
       </Layout>
 
       <div className="bottom-nav">
-        {CLIENT_NAV.map((item) => (
+        {nav.map((item) => (
           <button
             key={item.key}
             className={`bottom-nav-item${active === item.key ? ' active' : ''}`}

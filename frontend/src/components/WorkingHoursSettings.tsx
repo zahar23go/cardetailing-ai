@@ -4,8 +4,16 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Typography, Card, Select, Button, TimePicker, Switch, Space, message, Spin,
+  Typography,
+  Card,
+  Select,
+  TimePicker,
+  Switch,
+  Space,
+  message,
+  Spin,
 } from 'antd';
+import { Button } from '../components/ui';
 import { SaveOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -161,7 +169,7 @@ export default function WorkingHoursSettings() {
 
         <Button
           type="primary"
-          className="btn-gold"
+          look="gold"
           icon={<SaveOutlined />}
           onClick={handleSave}
           loading={saving}

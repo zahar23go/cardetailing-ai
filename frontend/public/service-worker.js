@@ -1,23 +1,21 @@
-/* ============================================================
-   CarDetailing AI — Service Worker
-   ============================================================ */
+/* CarDetailing AI — PWA service worker: оболочка + офлайн записей. */
 
-const CACHE_NAME = 'cardetailing-v1';
-const STATIC_URLS = [
-  '/',
-  '/index.html',
+const CACHE_NAME = 'cardetailing-pwa-v2';
+const SHELL = [
+  '/offline.html',
   '/manifest.json',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+  '/images/logo-formula-sport.png',
 ];
 
-// Install — cache static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_URLS)),
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL).catch(() => undefined)),
   );
   self.skipWaiting();
 });
 
-// Activate — clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -27,22 +25,51 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch — network first, fallback to cache, then offline page
+function isAppointmentsMe(url) {
+  try {
+    const u = new URL(url);
+    return u.pathname === '/api/appointments/me' || u.pathname.endsWith('/api/appointments/me');
+  } catch {
+    return false;
+  }
+}
+
 self.addEventListener('fetch', (event) => {
-  // API requests — network only
-  if (event.request.url.includes('/api/') || event.request.url.includes('/uploads/')) {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+
+  const url = req.url;
+  if (url.includes('/uploads/')) return;
+  if (url.includes('@vite') || url.includes('/src/') || url.includes('node_modules')) return;
+
+  if (isAppointmentsMe(url)) {
+    event.respondWith(
+      fetch(req)
+        .then((response) => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(req).then((cached) => cached || Response.error())),
+    );
     return;
   }
 
+  if (url.includes('/api/')) return;
+
   event.respondWith(
-    fetch(event.request)
+    fetch(req)
       .then((response) => {
-        const cacheResponse = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cacheResponse));
+        if (response && response.ok && req.url.startsWith(self.location.origin)) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+        }
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => {
-        return cached || caches.match('/offline.html');
-      })),
+      .catch(() =>
+        caches.match(req).then((cached) => cached || caches.match('/offline.html')),
+      ),
   );
 });

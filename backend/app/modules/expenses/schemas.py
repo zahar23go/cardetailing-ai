@@ -95,6 +95,19 @@ class ServiceMargin(BaseModel):
     margin_percent: float = 0
     appointment_count: int = 0
 
+
+class BoxMargin(BaseModel):
+    box_id: Optional[int] = None
+    box_name: str
+    total_revenue: float = 0
+    total_material_cost: float = 0
+    gross_profit: float = 0
+    margin_percent: float = 0
+    appointment_count: int = 0
+    allocated_expenses: float = 0
+    net_profit: float = 0
+
+
 class PLReport(BaseModel):
     # Revenue
     total_revenue: float = 0
@@ -114,5 +127,6 @@ class PLReport(BaseModel):
 
     # Details
     service_margins: list[ServiceMargin] = []
+    box_margins: list[BoxMargin] = []
     period: str = "month"
 

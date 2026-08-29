@@ -4,8 +4,20 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Typography, Row, Col, Table, Button, Space, Spin, Empty, Select, message, Tooltip, InputNumber, Alert,
+  Typography,
+  Row,
+  Col,
+  Table,
+  Space,
+  Spin,
+  Empty,
+  Select,
+  message,
+  Tooltip,
+  InputNumber,
+  Alert,
 } from 'antd';
+import { Button } from '../../../components/ui';
 import {
   ReloadOutlined, ShoppingCartOutlined, AuditOutlined, WarningOutlined,
   ThunderboltOutlined, CheckOutlined, CalculatorOutlined,
@@ -301,13 +313,13 @@ export default function TechAnalyticsPage() {
           />
           <Button
             icon={<ThunderboltOutlined />}
-            className="btn-gold"
+            look="gold"
             loading={syncing}
             onClick={runSync}
           >
             Синхронизировать
           </Button>
-          <Button icon={<ReloadOutlined />} className="btn-gold-secondary" onClick={refresh}>
+          <Button icon={<ReloadOutlined />} look="ghost" onClick={refresh}>
             Обновить
           </Button>
         </Space>
@@ -712,7 +724,7 @@ export default function TechAnalyticsPage() {
                     <Button
                       size="small"
                       icon={<CheckOutlined />}
-                      className="btn-gold-secondary"
+                      look="ghost"
                       onClick={() => resolveLog(r.id)}
                     >
                       OK

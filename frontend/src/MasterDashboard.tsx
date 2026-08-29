@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Typography, Card, Row, Col, Button, Tag, Space, Tabs,
-  message, Modal, Input, Layout, List, Empty, Spin, Tooltip,
+  Typography,
+  Card,
+  Row,
+  Col,
+  Tag,
+  Space,
+  Tabs,
+  message,
+  Layout,
+  List,
+  Empty,
+  Spin,
+  Tooltip,
   Statistic,
 } from 'antd';
+import { Button, Modal, Input } from './components/ui';
 import {
   ToolOutlined, CalendarOutlined, ClockCircleOutlined,
   CheckCircleOutlined, PlayCircleOutlined, EditOutlined,
@@ -12,14 +24,22 @@ import {
   UserOutlined, PhoneOutlined, FileTextOutlined,
   BellOutlined, HomeOutlined, BulbOutlined,
   CrownOutlined, CameraOutlined, GiftOutlined,
-  SettingOutlined,
+  SettingOutlined, DollarOutlined, TeamOutlined,
+  StarOutlined, FileProtectOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { isModuleEnabled, type AppModuleName } from './modules';
+import { useEnabledModules } from './ModulesContext';
 import dayjs from 'dayjs';
+import 'dayjs/locale/ru';
 import PortfolioSection from './components/PortfolioSection';
 import NotificationBell from './components/NotificationBell';
 import NotificationList from './components/NotificationList';
 import NotificationSettings from './components/NotificationSettings';
+import CloseVisitModal from './components/CloseVisitModal';
+
+dayjs.locale('ru');
 
 const { Text } = Typography;
 const { TabPane } = Tabs;
@@ -47,6 +67,64 @@ interface Appointment {
   master?: { id: number; full_name: string };
   car?: { id: number; make: string; model: string; license_plate: string };
   service?: { id: number; name: string; price: number };
+}
+
+interface KpiSparkPoint {
+  date: string;
+  value: number;
+}
+
+interface MasterKpi {
+  period_start: string;
+  revenue: number;
+  avg_check: number;
+  completed_month: number;
+  completed_today: number;
+  unique_clients: number;
+  repeat_clients: number;
+  repeat_rate: number;
+  tech_steps_done: number;
+  tech_steps_total: number;
+  tech_compliance_pct: number;
+  overspend_qty: number;
+  overspend_cost: number;
+  overspend_pct: number;
+  score: number;
+  score_hint: string;
+  sparkline_revenue: KpiSparkPoint[];
+}
+
+const EMPTY_KPI: MasterKpi = {
+  period_start: '',
+  revenue: 0,
+  avg_check: 0,
+  completed_month: 0,
+  completed_today: 0,
+  unique_clients: 0,
+  repeat_clients: 0,
+  repeat_rate: 0,
+  tech_steps_done: 0,
+  tech_steps_total: 0,
+  tech_compliance_pct: 0,
+  overspend_qty: 0,
+  overspend_cost: 0,
+  overspend_pct: 0,
+  score: 0,
+  score_hint: 'техкарта · расход · повтор',
+  sparkline_revenue: [],
+};
+
+function MasterKpiSpark({ data }: { data?: KpiSparkPoint[] }) {
+  if (!data || data.length < 2) return null;
+  return (
+    <div className="admin-kpi-spark">
+      <ResponsiveContainer width="100%" height={36}>
+        <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+          <Area type="monotone" dataKey="value" stroke="#C8A977" fill="#C8A977" fillOpacity={0.18} strokeWidth={1.5} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 /* ============================================================
@@ -92,22 +170,13 @@ const STATUS_LABELS: Record<string, string> = {
   no_show: 'Не явился',
 };
 
-/* ---------- sidebar items ---------- */
-const sidebarItems = [
-  { key: 'overview', icon: <HomeOutlined />, label: 'Обзор' },
-  { key: 'tasks', icon: <ToolOutlined />, label: 'Задания' },
-  { key: 'portfolio', icon: <CameraOutlined />, label: 'Портфолио' },
+/* ---------- sidebar / bottom nav ---------- */
+const MASTER_NAV: { key: string; icon: React.ReactNode; label: string; short?: string; module?: AppModuleName }[] = [
+  { key: 'overview', icon: <HomeOutlined />, label: 'Обзор', short: 'Главная' },
+  { key: 'tasks', icon: <ToolOutlined />, label: 'Задания', module: 'appointments' },
+  { key: 'portfolio', icon: <CameraOutlined />, label: 'Портфолио', module: 'photos' },
   { key: 'profile', icon: <UserOutlined />, label: 'Профиль' },
-  { key: 'notifications', icon: <BellOutlined />, label: 'Уведомления' },
-];
-
-/* ---------- bottom nav items ---------- */
-const bottomNavItems = [
-  { key: 'overview', icon: <HomeOutlined />, label: 'Главная' },
-  { key: 'tasks', icon: <ToolOutlined />, label: 'Задания' },
-  { key: 'portfolio', icon: <CameraOutlined />, label: 'Портфолио' },
-  { key: 'profile', icon: <UserOutlined />, label: 'Профиль' },
-  { key: 'notifications', icon: <BellOutlined />, label: 'Уведом.' },
+  { key: 'notifications', icon: <BellOutlined />, label: 'Уведомления', short: 'Уведом.', module: 'notifications' },
 ];
 
 /* ============================================================
@@ -121,9 +190,12 @@ interface MasterDashboardProps {
 
 export default function MasterDashboard({ user, onLogout, initialSection = 'overview' }: MasterDashboardProps) {
   const navigate = useNavigate();
+  const enabled = useEnabledModules();
+  const nav = MASTER_NAV.filter((item) => isModuleEnabled(enabled, item.module || 'core'));
   const [activeSection, setActiveSection] = useState(initialSection);
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [kpi, setKpi] = useState<MasterKpi>(EMPTY_KPI);
   const [loading, setLoading] = useState(false);
 
   const [notesModal, setNotesModal] = useState(false);
@@ -132,6 +204,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
   const [notesSaving, setNotesSaving] = useState(false);
 
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [closeAppt, setCloseAppt] = useState<Appointment | null>(null);
 
   // Services for portfolio upload
   const [masterServices, setMasterServices] = useState<{ id: number; name: string }[]>([]);
@@ -160,8 +233,12 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
   const fetchAppointments = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch<{items: Appointment[]; total: number}>('/api/masters/me/appointments?skip=0&limit=200');
+      const [data, kpiData] = await Promise.all([
+        apiFetch<{ items: Appointment[]; total: number }>('/api/masters/me/appointments?skip=0&limit=200'),
+        apiFetch<MasterKpi>('/api/masters/me/kpi').catch(() => null),
+      ]);
       setAppointments(data.items);
+      if (kpiData) setKpi(kpiData);
     } catch (e: any) {
       message.error(e.message || 'Ошибка загрузки записей');
     }
@@ -233,7 +310,9 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
     const quickActions = [
       { icon: <ToolOutlined />, label: 'Мои задания', key: 'tasks' },
       { icon: <UserOutlined />, label: 'Профиль', key: 'profile' },
-      { icon: <CameraOutlined />, label: 'Портфолио', key: 'portfolio' },
+      ...(isModuleEnabled(enabled, 'photos')
+        ? [{ icon: <CameraOutlined />, label: 'Портфолио', key: 'portfolio' }]
+        : []),
       { icon: <CrownOutlined />, label: 'Достижения', key: 'profile' },
     ];
 
@@ -269,7 +348,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                       <Col>
                         <Button
                           size="small"
-                          className="btn-gold-secondary"
+                          look="ghost"
                           onClick={() => goSection('tasks')}
                         >
                           К заданию
@@ -328,21 +407,19 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                 <div className="mt-12">
                   <Text className="text-titanium text-13">Выполнено сегодня</Text>
                   <div>
-                    <Text className="stat-value-green">
-                      {completedAppointments.filter((a) => dayjs(a.start_time).isSame(dayjs(), 'day')).length}
-                    </Text>
+                    <Text className="stat-value-green">{kpi.completed_today}</Text>
                   </div>
                 </div>
                 <div className="mt-12">
-                  <Text className="text-titanium text-13">Всего работ</Text>
+                  <Text className="text-titanium text-13">Закрыто за месяц</Text>
                   <div>
-                    <Text className="stat-value-white">{appointments.length}</Text>
+                    <Text className="stat-value-white">{kpi.completed_month}</Text>
                   </div>
                 </div>
                 <Button
                   type="primary"
                   size="large"
-                  className="btn-gold master-overview-tasks-btn"
+                  look="gold" className="master-overview-tasks-btn"
                   onClick={() => goSection('tasks')}
                 >
                   Мои задания
@@ -351,6 +428,96 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
             </motion.div>
           </Col>
         </Row>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.12 }}
+        >
+          <div className="admin-section-head master-kpi-title">
+            <div>
+              <h3>Мои показатели</h3>
+              <p className="text-titanium" style={{ marginTop: 4 }}>
+                За месяц{kpi.period_start ? ` · с ${dayjs(kpi.period_start).format('D MMMM')}` : ''}
+                {' · '}оценка по техкартам, расходу и повторным
+              </p>
+            </div>
+          </div>
+          <Row gutter={[12, 12]} className="master-kpi-row">
+            {[
+              {
+                key: 'rev',
+                label: 'Выручка',
+                value: formatCurrency(kpi.revenue),
+                icon: <DollarOutlined />,
+                tone: 'gold' as const,
+                hint: null as string | null,
+                spark: kpi.sparkline_revenue,
+              },
+              {
+                key: 'avg',
+                label: 'Средний чек',
+                value: formatCurrency(kpi.avg_check),
+                icon: <CheckCircleOutlined />,
+                tone: 'gold' as const,
+                hint: kpi.completed_month ? `${kpi.completed_month} закрытий` : 'пока нет закрытий',
+                spark: undefined,
+              },
+              {
+                key: 'rep',
+                label: 'Повторные',
+                value: String(kpi.repeat_clients),
+                icon: <TeamOutlined />,
+                tone: kpi.repeat_clients > 0 ? ('ok' as const) : ('gold' as const),
+                hint: kpi.unique_clients
+                  ? `${kpi.repeat_rate}% · ${kpi.unique_clients} клиентов`
+                  : 'клиенты с 2+ визитами',
+                spark: undefined,
+              },
+              {
+                key: 'score',
+                label: 'Оценка',
+                value: `${kpi.score.toFixed(1)} / 5`,
+                icon: <StarOutlined />,
+                tone: kpi.score >= 4 ? ('ok' as const) : kpi.score >= 2.5 ? ('gold' as const) : ('warn' as const),
+                hint: kpi.score_hint,
+                spark: undefined,
+              },
+              {
+                key: 'tech',
+                label: 'Техкарта',
+                value: `${kpi.tech_compliance_pct}%`,
+                icon: <FileProtectOutlined />,
+                tone: kpi.tech_compliance_pct >= 90 ? ('ok' as const) : kpi.tech_compliance_pct >= 70 ? ('gold' as const) : ('warn' as const),
+                hint: kpi.tech_steps_total
+                  ? `${kpi.tech_steps_done} из ${kpi.tech_steps_total} шагов`
+                  : 'нет отметок на закрытии',
+                spark: undefined,
+              },
+              {
+                key: 'over',
+                label: 'Перерасход',
+                value: kpi.overspend_cost > 0 ? `+${formatCurrency(kpi.overspend_cost)}` : formatCurrency(0),
+                icon: <WarningOutlined />,
+                tone: kpi.overspend_cost > 0 ? ('warn' as const) : ('ok' as const),
+                hint: kpi.overspend_qty > 0
+                  ? `+${kpi.overspend_qty} к норме · ${kpi.overspend_pct}%`
+                  : 'факт в пределах нормы',
+                spark: undefined,
+              },
+            ].map((m) => (
+              <Col xs={12} sm={8} lg={4} key={m.key}>
+                <Card className={`admin-kpi-card master-kpi-card tone-${m.tone}`} bordered={false}>
+                  <div className="admin-kpi-icon">{m.icon}</div>
+                  <div className="admin-kpi-label">{m.label}</div>
+                  <div className="admin-kpi-value">{m.value}</div>
+                  {m.hint ? <div className="master-kpi-hint">{m.hint}</div> : null}
+                  <MasterKpiSpark data={m.spark} />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -373,7 +540,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
               {aiServiceChips.map((chip) => (
                 <Button
                   key={chip}
-                  className="btn-gold-secondary"
+                  look="ghost"
                   onClick={() => {}}
                 >
                   {chip}
@@ -431,7 +598,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
             <Card className="card-luxury text-center" styles={{ body: { textAlign: 'center' } }}>
               <Statistic
                 title={<Text className="text-titanium text-12">Выполнено сегодня</Text>}
-                value={completedAppointments.filter(a => dayjs(a.start_time).isSame(dayjs(), 'day')).length}
+                value={kpi.completed_today}
                 valueStyle={{ color: '#4ECB71', fontSize: 28, fontWeight: 700 }}
               />
             </Card>
@@ -536,8 +703,10 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                               </Text>
                             )}
                             {item.master_brief && (
-                              <Text className="text-gold text-12">
-                                📋 Заметка: {item.master_brief}
+                              <Text className="text-gold text-12 detailer-brief">
+                                {item.master_brief.startsWith('Детейлер')
+                                  ? item.master_brief
+                                  : `📋 Заметка: ${item.master_brief}`}
                               </Text>
                             )}
                           </Space>
@@ -554,7 +723,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                                   icon={<PlayCircleOutlined />}
                                   loading={actionLoading === item.id}
                                   onClick={() => handleChangeStatus(item, 'in_progress')}
-                                  className="btn-gold-secondary"
+                                  look="ghost"
                                   style={{ width: 'auto', height: 32, fontSize: 12 }}
                                 >Взять в работу</Button>
                               )}
@@ -563,12 +732,9 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                                   size="small"
                                   icon={<CheckCircleOutlined />}
                                   loading={actionLoading === item.id}
-                                  onClick={() => handleChangeStatus(item, 'completed')}
-                                  style={{
-                                    width: 'auto', height: 32, fontSize: 12,
-                                    backgroundColor: '#0F5D46', border: 'none',
-                                    color: '#FFFFFF', borderRadius: 10,
-                                  }}
+                                  onClick={() => setCloseAppt(item)}
+                                  look="gold"
+                                  style={{ width: 'auto', height: 32, fontSize: 12 }}
                                 >Завершить</Button>
                               )}
                               <Tooltip title="Заметка мастера">
@@ -576,7 +742,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                                   size="small"
                                   icon={<EditOutlined />}
                                   onClick={() => openNotesModal(item)}
-                                  className="btn-gold-secondary"
+                                  look="ghost"
                                   style={{ width: 'auto', height: 32, fontSize: 12 }}
                                 >Заметка</Button>
                               </Tooltip>
@@ -677,7 +843,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
 
       <Button
         type="primary"
-        className="btn-gold mt-4"
+        look="gold" className="mt-4"
         icon={<CameraOutlined />}
         onClick={() => goSection('portfolio')}
       >
@@ -724,7 +890,9 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
      RENDER: Content router
      ============================================================ */
   const renderContent = () => {
-    switch (activeSection) {
+    const allowed = nav.some((item) => item.key === activeSection);
+    const section = allowed ? activeSection : 'overview';
+    switch (section) {
       case 'overview': return renderOverview();
       case 'tasks': return renderTasks();
       case 'portfolio': return renderPortfolio();
@@ -784,7 +952,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
           width={228}
           trigger={null}
         >
-          {sidebarItems.map(item => (
+          {nav.map(item => (
             <button
               key={item.key}
               className={`sidebar-item${activeSection === item.key ? ' active' : ''}`}
@@ -804,14 +972,14 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
 
       {/* Нижняя навигация (моб) */}
       <div className="bottom-nav">
-        {bottomNavItems.map(item => (
+        {nav.map(item => (
           <button
             key={item.key}
             className={`bottom-nav-item${activeSection === item.key ? ' active' : ''}`}
             onClick={() => goSection(item.key)}
           >
             <span className="bottom-nav-icon">{item.icon}</span>
-            <span className="bottom-nav-label">{item.label}</span>
+            <span className="bottom-nav-label">{item.short || item.label}</span>
           </button>
         ))}
       </div>
@@ -854,13 +1022,24 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
             <Button
               type="primary"
               size="large"
-              className="btn-gold"
+              look="gold"
               onClick={handleSaveNotes}
               loading={notesSaving}
             >Сохранить заметку</Button>
           </Space>
         )}
       </Modal>
+
+      <CloseVisitModal
+        open={Boolean(closeAppt)}
+        appointmentId={closeAppt?.id ?? null}
+        role="master"
+        onCancel={() => setCloseAppt(null)}
+        onClosed={() => {
+          setCloseAppt(null);
+          fetchAppointments();
+        }}
+      />
     </Layout>
   );
 }

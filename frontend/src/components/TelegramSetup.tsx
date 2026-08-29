@@ -3,7 +3,8 @@
    ============================================================ */
 
 import React, { useState } from 'react';
-import { Typography, Button, Input, Space, message } from 'antd';
+import { Typography, Space, message } from 'antd';
+import { Button, Input } from '../components/ui';
 import { connectTelegram, disconnectTelegram } from '../api/notifications';
 import type { NotificationSettings } from '../api/notifications';
 
@@ -71,7 +72,7 @@ export default function TelegramSetup({ settings, onUpdate }: TelegramSetupProps
               onChange={(e) => setCode(e.target.value)}
               onPressEnter={handleConnect}
             />
-            <Button type="primary" className="btn-gold" loading={connecting} onClick={handleConnect}>
+            <Button type="primary" look="gold" loading={connecting} onClick={handleConnect}>
               Подключить
             </Button>
           </Space.Compact>

@@ -159,6 +159,13 @@ class MaterialMovement(Base):
         nullable=True,
         index=True,
     )
+    appointment_id = Column(
+        Integer,
+        ForeignKey("appointments.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Заезд, если расход при закрытии",
+    )
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

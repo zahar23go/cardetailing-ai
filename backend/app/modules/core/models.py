@@ -36,6 +36,7 @@ class Tenant(Base):
     subdomain = Column(String(100), unique=True, nullable=False)
     logo_url = Column(Text, nullable=True)
     config = Column(JSONB, nullable=False, server_default="'{}'")
+    plan = Column(String(20), nullable=False, default="business", server_default="business")
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

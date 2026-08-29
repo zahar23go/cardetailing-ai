@@ -3,13 +3,20 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  Col, Input, InputNumber, Modal, Row, Select, Space, Typography, Upload, message,
+  Col,
+  InputNumber,
+  Row,
+  Select,
+  Space,
+  Typography,
+  Upload,
+  message,
 } from 'antd';
 import {
   ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PictureOutlined, PlusOutlined,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
-import { Button } from '../../../components/ui';
+import { Button, Modal, Input } from '../../../components/ui';
 import Card from '../../../components/Card';
 import { DurationMark } from './Marks';
 import StepPhoto from './StepPhoto';

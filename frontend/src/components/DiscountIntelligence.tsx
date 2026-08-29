@@ -4,8 +4,19 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Button, Card, Col, Empty, message, Row, Space, Spin, Table, Tag, Tooltip, Typography,
+  Card,
+  Col,
+  Empty,
+  message,
+  Row,
+  Space,
+  Spin,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
 } from 'antd';
+import { Button } from '../components/ui';
 import {
   GiftOutlined, ReloadOutlined, ThunderboltOutlined, SendOutlined, BulbOutlined,
 } from '@ant-design/icons';
@@ -191,7 +202,7 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
             <Button
               key={d}
               size="small"
-              className={periodDays === d ? 'btn-gold' : 'btn-gold-secondary'}
+              look={periodDays === d  ? 'gold' : 'ghost'}
               onClick={() => { setPeriodDays(d); }}
             >
               {d} дн.
@@ -200,7 +211,7 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
           <Button
             size="small"
             icon={<ReloadOutlined />}
-            className="btn-gold-secondary"
+            look="ghost"
             onClick={() => load(periodDays)}
           >
             Обновить
@@ -208,7 +219,7 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
           <Button
             size="small"
             icon={<SendOutlined />}
-            className="btn-gold"
+            look="gold"
             loading={broadcasting}
             onClick={handleBroadcast}
           >
@@ -283,7 +294,7 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
                   <div className="meta">ср. загрузка {s.avg_load}</div>
                   <div className="reason">{s.reason}</div>
                   <Button
-                    className="btn-gold"
+                    look="gold"
                     size="small"
                     icon={<GiftOutlined />}
                     loading={creatingKey === s.key}
@@ -314,7 +325,7 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
                           <div className="msg">{r.message}</div>
                         </div>
                         {r.action === 'create' && onApplyAdvice && (
-                          <Button size="small" className="btn-gold-secondary" onClick={() => onApplyAdvice(r)}>
+                          <Button size="small" look="ghost" onClick={() => onApplyAdvice(r)}>
                             К созданию
                           </Button>
                         )}

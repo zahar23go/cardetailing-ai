@@ -5,7 +5,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Typography, Row, Col, Table, Space, message, Popconfirm, Empty, Spin, Tooltip,
+  Typography,
+  Row,
+  Col,
+  Table,
+  Space,
+  message,
+  Popconfirm,
+  Empty,
+  Spin,
+  Tooltip,
 } from 'antd';
 import {
   DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined,

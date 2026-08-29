@@ -97,6 +97,11 @@ async def get_kpi(
     )
     pending_count = len(pending_result.scalars().all())
 
+    from app.modules.analytics.spec import sparkline_series
+
+    tenant_id = UUID(current_user["tenant_id"])
+    spark_rev, spark_n, spark_done = await sparkline_series(db, tenant_id)
+
     return KpiOut(
         total_clients=total_clients,
         total_masters=total_masters,
@@ -105,7 +110,21 @@ async def get_kpi(
         month_revenue=month_revenue,
         pending_appointments=pending_count,
         completed_month=sum(1 for a in month_appts if a.status == "completed"),
+        sparkline_revenue=spark_rev,
+        sparkline_appointments=spark_n,
+        sparkline_completed=spark_done,
     )
+
+
+@router.get("/api/analytics/spec", response_model=AnalyticsSpecResponse)
+async def get_analytics_spec(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Когорты, treemap услуг, загрузка мастеров и боксов."""
+    from app.modules.analytics.spec import build_spec
+
+    return await build_spec(db, UUID(current_user["tenant_id"]))
 
 @router.get("/api/analytics/expenses", response_model=ExpenseAnalyticsResponse)
 async def get_expense_analytics(
@@ -182,7 +201,10 @@ async def get_expense_analytics(
     appts = (
         await db.execute(
             select(Appointment)
-            .options(selectinload(Appointment.service))
+            .options(
+                selectinload(Appointment.service),
+                selectinload(Appointment.invoice),
+            )
             .where(
                 Appointment.tenant_id == tenant_id,
                 Appointment.start_time >= month_start,
@@ -190,8 +212,9 @@ async def get_expense_analytics(
             )
         )
     ).scalars().all()
-    revenue_month = sum(float(a.total_price or 0) for a in appts)
-    material_month = sum(float(a.service.material_cost or 0) if a.service else 0 for a in appts)
+    from app.modules.appointments.close_service import snapshot_material_cost, snapshot_revenue
+    revenue_month = sum(snapshot_revenue(a) for a in appts)
+    material_month = sum(snapshot_material_cost(a) for a in appts)
 
     # Fixed costs this month
     month_expenses = [e for e in expenses if e.expense_date and e.expense_date >= month_start]
@@ -295,7 +318,11 @@ async def get_pl_report(
     # --- Выручка ---
     month_appts = await db.execute(
         select(Appointment)
-        .options(selectinload(Appointment.service))
+        .options(
+            selectinload(Appointment.service),
+            selectinload(Appointment.box),
+            selectinload(Appointment.invoice).selectinload(AppointmentInvoice.box),
+        )
         .where(
             Appointment.start_time >= month_start,
             Appointment.tenant_id == tenant_id,
@@ -311,13 +338,18 @@ async def get_pl_report(
         net_margin_percent,
         net_profit as calc_net_profit,
     )
+    from app.modules.appointments.close_service import (
+        compute_box_margins,
+        snapshot_material_cost,
+        snapshot_revenue,
+    )
 
-    total_revenue = sum(float(a.total_price or 0) for a in completed)
+    total_revenue = sum(snapshot_revenue(a) for a in completed)
     completed_count = len(completed)
     avg_check = calc_avg_check(total_revenue, completed_count)
 
-    # --- Материальные затраты ---
-    total_material_cost = sum(float(a.service.material_cost or 0) for a in completed if a.service)
+    # --- Материальные затраты (чек закрытия, иначе каталог) ---
+    total_material_cost = sum(snapshot_material_cost(a) for a in completed)
 
     # --- Маржинальность по услугам ---
     service_map: dict[int, dict] = {}
@@ -335,8 +367,8 @@ async def get_pl_report(
                 "total_material_cost": 0.0,
                 "appointment_count": 0,
             }
-        service_map[sid]["total_revenue"] += float(a.total_price or 0)
-        service_map[sid]["total_material_cost"] += float(a.service.material_cost or 0) if a.service else 0
+        service_map[sid]["total_revenue"] += snapshot_revenue(a)
+        service_map[sid]["total_material_cost"] += snapshot_material_cost(a)
         service_map[sid]["appointment_count"] += 1
 
     service_margins = []
@@ -388,6 +420,7 @@ async def get_pl_report(
         net_profit=net_profit,
         net_margin_percent=net_margin,
         service_margins=service_margins,
+        box_margins=[BoxMargin(**row) for row in compute_box_margins(completed, total_expenses)],
         period="month",
     )
 
@@ -1316,7 +1349,12 @@ async def get_revenue_report(
     # Записи за текущий период
     appts_current = await db.execute(
         select(Appointment)
-        .options(selectinload(Appointment.service), selectinload(Appointment.master), selectinload(Appointment.client))
+        .options(
+            selectinload(Appointment.service),
+            selectinload(Appointment.master),
+            selectinload(Appointment.client),
+            selectinload(Appointment.invoice),
+        )
         .where(
             Appointment.tenant_id == tenant_id,
             Appointment.status == "completed",
@@ -1399,16 +1437,18 @@ async def get_revenue_report(
 
     # --- Детализация ---
     details = []
+    from app.modules.appointments.close_service import snapshot_material_cost, snapshot_revenue
     for a in current_appts:
-        material = float(a.service.material_cost or 0) if a.service else 0
+        material = snapshot_material_cost(a)
+        price = snapshot_revenue(a)
         details.append(RevenueDetail(
             date=a.start_time.strftime("%Y-%m-%d %H:%M"),
             service_name=a.service.name if a.service else "—",
             master_name=a.master.full_name if a.master else "—",
             client_name=a.client.full_name if a.client else "—",
-            total_price=float(a.total_price or 0),
+            total_price=price,
             material_cost=material,
-            profit=float(a.total_price or 0) - material,
+            profit=price - material,
         ))
 
     total_profit = sum(d.profit for d in details)

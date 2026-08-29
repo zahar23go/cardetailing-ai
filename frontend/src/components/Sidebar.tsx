@@ -11,14 +11,17 @@ import {
   SettingOutlined, GiftOutlined, BellOutlined, DownOutlined, RightOutlined,
   ToolOutlined, BgColorsOutlined, AppstoreOutlined, ExperimentOutlined,
   DatabaseOutlined, ProfileOutlined, FundOutlined, LineChartOutlined,
+  InsertRowAboveOutlined, CrownOutlined,
 } from '@ant-design/icons';
 import {
   ADMIN_NAV,
   NAV_STORAGE_KEY,
+  filterAdminNav,
   groupIdForPath,
   type NavEntry,
   type NavLeaf,
 } from '../admin/navConfig';
+import { useEnabledModules, usePlanFeatures } from '../ModulesContext';
 
 const ICONS: Record<string, React.ReactNode> = {
   home: <HomeOutlined />,
@@ -30,6 +33,7 @@ const ICONS: Record<string, React.ReactNode> = {
   upload: <AppstoreOutlined />,
   records: <FileTextOutlined />,
   calendar: <CalendarOutlined />,
+  boxes: <InsertRowAboveOutlined />,
   crm: <TeamOutlined />,
   users: <TeamOutlined />,
   services: <ToolOutlined />,
@@ -42,6 +46,7 @@ const ICONS: Record<string, React.ReactNode> = {
   settings: <SettingOutlined />,
   notifications: <BellOutlined />,
   branding: <BgColorsOutlined />,
+  tariffs: <CrownOutlined />,
 };
 
 function readOpenGroups(): string[] {
@@ -59,6 +64,9 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [openGroups, setOpenGroups] = useState<string[]>(readOpenGroups);
+  const enabled = useEnabledModules();
+  const features = usePlanFeatures();
+  const nav = filterAdminNav(ADMIN_NAV, enabled, features);
 
   // Авто-открыть группу активного пункта + сохранить
   useEffect(() => {
@@ -132,5 +140,5 @@ export default function Sidebar() {
     );
   };
 
-  return <>{ADMIN_NAV.map(renderEntry)}</>;
+  return <>{nav.map(renderEntry)}</>;
 }

@@ -24,6 +24,7 @@ _APPT_LOAD = (
     selectinload(Appointment.service),
     selectinload(Appointment.car),
     selectinload(Appointment.master),
+    selectinload(Appointment.box),
 )
 
 EXPENSE_CATALOG: list[dict] = [

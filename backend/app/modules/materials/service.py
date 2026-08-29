@@ -138,6 +138,7 @@ async def _log_movement(
     movement_type: str | None = None,
     reason: str | None = None,
     created_by_id: int | None = None,
+    appointment_id: int | None = None,
 ) -> None:
     db.add(
         MaterialMovement(
@@ -149,6 +150,7 @@ async def _log_movement(
             quantity_after=quantity_after,
             reason=reason,
             created_by_id=created_by_id,
+            appointment_id=appointment_id,
         )
     )
 
@@ -289,6 +291,41 @@ async def adjust_quantity(
     await db.commit()
     await db.refresh(material)
     return material
+
+
+async def apply_stock_delta(
+    db: AsyncSession,
+    tenant_id: UUID,
+    material_id: int,
+    delta: float,
+    *,
+    reason: str | None = None,
+    created_by_id: int | None = None,
+    appointment_id: int | None = None,
+) -> tuple[Material | None, float]:
+    """Как adjust_quantity, но без commit. Возвращает (материал, фактически применённый delta)."""
+    material = await get_material(db, tenant_id, material_id)
+    if not material:
+        return None, 0.0
+    before = float(material.quantity or 0)
+    requested = before + float(delta)
+    after = max(0.0, requested)
+    applied = after - before
+    material.quantity = after
+    if abs(applied) > 1e-9:
+        await _log_movement(
+            db,
+            tenant_id=tenant_id,
+            material_id=material.id,
+            delta=applied,
+            quantity_before=before,
+            quantity_after=after,
+            reason=reason or ("Приход" if applied > 0 else "Расход"),
+            created_by_id=created_by_id,
+            appointment_id=appointment_id,
+        )
+    await db.flush()
+    return material, applied
 
 
 def list_category_items() -> list[dict[str, str]]:

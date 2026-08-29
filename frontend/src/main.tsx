@@ -4,11 +4,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { BrandProvider } from './design';
+import { registerServiceWorker } from './pwa';
 
 import './styles/global.css';
 import './styles/theme.css';
 import './styles/components.css';
 import './components/ui/ui.css';
+
+registerServiceWorker();
 
 const queryClient = new QueryClient();
 

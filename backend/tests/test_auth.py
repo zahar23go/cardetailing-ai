@@ -90,6 +90,17 @@ class TestAuth:
         assert data["id"] == test_user.id
         assert data["phone"] == test_user.phone
         assert data["role"] == "client"
+        assert "enabled_modules" in data
+        assert "core" in data["enabled_modules"]
+
+    async def test_modules_endpoint(self, client: AsyncClient, auth_headers: dict):
+        """✅ GET /api/modules отдаёт включённые домены тарифа."""
+        response = await client.get("/api/modules", headers=auth_headers)
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert "modules" in data
+        assert "core" in data["modules"]
+        assert "appointments" in data["modules"]
 
     # ------------------------------------------------------------------
     # 6. Доступ к /api/me без токена → 403

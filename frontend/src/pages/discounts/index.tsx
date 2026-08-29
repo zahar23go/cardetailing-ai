@@ -4,10 +4,25 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  Typography, Card, Row, Col, Statistic, Table, Button, Tag, Space,
-  message, Modal, Select, Input, InputNumber, Popconfirm, Spin, Tooltip,
-  DatePicker, TimePicker, Switch,
+  Typography,
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Table,
+  Tag,
+  Space,
+  message,
+  Select,
+  InputNumber,
+  Popconfirm,
+  Spin,
+  Tooltip,
+  DatePicker,
+  TimePicker,
+  Switch,
 } from 'antd';
+import { Button, Modal, Input } from '../../components/ui';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined,
   PhoneOutlined, StarOutlined, AreaChartOutlined,
@@ -328,7 +343,7 @@ export default function DiscountsPage() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="btn-gold"
+            look="gold"
             style={{ width: 'auto' }}
             onClick={() => openDiscountModal()}
           >
@@ -840,7 +855,7 @@ export default function DiscountsPage() {
           <Button
             type="primary"
             size="large"
-            className="btn-gold"
+            look="gold"
             onClick={handleSaveDiscount}
             loading={discountSaving}
           >

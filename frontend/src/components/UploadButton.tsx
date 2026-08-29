@@ -3,11 +3,11 @@
    ============================================================ */
 
 import React, { useState } from 'react';
-import { Upload, message, Button, Modal, Space, Typography } from 'antd';
+import { Upload, message } from 'antd';
+import { Modal } from '../components/ui';
 import { UploadOutlined, InboxOutlined } from '@ant-design/icons';
 
 const { Dragger } = Upload;
-const { Text } = Typography;
 
 interface UploadButtonProps {
   /** Тип сущности: car, appointment, portfolio */

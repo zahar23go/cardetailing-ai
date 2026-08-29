@@ -4,8 +4,15 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Typography, Spin, Button, Space, message, Select, Segmented, Tooltip,
+  Typography,
+  Spin,
+  Space,
+  message,
+  Select,
+  Segmented,
+  Tooltip,
 } from 'antd';
+import { Button } from '../components/ui';
 import {
   ReloadOutlined, LeftOutlined, RightOutlined, UserOutlined, CalendarOutlined,
 } from '@ant-design/icons';
@@ -243,12 +250,12 @@ export default function MasterCalendar() {
 
       <div className="workload-toolbar">
         <Space wrap size={8}>
-          <Button icon={<LeftOutlined />} className="btn-gold-secondary" size="small" onClick={() => shiftRange(-1)} />
+          <Button icon={<LeftOutlined />} look="ghost" size="small" onClick={() => shiftRange(-1)} />
           <span className="workload-nav-label">
             <CalendarOutlined /> {navLabel}
           </span>
-          <Button icon={<RightOutlined />} className="btn-gold-secondary" size="small" onClick={() => shiftRange(1)} />
-          <Button icon={<ReloadOutlined />} className="btn-gold-secondary" size="small" onClick={fetchAll} />
+          <Button icon={<RightOutlined />} look="ghost" size="small" onClick={() => shiftRange(1)} />
+          <Button icon={<ReloadOutlined />} look="ghost" size="small" onClick={fetchAll} />
         </Space>
 
         <Space wrap size={8}>

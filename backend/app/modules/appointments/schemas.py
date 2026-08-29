@@ -16,6 +16,7 @@ class AppointmentCreate(BaseModel):
     client_notes: Optional[str] = None  # alias for notes
     box_id: Optional[int] = Field(None, description="ID бокса/зоны")
     master_id: Optional[int] = Field(None, description="Выбранный мастер")
+    inspect_id: Optional[int] = Field(None, description="Сессия осмотра детейлера")
 
     @field_validator("start_time")
     @classmethod
@@ -197,4 +198,78 @@ class HistoryResponse(BaseModel):
     total: int
     skip: int = 0
     limit: int = 50
+
+
+class CloseStepIn(BaseModel):
+    block_id: Optional[int] = None
+    done: bool = True
+
+
+class CloseMaterialIn(BaseModel):
+    material_id: int
+    actual_qty: float = Field(..., ge=0)
+
+
+class AppointmentCloseRequest(BaseModel):
+    steps: list[CloseStepIn] = []
+    materials: list[CloseMaterialIn] = []
+    notes: Optional[str] = None
+
+
+class BoxLiveVisit(BaseModel):
+    id: int
+    status: str
+    service_name: str = ""
+    client_name: str = ""
+    master_name: Optional[str] = None
+    master_id: Optional[int] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    elapsed_minutes: int = 0
+    remaining_minutes: int = 0
+    overrun: bool = False
+
+
+class BoxLiveItem(BaseModel):
+    box_id: int
+    name: str
+    color: Optional[str] = None
+    is_active: bool = True
+    state: str
+    state_label: str
+    current: Optional[BoxLiveVisit] = None
+    next: Optional[BoxLiveVisit] = None
+
+
+class BoxLiveResponse(BaseModel):
+    server_time: datetime
+    prep_minutes: int = 15
+    boxes: list[BoxLiveItem] = []
+
+
+class MasterKpiSparkPoint(BaseModel):
+    date: str
+    value: float = 0
+
+
+class MasterKpiOut(BaseModel):
+    period: str = "month"
+    period_start: str = ""
+    revenue: float = 0
+    avg_check: float = 0
+    completed_month: int = 0
+    completed_today: int = 0
+    unique_clients: int = 0
+    repeat_clients: int = 0
+    repeat_rate: float = 0
+    tech_steps_done: int = 0
+    tech_steps_total: int = 0
+    tech_compliance_pct: float = 0
+    overspend_qty: float = 0
+    overspend_cost: float = 0
+    overspend_pct: float = 0
+    no_show_count: int = 0
+    score: float = 0
+    score_hint: str = "техкарта · расход · повтор"
+    sparkline_revenue: list[MasterKpiSparkPoint] = []
 

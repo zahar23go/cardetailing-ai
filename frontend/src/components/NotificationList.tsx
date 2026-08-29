@@ -4,8 +4,15 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Typography, List, Button, Space, Spin, Empty, message, Card,
+  Typography,
+  List,
+  Space,
+  Spin,
+  Empty,
+  message,
+  Card,
 } from 'antd';
+import { Button } from '../components/ui';
 import { CheckOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getNotifications, markAsRead, markAllAsRead } from '../api/notifications';
 import type { Notification } from '../api/notifications';
@@ -97,14 +104,14 @@ export default function NotificationList({
         <div className="reports-toolbar">
           <Button
             icon={<ReloadOutlined />}
-            className="btn-gold-secondary"
+            look="ghost"
             onClick={() => fetchData(1)}
           >
             Обновить
           </Button>
           <Button
             icon={<CheckOutlined />}
-            className="btn-gold"
+            look="gold"
             onClick={handleMarkAllRead}
           >
             Всё прочитано
@@ -143,7 +150,7 @@ export default function NotificationList({
                         {!item.is_read && (
                           <Button
                             size="small"
-                            className="btn-gold-secondary"
+                            look="ghost"
                             icon={<CheckOutlined />}
                             onClick={() => handleMarkRead(item.id)}
                           >

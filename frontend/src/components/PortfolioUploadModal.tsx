@@ -5,8 +5,13 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Modal, Upload, Select, Input, Button, Space, Typography, message,
+  Upload,
+  Select,
+  Space,
+  Typography,
+  message,
 } from 'antd';
+import { Button, Modal, Input } from '../components/ui';
 import { InboxOutlined } from '@ant-design/icons';
 import { uploadPortfolioPhoto } from '../api/photos';
 
@@ -165,7 +170,7 @@ export default function PortfolioUploadModal({
           </Button>
           <Button
             type="primary"
-            className="btn-gold"
+            look="gold"
             onClick={handleUpload}
             loading={uploading}
             disabled={!file}

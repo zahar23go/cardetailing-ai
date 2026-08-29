@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone, time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status, Body, Request
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import StreamingResponse, Response, JSONResponse
 from sqlalchemy import func, or_, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -31,6 +31,7 @@ from app.core.image_service import (
 from app.core.deepseek_client import get_ai_response, get_financier_response, get_consultant_response
 from app.models import *  # noqa: F401,F403
 from app.schemas import *  # noqa: F401,F403
+from app.modules.plans import catalog as plan_catalog, modules_payload, normalize_plan, PLAN_IDS, load_tenant, pwa_for_tenant, web_manifest
 
 router = APIRouter()
 
@@ -159,7 +160,21 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
     await db.refresh(user)
 
     token = _create_token(user.id, str(tenant_id))
-    return AuthResponse(token=token, user=UserOut.model_validate(user))
+    extras = await modules_payload(db, tenant_id)
+    return AuthResponse(
+        token=token,
+        user=UserOut.model_validate(user),
+        enabled_modules=extras["modules"],
+        plan=extras["plan"],
+        plan_label=extras["plan_label"],
+        price=extras["price"],
+        appointment_limit=extras["appointment_limit"],
+        appointments_this_month=extras["appointments_this_month"],
+        features=extras["features"],
+        tenant_name=extras.get("tenant_name"),
+        logo_url=extras.get("logo_url"),
+        pwa=extras.get("pwa") or {},
+    )
 
 @router.post("/api/login", response_model=AuthResponse)
 async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
@@ -170,11 +185,79 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
 
     tenant_id = str(user.tenant_id) if user.tenant_id else ""
     token = _create_token(user.id, tenant_id)
-    return AuthResponse(token=token, user=UserOut.model_validate(user))
+    extras = await modules_payload(db, user.tenant_id)
+    return AuthResponse(
+        token=token,
+        user=UserOut.model_validate(user),
+        enabled_modules=extras["modules"],
+        plan=extras["plan"],
+        plan_label=extras["plan_label"],
+        price=extras["price"],
+        appointment_limit=extras["appointment_limit"],
+        appointments_this_month=extras["appointments_this_month"],
+        features=extras["features"],
+        tenant_name=extras.get("tenant_name"),
+        logo_url=extras.get("logo_url"),
+        pwa=extras.get("pwa") or {},
+    )
 
 @router.get("/api/me")
-async def get_me(current_user: dict = Depends(_get_current_user)):
-    return current_user
+async def get_me(
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    extras = await modules_payload(db, current_user.get("tenant_id"))
+    return {**current_user, **extras, "enabled_modules": extras["modules"]}
+
+
+@router.get("/api/modules")
+async def get_enabled_modules(
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Домены и план салона (не env ENABLED_MODULES)."""
+    extras = await modules_payload(db, current_user.get("tenant_id"))
+    return extras
+
+
+@router.get("/api/pwa/manifest")
+async def pwa_manifest(
+    tenant: UUID | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Манифест установки: бренд платформы или White Label салона (тариф Бизнес)."""
+    found = await load_tenant(db, tenant) if tenant else None
+    return JSONResponse(
+        content=web_manifest(pwa_for_tenant(found)),
+        media_type="application/manifest+json",
+    )
+
+
+@router.get("/api/plans", response_model=list[PlanCatalogItem])
+async def list_plans(current_user: dict = Depends(_get_current_user)):
+    return plan_catalog()
+
+
+@router.put("/api/tenants/{tenant_id}/plan", response_model=TenantOut)
+async def set_tenant_plan(
+    tenant_id: UUID,
+    request: TenantPlanUpdate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user["role"] != "super_admin":
+        raise HTTPException(status_code=403, detail="Тариф назначает супер-админ")
+    plan = normalize_plan(request.plan)
+    if request.plan.strip().lower() not in PLAN_IDS:
+        raise HTTPException(status_code=422, detail="Тариф: basic, pro или business")
+    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    tenant = result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    tenant.plan = plan
+    await db.commit()
+    await db.refresh(tenant)
+    return TenantOut.model_validate(tenant)
 
 @router.put("/api/me", response_model=UserOut)
 async def update_me(

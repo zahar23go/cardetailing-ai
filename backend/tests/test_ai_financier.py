@@ -139,3 +139,100 @@ class TestRuleBasedRecommendations:
         ctx = build_financier_context_metrics(fixture_data["transactions"])
         assert ctx["month_revenue"] == fixture_data["expected"]["total_revenue"]
         assert ctx["avg_check"] == fixture_data["expected"]["avg_check"]
+
+
+class TestFinancierBrief:
+    def test_rain_recommendation_has_rubles(self):
+        from app.modules.ai.financier_service import WeatherDay, build_recommendations
+
+        recs = build_recommendations(
+            season="summer",
+            days=[
+                WeatherDay("2026-08-30", 18, 12, 10),
+                WeatherDay("2026-08-31", 16, 11, 6),
+                WeatherDay("2026-09-01", 17, 12, 0),
+            ],
+            services=[],
+            occupancy={},
+            box_revenue={},
+            net_profit=0,
+            avg_check=3000,
+        )
+        rain = next(r for r in recs if r["id"] == "weather-rain-wash")
+        assert "дождь" in rain["cause"].lower()
+        assert rain["effect_rub"] >= 4000
+        assert rain["action"]
+
+    def test_winter_season_rec(self):
+        from app.modules.ai.financier_service import build_recommendations, season_id
+        from datetime import datetime
+
+        assert season_id(datetime(2026, 1, 15)) == "winter"
+        recs = build_recommendations(
+            season="winter",
+            days=[],
+            services=[],
+            occupancy={},
+            box_revenue={},
+            net_profit=0,
+            avg_check=2500,
+        )
+        assert any(r["id"] == "season-winter" for r in recs)
+
+    async def test_brief_unauthorized(self, client: AsyncClient):
+        resp = await client.get("/api/ai/financier/brief")
+        assert resp.status_code in (401, 403)
+
+    async def test_brief_forbidden_for_client(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+    ):
+        resp = await client.get("/api/ai/financier/brief", headers=auth_headers)
+        assert resp.status_code == 403
+
+    async def test_brief_returns_cause_action_effect(
+        self,
+        client: AsyncClient,
+        admin_headers: dict,
+        test_service,
+        db_session,
+        default_tenant,
+    ):
+        from app.modules.ai.financier_service import WeatherDay
+        from app.models import Service
+
+        wash = Service(
+            name="Мойка кузова",
+            description="Двухфазная мойка",
+            category="Мойка",
+            price=2000,
+            duration=40,
+            material_cost=100,
+            is_active=True,
+            tenant_id=default_tenant.id,
+        )
+        db_session.add(wash)
+        await db_session.commit()
+
+        rainy = [
+            WeatherDay("2026-08-30", 18, 12, 12),
+            WeatherDay("2026-08-31", 17, 11, 8),
+            WeatherDay("2026-09-01", 19, 13, 3),
+        ]
+        with patch(
+            "app.modules.ai.financier_service.fetch_weather_forecast",
+            new_callable=AsyncMock,
+            return_value=rainy,
+        ):
+            resp = await client.get("/api/ai/financier/brief", headers=admin_headers)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["season"]
+        assert data["outlook"]
+        assert data["recommendations"]
+        rec = next(r for r in data["recommendations"] if r["id"] == "weather-rain-wash")
+        assert rec["cause"]
+        assert rec["action"]
+        assert rec["effect_rub"] >= 4000
+        assert "Мойка" in rec["action"]
