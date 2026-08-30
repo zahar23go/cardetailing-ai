@@ -20,12 +20,24 @@ function conditionsText(rule: DiscountRule) {
   if (rule.slot_start && rule.slot_end) parts.push(`Часы: ${rule.slot_start}–${rule.slot_end}`);
   if (rule.valid_until) parts.push(`До ${dayjs(rule.valid_until).format('D MMMM YYYY')}`);
   if (rule.client_id) parts.push('Персональное предложение');
-  const extra = rule.conditions && typeof rule.conditions === 'object'
-    ? Object.entries(rule.conditions)
+  const c = rule.conditions && typeof rule.conditions === 'object' ? rule.conditions : {};
+  if (rule.type === 'win_back' && c.max_recency_days) {
+    parts.push(`Если не были ${c.max_recency_days} дней и больше`);
+  } else if (rule.type === 'weather') {
+    const labels: Record<string, string> = {
+      rain: 'В дождь',
+      freeze: 'В мороз',
+      heat: 'В жару',
+      dry: 'В сухую тёплую погоду',
+    };
+    parts.push(labels[String(c.weather || '')] || 'По прогнозу на день записи');
+  } else {
+    const extra = Object.entries(c)
       .filter(([, v]) => v !== null && v !== '')
-      .map(([k, v]) => `${k}: ${String(v)}`)
-    : [];
-  return [...parts, ...extra];
+      .map(([k, v]) => `${k}: ${String(v)}`);
+    parts.push(...extra);
+  }
+  return parts;
 }
 
 export default function ClientDiscountsPage() {

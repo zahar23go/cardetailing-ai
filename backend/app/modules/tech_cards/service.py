@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -114,6 +114,7 @@ def tech_card_to_out(card: TechCard) -> TechCardOut:
         blocks=blocks,
         blocks_count=len(blocks),
         total_duration_minutes=sum(b.duration_minutes for b in blocks),
+        current_version=int(getattr(card, "current_version", 0) or 0),
         created_at=card.created_at,
         updated_at=card.updated_at,
     )
@@ -190,7 +191,20 @@ async def get_tech_card(
     return result.scalar_one_or_none()
 
 
-async def _reload_card(db: AsyncSession, tenant_id: UUID, card_id: int) -> TechCard:
+async def _reload_card(
+    db: AsyncSession,
+    tenant_id: UUID,
+    card_id: int,
+    *,
+    snapshot: bool = False,
+    actor_id: int | None = None,
+) -> TechCard:
+    if snapshot:
+        from app.modules.tech_cards.versions import record_version
+
+        pending = await get_tech_card(db, tenant_id, card_id, populate_existing=True)
+        assert pending is not None
+        await record_version(db, pending, actor_id=actor_id)
     await db.commit()
     reloaded = await get_tech_card(db, tenant_id, card_id, populate_existing=True)
     assert reloaded is not None
@@ -320,6 +334,8 @@ async def create_tech_card(
     db: AsyncSession,
     tenant_id: UUID,
     data: TechCardCreate,
+    *,
+    actor_id: int | None = None,
 ) -> TechCard:
     await _ensure_service(db, tenant_id, data.service_id)
 
@@ -347,7 +363,7 @@ async def create_tech_card(
     await db.flush()
     if blocks:
         await _replace_blocks(db, card, blocks)
-    return await _reload_card(db, tenant_id, card.id)
+    return await _reload_card(db, tenant_id, card.id, snapshot=True, actor_id=actor_id)
 
 
 async def update_tech_card(
@@ -355,6 +371,8 @@ async def update_tech_card(
     tenant_id: UUID,
     card_id: int,
     data: TechCardUpdate,
+    *,
+    actor_id: int | None = None,
 ) -> TechCard | None:
     card = await get_tech_card(db, tenant_id, card_id)
     if not card:
@@ -367,15 +385,20 @@ async def update_tech_card(
         setattr(card, key, value)
 
     payload = data.model_dump(exclude_unset=True)
+    snapshot = False
     if "blocks" in payload:
         blocks = list(data.blocks or [])
         await _validate_blocks(db, tenant_id, blocks)
         await _replace_blocks(db, card, blocks)
+        snapshot = True
     elif "items" in payload and data.items is not None:
         await _validate_items(db, tenant_id, data.items)
         await _replace_items(db, card, data.items)
+        snapshot = True
 
-    return await _reload_card(db, tenant_id, card_id)
+    return await _reload_card(
+        db, tenant_id, card_id, snapshot=snapshot, actor_id=actor_id,
+    )
 
 
 async def delete_tech_card(
@@ -386,6 +409,8 @@ async def delete_tech_card(
     card = await get_tech_card(db, tenant_id, card_id)
     if not card:
         return False
+    from app.modules.tech_cards.models import TechCardVersion
+    await db.execute(delete(TechCardVersion).where(TechCardVersion.tech_card_id == card.id))
     await db.delete(card)
     await db.commit()
     return True
@@ -396,6 +421,8 @@ async def add_block(
     tenant_id: UUID,
     card_id: int,
     data: TechCardBlockIn,
+    *,
+    actor_id: int | None = None,
 ) -> TechCard | None:
     card = await get_tech_card(db, tenant_id, card_id)
     if not card:
@@ -422,7 +449,7 @@ async def add_block(
                 notes=item.notes,
             )
         )
-    return await _reload_card(db, tenant_id, card_id)
+    return await _reload_card(db, tenant_id, card_id, snapshot=True, actor_id=actor_id)
 
 
 async def update_block(
@@ -431,6 +458,8 @@ async def update_block(
     card_id: int,
     block_id: int,
     data: TechCardBlockIn,
+    *,
+    actor_id: int | None = None,
 ) -> TechCard | None:
     card = await get_tech_card(db, tenant_id, card_id)
     if not card:
@@ -460,7 +489,7 @@ async def update_block(
                 notes=item.notes,
             )
         )
-    return await _reload_card(db, tenant_id, card_id)
+    return await _reload_card(db, tenant_id, card_id, snapshot=True, actor_id=actor_id)
 
 
 async def delete_block(
@@ -468,6 +497,8 @@ async def delete_block(
     tenant_id: UUID,
     card_id: int,
     block_id: int,
+    *,
+    actor_id: int | None = None,
 ) -> TechCard | None:
     card = await get_tech_card(db, tenant_id, card_id)
     if not card:
@@ -486,7 +517,7 @@ async def delete_block(
     ).scalars().all()
     for idx, row in enumerate(remaining):
         row.sort_order = idx
-    return await _reload_card(db, tenant_id, card_id)
+    return await _reload_card(db, tenant_id, card_id, snapshot=True, actor_id=actor_id)
 
 
 async def reorder_blocks(
@@ -494,6 +525,8 @@ async def reorder_blocks(
     tenant_id: UUID,
     card_id: int,
     block_ids: list[int],
+    *,
+    actor_id: int | None = None,
 ) -> TechCard | None:
     card = await get_tech_card(db, tenant_id, card_id)
     if not card:
@@ -503,4 +536,4 @@ async def reorder_blocks(
         raise ValueError("Список блоков не совпадает с техкартой")
     for idx, bid in enumerate(block_ids):
         existing[bid].sort_order = idx
-    return await _reload_card(db, tenant_id, card_id)
+    return await _reload_card(db, tenant_id, card_id, snapshot=True, actor_id=actor_id)

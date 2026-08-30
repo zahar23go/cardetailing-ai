@@ -62,3 +62,41 @@ class InventorySummaryOut(BaseModel):
     movements_period: int = 0
     period_days: int = 30
 
+
+class StockDocLineIn(BaseModel):
+    material_id: int
+    qty: float = Field(..., ge=0)
+
+
+class StockIntakeRequest(BaseModel):
+    signed_name: str = Field(..., min_length=1, max_length=255)
+    document_no: Optional[str] = Field(None, max_length=80)
+    note: Optional[str] = None
+    lines: list[StockDocLineIn] = Field(..., min_length=1)
+
+
+class StockRevisionRequest(BaseModel):
+    signed_name: str = Field(..., min_length=1, max_length=255)
+    note: Optional[str] = None
+    lines: list[StockDocLineIn] = Field(..., min_length=1)
+
+
+class StockDocLineOut(BaseModel):
+    material_id: Optional[int] = None
+    name: str = ""
+    unit: str = "pcs"
+    system_qty: float = 0
+    qty: float = 0
+    delta: float = 0
+
+
+class StockDocumentOut(BaseModel):
+    id: int
+    doc_type: str
+    document_no: Optional[str] = None
+    note: Optional[str] = None
+    signed_name: str = ""
+    signed_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    lines: list[StockDocLineOut] = []
+

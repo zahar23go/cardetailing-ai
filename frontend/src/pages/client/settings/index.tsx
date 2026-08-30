@@ -17,6 +17,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import Card from '../../../components/Card';
 import Badge from '../../../components/Badge';
+import CarCard from '../../../components/CarCard';
 import {
   APPT_STATUS,
   Appointment,
@@ -35,10 +36,14 @@ type CarDraft = {
   year: number | undefined;
   license_plate: string;
   color: string;
+  vin: string;
+  body_type: string;
+  mileage: number | undefined;
 };
 
 const emptyCar = (): CarDraft => ({
   make: '', model: '', year: undefined, license_plate: '', color: '',
+  vin: '', body_type: '', mileage: undefined,
 });
 
 function carToDraft(c: Car): CarDraft {
@@ -48,6 +53,9 @@ function carToDraft(c: Car): CarDraft {
     year: c.year || undefined,
     license_plate: c.license_plate || '',
     color: c.color || '',
+    vin: c.vin || '',
+    body_type: c.body_type || '',
+    mileage: c.mileage || undefined,
   };
 }
 
@@ -116,6 +124,9 @@ export default function ClientSettingsPage() {
     year: d.year || null,
     license_plate: d.license_plate.trim() || null,
     color: d.color.trim() || null,
+    vin: d.vin.trim() || null,
+    body_type: d.body_type.trim() || null,
+    mileage: d.mileage || null,
   });
 
   const addCar = async () => {
@@ -197,37 +208,37 @@ export default function ClientSettingsPage() {
 
       <div className="client-section-title">Автомобиль</div>
       {cars.map((c) => (
-        <Card key={c.id} variant="admin" className="client-block">
+        <div key={`${c.id}-${c.vin || ''}-${c.mileage || 0}`} className="client-block apple-car-wrap">
+          <CarCard carId={c.id} />
           {editingId === c.id ? (
-            <Space direction="vertical" size="small" className="client-stack">
-              <Input className="input-luxury client-field" placeholder="Марка" value={editDraft.make} onChange={(e) => setEditDraft((p) => ({ ...p, make: e.target.value }))} />
-              <Input className="input-luxury client-field" placeholder="Модель" value={editDraft.model} onChange={(e) => setEditDraft((p) => ({ ...p, model: e.target.value }))} />
-              <InputNumber className="input-luxury client-field" placeholder="Год" min={1990} max={2030} value={editDraft.year} onChange={(v) => setEditDraft((p) => ({ ...p, year: v || undefined }))} />
-              <Input className="input-luxury" placeholder="Госномер" value={editDraft.license_plate} onChange={(e) => setEditDraft((p) => ({ ...p, license_plate: e.target.value }))} />
-              <Input className="input-luxury" placeholder="Цвет" value={editDraft.color} onChange={(e) => setEditDraft((p) => ({ ...p, color: e.target.value }))} />
-              <Space>
-                <Button look="gold" loading={savingCar} onClick={() => saveCar(c.id)}>Сохранить</Button>
-                <Button look="ghost" onClick={() => setEditingId(null)}>Отмена</Button>
+            <Card variant="admin" className="client-block">
+              <Space direction="vertical" size="small" className="client-stack">
+                <Input className="input-luxury client-field" placeholder="Марка" value={editDraft.make} onChange={(e) => setEditDraft((p) => ({ ...p, make: e.target.value }))} />
+                <Input className="input-luxury client-field" placeholder="Модель" value={editDraft.model} onChange={(e) => setEditDraft((p) => ({ ...p, model: e.target.value }))} />
+                <InputNumber className="input-luxury client-field" placeholder="Год" min={1990} max={2030} value={editDraft.year} onChange={(v) => setEditDraft((p) => ({ ...p, year: v || undefined }))} />
+                <Input className="input-luxury" placeholder="Госномер" value={editDraft.license_plate} onChange={(e) => setEditDraft((p) => ({ ...p, license_plate: e.target.value }))} />
+                <Input className="input-luxury" placeholder="Цвет" value={editDraft.color} onChange={(e) => setEditDraft((p) => ({ ...p, color: e.target.value }))} />
+                <Input className="input-luxury" placeholder="VIN" value={editDraft.vin} onChange={(e) => setEditDraft((p) => ({ ...p, vin: e.target.value }))} maxLength={17} />
+                <Input className="input-luxury" placeholder="Кузов (седан, кроссовер…)" value={editDraft.body_type} onChange={(e) => setEditDraft((p) => ({ ...p, body_type: e.target.value }))} />
+                <InputNumber className="input-luxury client-field" placeholder="Пробег, км" min={0} max={2000000} value={editDraft.mileage} onChange={(v) => setEditDraft((p) => ({ ...p, mileage: v || undefined }))} />
+                <Space>
+                  <Button look="gold" loading={savingCar} onClick={() => saveCar(c.id)}>Сохранить</Button>
+                  <Button look="ghost" onClick={() => setEditingId(null)}>Отмена</Button>
+                </Space>
               </Space>
-            </Space>
+            </Card>
           ) : (
-            <div className="client-appt-row">
-              <div>
-                <div className="client-appt-name">{c.make} {c.model}</div>
-                <Text className="text-titanium">
-                  {[c.year, c.color, c.license_plate].filter(Boolean).join(' · ') || 'Без доп. данных'}
-                </Text>
-              </div>
+            <div style={{ padding: '0 16px 16px' }}>
               <Button
                 size="small"
                 look="ghost"
                 onClick={() => { setEditingId(c.id); setEditDraft(carToDraft(c)); }}
               >
-                Изменить
+                Изменить данные
               </Button>
             </div>
           )}
-        </Card>
+        </div>
       ))}
       <Card variant="admin" className="client-block">
         <Space direction="vertical" size="small" className="client-stack">
@@ -237,6 +248,9 @@ export default function ClientSettingsPage() {
           <InputNumber className="input-luxury client-field" placeholder="Год" min={1990} max={2030} value={carForm.year} onChange={(v) => setCarForm((p) => ({ ...p, year: v || undefined }))} />
           <Input className="input-luxury" placeholder="Госномер" value={carForm.license_plate} onChange={(e) => setCarForm((p) => ({ ...p, license_plate: e.target.value }))} />
           <Input className="input-luxury" placeholder="Цвет" value={carForm.color} onChange={(e) => setCarForm((p) => ({ ...p, color: e.target.value }))} />
+          <Input className="input-luxury" placeholder="VIN" value={carForm.vin} onChange={(e) => setCarForm((p) => ({ ...p, vin: e.target.value }))} maxLength={17} />
+          <Input className="input-luxury" placeholder="Кузов" value={carForm.body_type} onChange={(e) => setCarForm((p) => ({ ...p, body_type: e.target.value }))} />
+          <InputNumber className="input-luxury client-field" placeholder="Пробег, км" min={0} max={2000000} value={carForm.mileage} onChange={(v) => setCarForm((p) => ({ ...p, mileage: v || undefined }))} />
           <Button icon={<PlusOutlined />} look="ghost" loading={addingCar} onClick={addCar}>
             Добавить
           </Button>

@@ -135,6 +135,7 @@ class TestClientCabinetE2E:
             "/client": [
                 ("GET", "/api/appointments/me?skip=0&limit=50"),
                 ("GET", "/api/services?skip=0&limit=200"),
+                ("GET", "/api/cars?skip=0&limit=20"),
             ],
             "/client/booking": [
                 ("GET", "/api/services?skip=0&limit=200"),

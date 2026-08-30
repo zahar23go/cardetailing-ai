@@ -70,6 +70,9 @@ async def create_car(
         year=car_data.year,
         license_plate=car_data.license_plate,
         color=car_data.color,
+        vin=car_data.vin,
+        body_type=car_data.body_type,
+        mileage=car_data.mileage,
         notes=car_data.notes,
         tenant_id=UUID(current_user["tenant_id"]),
     )
@@ -77,6 +80,22 @@ async def create_car(
     await db.commit()
     await db.refresh(new_car)
     return CarOut.model_validate(new_car)
+
+
+@router.get("/api/cars/{car_id}", response_model=CarCardOut)
+async def get_car_card(
+    car_id: int,
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Карточка авто: фото, VIN, характеристики, таймлайн визитов."""
+    from app.modules.cars.card_service import build_car_card, can_access_car, load_car
+
+    car = await load_car(db, car_id, UUID(current_user["tenant_id"]))
+    if not car or not can_access_car(current_user, car):
+        raise HTTPException(status_code=404, detail="Машина не найдена")
+    return await build_car_card(db, car)
+
 
 @router.put("/api/cars/{car_id}", response_model=CarOut)
 async def update_car(

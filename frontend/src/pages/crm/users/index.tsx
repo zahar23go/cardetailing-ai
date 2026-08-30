@@ -18,9 +18,11 @@ import {
   Empty,
   Spin,
   Tooltip,
+  Select,
+  InputNumber,
 } from 'antd';
 import { Button, Modal } from '../../../components/ui';
-import { PhoneOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PhoneOutlined, DeleteOutlined, ToolOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -34,6 +36,18 @@ interface UserRow {
   full_name: string;
   role: string;
   created_at?: string;
+}
+
+interface ServiceOption {
+  id: number;
+  name: string;
+}
+
+interface SkillItem {
+  service_id: number;
+  service_name: string;
+  has_tech_card: boolean;
+  commission_percent: number;
 }
 
 interface RfmClient {
@@ -143,6 +157,15 @@ export default function UsersPage() {
     total_spent: number;
   } | null>(null);
 
+  const [skillModal, setSkillModal] = useState(false);
+  const [skillMaster, setSkillMaster] = useState<UserRow | null>(null);
+  const [skillLoading, setSkillLoading] = useState(false);
+  const [skillSaving, setSkillSaving] = useState(false);
+  const [skillPercent, setSkillPercent] = useState(0);
+  const [skillServiceIds, setSkillServiceIds] = useState<number[]>([]);
+  const [allServices, setAllServices] = useState<ServiceOption[]>([]);
+  const [skillHasCard, setSkillHasCard] = useState<Record<number, boolean>>({});
+
   const fetchClients = async (segment?: string) => {
     setClientsLoading(true);
     try {
@@ -186,6 +209,50 @@ export default function UsersPage() {
     } catch (e: any) {
       message.error(e.message || 'Ошибка удаления пользователя');
     }
+  };
+
+  const openSkills = async (row: UserRow) => {
+    setSkillMaster(row);
+    setSkillModal(true);
+    setSkillLoading(true);
+    try {
+      const [skills, svc] = await Promise.all([
+        apiFetch<{ commission_percent: number; items: SkillItem[] }>(`/api/masters/${row.id}/skills`),
+        apiFetch<{ items: ServiceOption[] }>('/api/services?skip=0&limit=200'),
+      ]);
+      setAllServices(svc.items || []);
+      setSkillPercent(skills.commission_percent || 0);
+      setSkillServiceIds((skills.items || []).map((i) => i.service_id));
+      const cards: Record<number, boolean> = {};
+      for (const i of skills.items || []) cards[i.service_id] = i.has_tech_card;
+      setSkillHasCard(cards);
+    } catch (e: any) {
+      message.error(e.message || 'Не удалось загрузить навыки');
+      setSkillModal(false);
+    }
+    setSkillLoading(false);
+  };
+
+  const saveSkills = async () => {
+    if (!skillMaster) return;
+    setSkillSaving(true);
+    try {
+      await apiFetch(`/api/masters/${skillMaster.id}/skills`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          commission_percent: skillPercent,
+          items: skillServiceIds.map((id) => ({
+            service_id: id,
+            commission_percent: skillPercent,
+          })),
+        }),
+      });
+      message.success('Услуги и комиссия сохранены');
+      setSkillModal(false);
+    } catch (e: any) {
+      message.error(e.message || 'Не удалось сохранить');
+    }
+    setSkillSaving(false);
   };
 
   const openClientDetail = async (clientId: number) => {
@@ -411,6 +478,22 @@ export default function UsersPage() {
                       </Text>
                     ),
                   },
+                  {
+                    title: '',
+                    key: 'skills',
+                    width: 120,
+                    render: (_: unknown, record: UserRow) => (
+                      <Button
+                        size="small"
+                        look="ghost"
+                        icon={<ToolOutlined />}
+                        onClick={() => openSkills(record)}
+                        style={{ width: 'auto' }}
+                      >
+                        Услуги
+                      </Button>
+                    ),
+                  },
                 ]}
                 components={{
                   header: { cell: (p: any) => <th {...p} className="table-header-cell" /> },
@@ -583,6 +666,54 @@ export default function UsersPage() {
               )}
             </Space>
           )}
+        </Spin>
+      </Modal>
+
+      <Modal
+        title={<Text className="text-gold-bold">Услуги и комиссия · {skillMaster?.full_name}</Text>}
+        open={skillModal}
+        onCancel={() => { setSkillModal(false); setSkillMaster(null); }}
+        footer={null}
+        width={520}
+        className="modal-command"
+      >
+        <Spin spinning={skillLoading}>
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <div>
+              <span className="label-field">Комиссия в чеке, %</span>
+              <InputNumber
+                size="large"
+                className="w-full input-luxury"
+                min={0}
+                max={100}
+                value={skillPercent}
+                onChange={(v) => setSkillPercent(v || 0)}
+                style={{ width: '100%' }}
+              />
+              <Text className="text-titanium text-12 d-block" style={{ marginTop: 4 }}>
+                Считается от цены заезда при закрытии. Пустой список услуг — мастер делает всё.
+              </Text>
+            </div>
+            <div>
+              <span className="label-field">Услуги / техкарты</span>
+              <Select
+                mode="multiple"
+                size="large"
+                className="w-full"
+                placeholder="Все услуги"
+                value={skillServiceIds}
+                onChange={setSkillServiceIds}
+                optionFilterProp="label"
+                options={allServices.map((s) => ({
+                  value: s.id,
+                  label: skillHasCard[s.id] ? `${s.name} · техкарта` : s.name,
+                }))}
+              />
+            </div>
+            <Button type="primary" look="gold" loading={skillSaving} onClick={saveSkills}>
+              Сохранить
+            </Button>
+          </Space>
         </Spin>
       </Modal>
     </>

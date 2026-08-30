@@ -121,6 +121,7 @@ class MaterialMovementType(str, enum.Enum):
     out = "out"          # расход
     adjust = "adjust"    # ручная корректировка
     initial = "initial"  # начальный остаток
+    revision = "revision"  # ревизия
 
 class MaterialMovement(Base):
     """История движения материалов (модуль «Технология» / Учёт)."""
@@ -165,6 +166,13 @@ class MaterialMovement(Base):
         nullable=True,
         index=True,
         comment="Заезд, если расход при закрытии",
+    )
+    document_id = Column(
+        Integer,
+        ForeignKey("stock_documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Документ приёмки или ревизии",
     )
     created_at = Column(
         DateTime(timezone=True),

@@ -19,6 +19,7 @@ import {
 import { Button } from '../components/ui';
 import {
   GiftOutlined, ReloadOutlined, ThunderboltOutlined, SendOutlined, BulbOutlined,
+  DownOutlined, UpOutlined,
 } from '@ant-design/icons';
 import {
   Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis,
@@ -134,6 +135,8 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
   const [creatingKey, setCreatingKey] = useState<string | null>(null);
   const [data, setData] = useState<IntelligenceData | null>(null);
   const [periodDays, setPeriodDays] = useState(60);
+  const [heatmapOpen, setHeatmapOpen] = useState(false);
+  const [chartOpen, setChartOpen] = useState(false);
 
   const load = useCallback(async (days = periodDays) => {
     setLoading(true);
@@ -193,6 +196,16 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
     После: p.after_avg,
   }));
 
+  const peakCell = useMemo(() => {
+    const cells = data?.cells || [];
+    if (!cells.length) return null;
+    return cells.reduce((best, c) => (c.count > best.count ? c : best), cells[0]);
+  }, [data]);
+
+  const heatmapSummary = peakCell && peakCell.count > 0
+    ? `15 часов × 7 дней · пик ${DAY_NAMES[peakCell.day] || ''} ${String(peakCell.hour).padStart(2, '0')}:00 — ${peakCell.count} зап.`
+    : '15 часов × 7 дней · данные на месте, карта свёрнута';
+
   return (
     <div className="discount-intel">
       <div className="discount-intel-toolbar">
@@ -230,43 +243,59 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
 
       <Spin spinning={loading}>
         <Card className="admin-panel-card" bordered={false} style={{ marginBottom: 16 }}>
-          <Text className="admin-panel-title">Тепловая карта загрузки</Text>
-          <p className="discount-intel-hint">
-            Дни × часы за последние {data?.period_days || periodDays} дней. Чем ярче золото — тем выше загрузка
-            (пик, без скидок). Тёмные ячейки = простой → сюда Happy Hours.
-          </p>
-          {!data?.cells?.length ? (
-            <Empty description={<span className="text-titanium">Нет данных за период</span>} />
-          ) : (
-            <div className="discount-heatmap-wrap">
-              <table className="discount-heatmap">
-                <thead>
-                  <tr>
-                    <th />
-                    {DAY_NAMES.map((d) => (
-                      <th key={d}>{d}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {HOURS.map((hour) => (
-                    <tr key={hour}>
-                      <td className="hour">{String(hour).padStart(2, '0')}:00</td>
-                      {DAY_NAMES.map((_, day) => {
-                        const count = getCount(day, hour);
-                        return (
-                          <Tooltip key={`${day}-${hour}`} title={`${DAY_NAMES[day]} ${hour}:00 — ${count} записей`}>
-                            <td style={{ background: cellColor(count, maxCount) }}>
-                              <span>{count || ''}</span>
-                            </td>
-                          </Tooltip>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="flex-space-between" style={{ alignItems: 'flex-start', gap: 12 }}>
+            <div>
+              <Text className="admin-panel-title">Тепловая карта загрузки</Text>
+              <p className="discount-intel-hint" style={{ marginBottom: heatmapOpen ? 12 : 0 }}>
+                {heatmapOpen
+                  ? `Дни × часы за последние ${data?.period_days || periodDays} дней. Чем ярче золото — тем выше загрузка (пик, без скидок). Тёмные ячейки = простой → сюда Happy Hours.`
+                  : heatmapSummary}
+              </p>
             </div>
+            <Button
+              size="small"
+              look="ghost"
+              icon={heatmapOpen ? <UpOutlined /> : <DownOutlined />}
+              onClick={() => setHeatmapOpen((v) => !v)}
+              style={{ width: 'auto', flexShrink: 0 }}
+            >
+              {heatmapOpen ? 'Свернуть' : 'Показать карту'}
+            </Button>
+          </div>
+          {heatmapOpen && (
+            !data?.cells?.length ? (
+              <Empty description={<span className="text-titanium">Нет данных за период</span>} />
+            ) : (
+              <div className="discount-heatmap-wrap">
+                <table className="discount-heatmap">
+                  <thead>
+                    <tr>
+                      <th />
+                      {DAY_NAMES.map((d) => (
+                        <th key={d}>{d}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {HOURS.map((hour) => (
+                      <tr key={hour}>
+                        <td className="hour">{String(hour).padStart(2, '0')}:00</td>
+                        {DAY_NAMES.map((_, day) => {
+                          const count = getCount(day, hour);
+                          return (
+                            <Tooltip key={`${day}-${hour}`} title={`${DAY_NAMES[day]} ${hour}:00 — ${count} записей`}>
+                              <td style={{ background: cellColor(count, maxCount) }}>
+                                <span>{count || ''}</span>
+                              </td>
+                            </Tooltip>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
         </Card>
 
@@ -379,23 +408,42 @@ export default function DiscountIntelligence({ onCreateSuggestion, onApplyAdvice
 
         {chartData.length > 0 && (
           <Card className="admin-panel-card" bordered={false} style={{ marginTop: 16 }}>
-            <Text className="admin-panel-title">До / После введения скидки</Text>
-            <p className="discount-intel-hint">Средняя загрузка слота за 30 дней до и после создания правила</p>
-            <div style={{ width: '100%', height: 260, marginTop: 8 }}>
-              <ResponsiveContainer>
-                <BarChart data={chartData}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fill: '#aab2bf', fontSize: 11 }} />
-                  <YAxis tick={{ fill: '#aab2bf', fontSize: 11 }} width={36} />
-                  <RechartsTooltip
-                    contentStyle={{ background: '#14161a', border: '1px solid rgba(212,168,75,0.3)' }}
-                  />
-                  <Legend />
-                  <Bar dataKey="До" fill="rgba(170,178,191,0.7)" radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="После" fill="#D4A84B" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="flex-space-between" style={{ alignItems: 'flex-start', gap: 12 }}>
+              <div>
+                <Text className="admin-panel-title">До / После введения скидки</Text>
+                <p className="discount-intel-hint" style={{ marginBottom: chartOpen ? 8 : 0 }}>
+                  {chartOpen
+                    ? 'Средняя загрузка слота за 30 дней до и после создания правила'
+                    : `${chartData.length} правил · график на месте, свёрнут`}
+                </p>
+              </div>
+              <Button
+                size="small"
+                look="ghost"
+                icon={chartOpen ? <UpOutlined /> : <DownOutlined />}
+                onClick={() => setChartOpen((v) => !v)}
+                style={{ width: 'auto', flexShrink: 0 }}
+              >
+                {chartOpen ? 'Свернуть' : 'Показать график'}
+              </Button>
             </div>
+            {chartOpen && (
+              <div style={{ width: '100%', height: 260, marginTop: 8 }}>
+                <ResponsiveContainer>
+                  <BarChart data={chartData}>
+                    <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#aab2bf', fontSize: 11 }} />
+                    <YAxis tick={{ fill: '#aab2bf', fontSize: 11 }} width={36} />
+                    <RechartsTooltip
+                      contentStyle={{ background: '#14161a', border: '1px solid rgba(212,168,75,0.3)' }}
+                    />
+                    <Legend />
+                    <Bar dataKey="До" fill="rgba(170,178,191,0.7)" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="После" fill="#D4A84B" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </Card>
         )}
       </Spin>

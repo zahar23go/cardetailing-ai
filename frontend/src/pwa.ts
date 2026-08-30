@@ -46,6 +46,12 @@ export function applyPwaBrand(pwa?: PwaBrand | null, tenantId?: string) {
 
 export function registerServiceWorker() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  if (import.meta.env.DEV) {
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((r) => r.unregister());
+    });
+    return;
+  }
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js').catch(() => undefined);
   });

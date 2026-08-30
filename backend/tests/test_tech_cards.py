@@ -244,3 +244,77 @@ class TestTechCardsAPI:
         assert photo.json()["url"].startswith("/uploads/tech-cards/")
 
         await client.delete(f"/api/tech-cards/{card_id}", headers=admin_headers)
+
+
+@pytest.mark.asyncio
+class TestTechCardVersionsPdf:
+    async def test_versions_and_pdf(
+        self,
+        client: AsyncClient,
+        admin_headers: dict,
+        db_session,
+        default_tenant,
+        test_service,
+    ):
+        mat = Material(
+            name="Воск",
+            category="chemistry",
+            unit="ml",
+            quantity=500,
+            purchase_price=3,
+            tenant_id=default_tenant.id,
+        )
+        db_session.add(mat)
+        await db_session.commit()
+        await db_session.refresh(mat)
+
+        created = await client.post(
+            "/api/tech-cards",
+            headers=admin_headers,
+            json={
+                "service_id": test_service.id,
+                "name": "ТК версии",
+                "blocks": [{
+                    "title": "Нанесение",
+                    "description": "Нанести тонкий слой",
+                    "duration_minutes": 5,
+                    "items": [{"material_id": mat.id, "quantity": 20}],
+                }],
+            },
+        )
+        assert created.status_code == 201, created.text
+        card_id = created.json()["id"]
+        assert created.json()["current_version"] == 1
+
+        listed = await client.get(f"/api/tech-cards/{card_id}/versions", headers=admin_headers)
+        assert listed.status_code == 200
+        assert listed.json()["total"] == 1
+        assert listed.json()["items"][0]["version_no"] == 1
+
+        updated = await client.put(
+            f"/api/tech-cards/{card_id}",
+            headers=admin_headers,
+            json={
+                "blocks": [{
+                    "title": "Нанесение",
+                    "description": "Нанести тонкий слой",
+                    "duration_minutes": 5,
+                    "items": [{"material_id": mat.id, "quantity": 40}],
+                }],
+            },
+        )
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["current_version"] == 2
+
+        v1 = await client.get(f"/api/tech-cards/{card_id}/versions/1", headers=admin_headers)
+        assert v1.status_code == 200
+        assert v1.json()["snapshot"]["items"][0]["quantity"] == 20
+
+        pdf = await client.get(f"/api/tech-cards/{card_id}/pdf", headers=admin_headers)
+        assert pdf.status_code == 200
+        assert pdf.headers["content-type"].startswith("application/pdf")
+        assert pdf.content[:4] == b"%PDF"
+
+        pdf_v1 = await client.get(f"/api/tech-cards/{card_id}/pdf?version=1", headers=admin_headers)
+        assert pdf_v1.status_code == 200
+        assert pdf_v1.content[:4] == b"%PDF"

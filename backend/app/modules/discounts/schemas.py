@@ -12,7 +12,7 @@ T = TypeVar("T")
 
 class DiscountRuleCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    type: str = Field(..., description="happy_hours, frequency, win_back, cashback, service, client")
+    type: str = Field(..., description="happy_hours, frequency, win_back, weather, cashback, service, client")
     conditions: Optional[dict] = None
     discount_percent: int = Field(default=0, ge=0, le=100)
     slot_start: Optional[str] = Field(None, description="Время начала слота HH:MM (для happy_hours)")

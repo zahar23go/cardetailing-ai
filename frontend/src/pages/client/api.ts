@@ -107,6 +107,9 @@ export interface Car {
   year?: number | null;
   license_plate?: string | null;
   color?: string | null;
+  vin?: string | null;
+  body_type?: string | null;
+  mileage?: number | null;
   notes?: string | null;
 }
 
@@ -126,7 +129,7 @@ export interface Appointment {
   box_id?: number | null;
   service_name: string | null;
   master?: { id: number; full_name: string } | null;
-  car?: { id: number; make: string; model: string; license_plate?: string };
+  car?: { id: number; make: string; model: string; license_plate?: string; vin?: string };
   service?: { id: number; name: string; price: number };
 }
 
@@ -158,6 +161,7 @@ export const DISCOUNT_TYPE_LABELS: Record<string, string> = {
   frequency: 'За частоту',
   win_back: 'Возврат',
   cashback: 'Кэшбек',
+  weather: 'Погода',
 };
 
 export function tzOffsetMinutes() {

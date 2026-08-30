@@ -38,6 +38,7 @@ watchfiles==1.2.0
 chardet>=5.2.0
 websockets==16.0
 Pillow==12.3.0
+reportlab==4.4.4
 
 # Testing
 pytest==8.2.2

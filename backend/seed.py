@@ -130,6 +130,13 @@ async def seed() -> None:
             print("[SKIP] Default tenant not found. Have you run init_db / migrations?")
             return
 
+        from app.modules.tech_cards.demo_pack import apply_demo_pack
+        pack = await apply_demo_pack(session, TENANT_ID, force=True)
+        print(
+            f"[OK] Demo tech pack: materials={pack['materials']} "
+            f"cards created={pack['created']} updated={pack['updated']} skipped={pack['skipped']}"
+        )
+
         # ---- Load existing services ----
         from sqlalchemy import select as sa_select
         result = await session.execute(sa_select(Service).where(Service.tenant_id == TENANT_ID))

@@ -38,6 +38,7 @@ import NotificationBell from './components/NotificationBell';
 import NotificationList from './components/NotificationList';
 import NotificationSettings from './components/NotificationSettings';
 import CloseVisitModal from './components/CloseVisitModal';
+import CarCard from './components/CarCard';
 
 dayjs.locale('ru');
 
@@ -328,57 +329,50 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <Card className="card-luxury client-car-card">
+              <Card className="card-luxury client-car-card" styles={{ body: { padding: 0 } }}>
                 {firstCar ? (
                   <>
-                    <Row justify="space-between" align="top">
-                      <Col>
-                        <Text className="text-white car-title">
-                          {firstCar.make} {firstCar.model}
-                        </Text>
-                        <div className="mt-4">
-                          <Text className="text-titanium car-subtitle">
-                            {firstCar.license_plate ? ` · ${firstCar.license_plate}` : ''}
-                          </Text>
-                        </div>
-                        <div className="mt-8">
-                          <Text className="car-status">✔ Автомобиль клиента</Text>
-                        </div>
-                      </Col>
-                      <Col>
-                        <Button
-                          size="small"
-                          look="ghost"
-                          onClick={() => goSection('tasks')}
-                        >
-                          К заданию
-                        </Button>
-                      </Col>
-                    </Row>
-                    {activeAppointments.length > 0 && (
-                      <>
-                        <Divider className="divider-dim" />
-                        <div>
-                          <Text className="text-titanium car-service-label">ТЕКУЩЕЕ ЗАДАНИЕ</Text>
-                          <div className="flex-space-between mt-8">
-                            <div>
-                              <Text className="text-white car-service-date">
-                                {activeAppointments[0].service_name || `Услуга #${activeAppointments[0].service_id}`}
-                              </Text>
-                              <Text className="text-titanium d-block car-service-name">
-                                <ClockCircleOutlined /> {dayjs(activeAppointments[0].start_time).format('DD.MM HH:mm')}
-                              </Text>
+                    <CarCard carId={firstCar.id} readonly compact />
+                    <div style={{ padding: '12px 16px 16px' }}>
+                      <Row justify="space-between" align="middle">
+                        <Col>
+                          <Text className="car-status">Автомобиль клиента</Text>
+                        </Col>
+                        <Col>
+                          <Button
+                            size="small"
+                            look="ghost"
+                            onClick={() => goSection('tasks')}
+                          >
+                            К заданию
+                          </Button>
+                        </Col>
+                      </Row>
+                      {activeAppointments.length > 0 && (
+                        <>
+                          <Divider className="divider-dim" />
+                          <div>
+                            <Text className="text-titanium car-service-label">ТЕКУЩЕЕ ЗАДАНИЕ</Text>
+                            <div className="flex-space-between mt-8">
+                              <div>
+                                <Text className="text-white car-service-date">
+                                  {activeAppointments[0].service_name || `Услуга #${activeAppointments[0].service_id}`}
+                                </Text>
+                                <Text className="text-titanium d-block car-service-name">
+                                  <ClockCircleOutlined /> {dayjs(activeAppointments[0].start_time).format('DD.MM HH:mm')}
+                                </Text>
+                              </div>
+                              <Tag color={STATUS_COLORS[activeAppointments[0].status]} className="tag-status">
+                                {STATUS_LABELS[activeAppointments[0].status]}
+                              </Tag>
                             </div>
-                            <Tag color={STATUS_COLORS[activeAppointments[0].status]} className="tag-status">
-                              {STATUS_LABELS[activeAppointments[0].status]}
-                            </Tag>
                           </div>
-                        </div>
-                      </>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </>
                 ) : (
-                  <div className="text-center">
+                  <div className="text-center" style={{ padding: 28 }}>
                     <ToolOutlined className="text-gold" style={{ fontSize: 40 }} />
                     <Text className="text-titanium d-block text-13 mt-8">
                       Нет активных заданий

@@ -19,7 +19,7 @@ import {
 import {
   DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined,
   SearchOutlined, FileTextOutlined, ToolOutlined, EyeOutlined,
-  ClockCircleOutlined,
+  ClockCircleOutlined, FilePdfOutlined,
 } from '@ant-design/icons';
 import { Button, Input, Card, Badge } from '../../../components/ui';
 import TechCardForm from './TechCardForm';
@@ -32,6 +32,7 @@ import {
   TechCard,
   apiFetch,
   cardToDraftBlocks,
+  downloadTechCardPdf,
   formatCurrency,
   formatDuration,
   formatUnit,
@@ -412,7 +413,7 @@ export default function TechCardsPage() {
               {
                 title: '',
                 key: 'actions',
-                width: 150,
+                width: 180,
                 render: (_, record) => (
                   <Space>
                     <Tooltip title="Инструкция">
@@ -421,6 +422,18 @@ export default function TechCardsPage() {
                         icon={<EyeOutlined />}
                         className="btn-action-gold"
                         onClick={() => navigate(`/technology/tech-cards/${record.id}`)}
+                      />
+                    </Tooltip>
+                    <Tooltip title="PDF">
+                      <Button
+                        size="small"
+                        icon={<FilePdfOutlined />}
+                        className="btn-action-gold"
+                        onClick={() => {
+                          downloadTechCardPdf(record.id).catch((e: unknown) => {
+                            message.error(e instanceof Error ? e.message : 'Не удалось скачать PDF');
+                          });
+                        }}
                       />
                     </Tooltip>
                     <Tooltip title="Редактировать">

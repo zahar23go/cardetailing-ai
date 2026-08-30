@@ -61,6 +61,8 @@ export interface ClosePreview {
   estimated_gross_profit: number;
   material_cost?: number;
   gross_profit?: number;
+  commission_percent?: number;
+  commission_amount?: number;
   has_tech_card: boolean;
   already_closed: boolean;
   steps: CloseStep[];
@@ -304,6 +306,11 @@ export default function CloseVisitModal({
               {' · '}
               Маржа {money((preview.price || 0) - (already ? Number(preview.material_cost ?? estimatedCost) : estimatedCost))}
             </Text>
+            {(preview.commission_percent || preview.commission_amount) ? (
+              <Text className="text-13 d-block" style={{ marginTop: 4 }}>
+                Комиссия мастера {preview.commission_percent || 0}% · {money(preview.commission_amount || 0)}
+              </Text>
+            ) : null}
             <Text className="text-titanium text-12 d-block">
               Каталог услуги: {money(preview.catalog_material_cost)}
             </Text>

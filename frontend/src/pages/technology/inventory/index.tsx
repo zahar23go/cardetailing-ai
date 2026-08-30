@@ -125,6 +125,7 @@ function abcBadge(cls: string) {
 function moveBadge(type: string, label: string) {
   if (type === 'in' || type === 'initial') return <Badge variant="success" size="sm">{label}</Badge>;
   if (type === 'out') return <Badge variant="warning" size="sm">{label}</Badge>;
+  if (type === 'revision') return <Badge variant="gold" size="sm">{label}</Badge>;
   return <Badge variant="neutral" size="sm">{label}</Badge>;
 }
 

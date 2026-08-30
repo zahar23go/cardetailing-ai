@@ -81,6 +81,13 @@ class User(Base):
         nullable=False,
         default=UserRole.client,
     )
+    commission_percent = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="Базовая комиссия мастера, % от цены заезда",
+    )
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -113,4 +120,44 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, phone='{self.phone}', role='{self.role}')>"
+
+
+class MasterSkill(Base):
+    """Какие услуги/техкарты делает мастер и комиссия по ним."""
+    __tablename__ = "master_skills"
+    __table_args__ = (
+        UniqueConstraint("master_id", "service_id", name="uq_master_skills_master_service"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    master_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    service_id = Column(
+        Integer,
+        ForeignKey("services.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    commission_percent = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    master = relationship("User", backref="master_skills")
+    service = relationship("Service")
+
+    def __repr__(self) -> str:
+        return f"<MasterSkill(master={self.master_id}, service={self.service_id})>"
 

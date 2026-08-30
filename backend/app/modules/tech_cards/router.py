@@ -103,7 +103,7 @@ async def create_tech_card_endpoint(
     """Создать техкарту для услуги."""
     from app.services.tech_cards_service import create_tech_card, tech_card_to_out
     try:
-        card = await create_tech_card(db, UUID(current_user["tenant_id"]), request)
+        card = await create_tech_card(db, UUID(current_user["tenant_id"]), request, actor_id=int(current_user["id"]))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return tech_card_to_out(card)
@@ -119,7 +119,7 @@ async def update_tech_card_endpoint(
     from app.services.tech_cards_service import update_tech_card, tech_card_to_out
     try:
         card = await update_tech_card(
-            db, UUID(current_user["tenant_id"]), card_id, request
+            db, UUID(current_user["tenant_id"]), card_id, request, actor_id=int(current_user["id"])
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -150,7 +150,7 @@ async def add_tech_card_block(
     """Добавить шаг в техкарту."""
     from app.services.tech_cards_service import add_block, tech_card_to_out
     try:
-        card = await add_block(db, UUID(current_user["tenant_id"]), card_id, request)
+        card = await add_block(db, UUID(current_user["tenant_id"]), card_id, request, actor_id=int(current_user["id"]))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not card:
@@ -168,7 +168,7 @@ async def reorder_tech_card_blocks(
     from app.services.tech_cards_service import reorder_blocks, tech_card_to_out
     try:
         card = await reorder_blocks(
-            db, UUID(current_user["tenant_id"]), card_id, request.block_ids,
+            db, UUID(current_user["tenant_id"]), card_id, request.block_ids, actor_id=int(current_user["id"]),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -188,7 +188,7 @@ async def update_tech_card_block(
     from app.services.tech_cards_service import update_block, tech_card_to_out
     try:
         card = await update_block(
-            db, UUID(current_user["tenant_id"]), card_id, block_id, request,
+            db, UUID(current_user["tenant_id"]), card_id, block_id, request, actor_id=int(current_user["id"]),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -206,10 +206,66 @@ async def delete_tech_card_block(
     """Удалить шаг техкарты."""
     from app.services.tech_cards_service import delete_block, tech_card_to_out
     try:
-        card = await delete_block(db, UUID(current_user["tenant_id"]), card_id, block_id)
+        card = await delete_block(db, UUID(current_user["tenant_id"]), card_id, block_id, actor_id=int(current_user["id"]))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not card:
         raise HTTPException(status_code=404, detail="Tech card not found")
     return tech_card_to_out(card)
+
+
+@router.get("/api/tech-cards/{card_id}/versions")
+async def list_tech_card_versions(
+    card_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """История версий техкарты."""
+    from app.services.tech_cards_service import get_tech_card
+    from app.modules.tech_cards.versions import list_versions
+
+    card = await get_tech_card(db, UUID(current_user["tenant_id"]), card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Tech card not found")
+    items = await list_versions(db, UUID(current_user["tenant_id"]), card_id)
+    return {"items": items, "total": len(items), "current_version": int(card.current_version or 0)}
+
+
+@router.get("/api/tech-cards/{card_id}/versions/{version_no}", response_model=TechCardVersionDetailOut)
+async def get_tech_card_version(
+    card_id: int,
+    version_no: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Снимок конкретной версии техкарты."""
+    from app.modules.tech_cards.versions import get_version
+
+    row = await get_version(db, UUID(current_user["tenant_id"]), card_id, version_no)
+    if not row:
+        raise HTTPException(status_code=404, detail="Версия не найдена")
+    return TechCardVersionDetailOut(**row)
+
+
+@router.get("/api/tech-cards/{card_id}/pdf")
+async def download_tech_card_pdf(
+    card_id: int,
+    current_user: dict = Depends(_require_master),
+    db: AsyncSession = Depends(get_db),
+    version: int | None = Query(None, ge=1),
+):
+    """PDF инструкции: текущая карта или выбранная версия."""
+    from app.modules.tech_cards.versions import render_pdf
+
+    pdf, filename = await render_pdf(
+        db,
+        UUID(current_user["tenant_id"]),
+        card_id,
+        version_no=version,
+    )
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 

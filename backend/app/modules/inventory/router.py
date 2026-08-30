@@ -112,3 +112,70 @@ async def get_inventory_critical(
     rows = await critical_positions(db, UUID(current_user["tenant_id"]))
     return [CriticalItemOut(**r) for r in rows]
 
+
+@router.post("/api/inventory/intake", response_model=StockDocumentOut)
+async def post_stock_intake(
+    request: StockIntakeRequest,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Оприходование: приход по списку позиций, обязательная подпись."""
+    from app.modules.inventory.stock_service import post_intake, serialize_document
+
+    doc = await post_intake(
+        db,
+        UUID(current_user["tenant_id"]),
+        current_user,
+        lines=[ln.model_dump() for ln in request.lines],
+        signed_name=request.signed_name,
+        document_no=request.document_no,
+        note=request.note,
+    )
+    return serialize_document(doc)
+
+
+@router.post("/api/inventory/revision", response_model=StockDocumentOut)
+async def post_stock_revision(
+    request: StockRevisionRequest,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Инвентаризация: факт vs система, обязательная подпись."""
+    from app.modules.inventory.stock_service import post_revision, serialize_document
+
+    doc = await post_revision(
+        db,
+        UUID(current_user["tenant_id"]),
+        current_user,
+        lines=[ln.model_dump() for ln in request.lines],
+        signed_name=request.signed_name,
+        note=request.note,
+    )
+    return serialize_document(doc)
+
+
+@router.get("/api/inventory/documents")
+async def list_stock_documents(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(30, ge=1, le=100),
+    doc_type: str | None = Query(None),
+):
+    """Журнал приёмок и ревизий."""
+    from app.modules.inventory.stock_service import list_documents, serialize_document
+
+    items, total = await list_documents(
+        db,
+        UUID(current_user["tenant_id"]),
+        skip=skip,
+        limit=limit,
+        doc_type=doc_type,
+    )
+    return {
+        "items": [serialize_document(d) for d in items],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+

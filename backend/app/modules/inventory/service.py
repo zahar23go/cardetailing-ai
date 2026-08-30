@@ -19,6 +19,7 @@ MOVEMENT_TYPE_LABELS = {
     "out": "Расход",
     "adjust": "Корректировка",
     "initial": "Начальный остаток",
+    "revision": "Ревизия",
 }
 
 

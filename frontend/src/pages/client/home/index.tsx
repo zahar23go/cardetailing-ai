@@ -11,11 +11,13 @@ import { Button, Card, Badge } from '../../../components/ui';
 import {
   APPT_STATUS,
   Appointment,
+  Car,
   Service,
   apiFetch,
   formatCurrency,
 } from '../api';
 import { APPT_OFFLINE_KEY } from '../../../pwa';
+import CarCard from '../../../components/CarCard';
 
 dayjs.locale('ru');
 const { Text } = Typography;
@@ -42,6 +44,7 @@ export default function ClientHomePage() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
 
@@ -50,13 +53,15 @@ export default function ClientHomePage() {
     (async () => {
       setLoading(true);
       try {
-        const [appts, svc] = await Promise.all([
+        const [appts, svc, carData] = await Promise.all([
           apiFetch<{ items: Appointment[] }>('/api/appointments/me?skip=0&limit=50'),
           apiFetch<{ items: Service[] }>('/api/services?skip=0&limit=200'),
+          apiFetch<{ items: Car[] }>('/api/cars?skip=0&limit=20').catch(() => ({ items: [] as Car[] })),
         ]);
         if (!cancelled) {
           setAppointments(appts.items || []);
           setServices(svc.items || []);
+          setCars(carData.items || []);
           setOffline(false);
           try {
             localStorage.setItem(APPT_OFFLINE_KEY, JSON.stringify(appts));
@@ -116,6 +121,15 @@ export default function ClientHomePage() {
           </Button>
         </div>
       </div>
+
+      {cars[0] ? (
+        <>
+          <div className="client-section-title">Автомобиль</div>
+          <div className="client-block apple-car-wrap">
+            <CarCard carId={cars[0].id} compact readonly />
+          </div>
+        </>
+      ) : null}
 
       <div className="client-section-title">Текущие записи</div>
       {upcoming.length === 0 ? (

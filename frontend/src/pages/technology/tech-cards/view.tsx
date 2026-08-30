@@ -7,7 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Col, Empty, Row, Space, Spin, Typography, message } from 'antd';
 import {
   ArrowLeftOutlined, CameraOutlined, ClockCircleOutlined,
-  EditOutlined, FileTextOutlined, ToolOutlined,
+  EditOutlined, FilePdfOutlined, FileTextOutlined, ToolOutlined,
 } from '@ant-design/icons';
 import { Button } from '../../../components/ui';
 import Card from '../../../components/Card';
@@ -15,7 +15,9 @@ import Badge from '../../../components/Badge';
 import StepPhoto from './StepPhoto';
 import {
   TechCard,
+  TechCardVersion,
   apiFetch,
+  downloadTechCardPdf,
   formatCurrency,
   formatDuration,
   formatUnit,
@@ -27,6 +29,7 @@ export default function TechCardViewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [card, setCard] = useState<TechCard | null>(null);
+  const [versions, setVersions] = useState<TechCardVersion[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,6 +39,12 @@ export default function TechCardViewPage() {
       try {
         const data = await apiFetch<TechCard>(`/api/tech-cards/${id}`);
         if (!cancelled) setCard(data);
+        try {
+          const hist = await apiFetch<{ items: TechCardVersion[] }>(`/api/tech-cards/${id}/versions`);
+          if (!cancelled) setVersions(hist.items || []);
+        } catch {
+          if (!cancelled) setVersions([]);
+        }
       } catch (e: unknown) {
         if (!cancelled) {
           message.error(e instanceof Error ? e.message : 'Не удалось загрузить техкарту');
@@ -71,6 +80,17 @@ export default function TechCardViewPage() {
             onClick={() => navigate('/technology/tech-cards')}
           >
             К списку
+          </Button>
+          <Button
+            look="ghost"
+            icon={<FilePdfOutlined />}
+            onClick={() => {
+              downloadTechCardPdf(card.id).catch((e: unknown) => {
+                message.error(e instanceof Error ? e.message : 'Не удалось скачать PDF');
+              });
+            }}
+          >
+            PDF
           </Button>
           <Button
             type="primary"
@@ -201,6 +221,35 @@ export default function TechCardViewPage() {
             </div>
           </Card>
         </>
+      )}
+
+      {versions.length > 0 && (
+        <Card variant="admin" style={{ marginTop: 16 }}>
+          <Text className="text-titanium" style={{ display: 'block', marginBottom: 10 }}>
+            Версии {card.current_version ? `· текущая v${card.current_version}` : ''}
+          </Text>
+          {versions.map((v) => (
+            <div key={v.id} style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+              <Text className="text-white">v{v.version_no}</Text>
+              <Text className="text-titanium">
+                {v.blocks_count} шаг. · {v.items_count} мат.
+                {v.created_at ? ` · ${new Date(v.created_at).toLocaleString('ru-RU')}` : ''}
+              </Text>
+              <Button
+                size="small"
+                look="ghost"
+                icon={<FilePdfOutlined />}
+                onClick={() => {
+                  downloadTechCardPdf(card.id, v.version_no).catch((e: unknown) => {
+                    message.error(e instanceof Error ? e.message : 'Не удалось скачать PDF');
+                  });
+                }}
+              >
+                PDF
+              </Button>
+            </div>
+          ))}
+        </Card>
       )}
     </div>
   );

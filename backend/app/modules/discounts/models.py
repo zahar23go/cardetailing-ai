@@ -30,6 +30,7 @@ class DiscountType(str, enum.Enum):
     frequency = "frequency"
     win_back = "win_back"
     cashback = "cashback"
+    weather = "weather"
 
 class DiscountRule(Base):
     __tablename__ = "discount_rules"
@@ -42,7 +43,7 @@ class DiscountRule(Base):
         index=True,
     )
     name = Column(String(255), nullable=False)
-    type = Column(String(50), nullable=False, comment="happy_hours, frequency, win_back, cashback, service, client")
+    type = Column(String(50), nullable=False, comment="happy_hours, frequency, win_back, weather, cashback, service, client")
     conditions = Column(JSONB, nullable=False, server_default="'{}'")
     discount_percent = Column(Integer, nullable=False, default=0)
     slot_start = Column(Time(timezone=False), nullable=True, comment="Время начала слота (HH:MM)")

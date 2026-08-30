@@ -113,6 +113,8 @@ def serialize_invoice(inv: AppointmentInvoice) -> dict:
         "catalog_material_cost": _round2(inv.catalog_material_cost),
         "shortage_qty_cost": _round2(inv.shortage_qty_cost),
         "gross_profit": _round2(inv.gross_profit),
+        "commission_percent": int(getattr(inv, "commission_percent", 0) or 0),
+        "commission_amount": _round2(getattr(inv, "commission_amount", 0) or 0),
         "closed_at": inv.closed_at,
         "notes": inv.notes,
         "steps": [
@@ -249,6 +251,8 @@ def build_preview(appointment: Appointment, card: TechCard | None) -> dict:
         "catalog_material_cost": _round2(catalog_cost),
         "estimated_material_cost": estimated_cost,
         "estimated_gross_profit": _round2(price - estimated_cost),
+        "commission_percent": 0,
+        "commission_amount": 0.0,
         "has_tech_card": card is not None,
         "already_closed": False,
         "steps": steps,
@@ -266,7 +270,14 @@ async def preview_close(db: AsyncSession, appointment: Appointment, tenant_id: U
         data["estimated_gross_profit"] = data["gross_profit"]
         return data
     card = await load_tech_card(db, tenant_id, appointment.service_id)
-    return build_preview(appointment, card)
+    data = build_preview(appointment, card)
+    from app.modules.appointments.skills import resolve_commission
+    pct, amount = await resolve_commission(
+        db, tenant_id, appointment.master_id, appointment.service_id, data["price"],
+    )
+    data["commission_percent"] = pct
+    data["commission_amount"] = amount
+    return data
 
 
 async def ensure_invoice(
@@ -385,6 +396,10 @@ async def ensure_invoice(
     price = float(appointment.total_price or 0)
     discount = float(appointment.discount_applied or 0)
     service_name = appointment.service.name if appointment.service else preview["service_name"]
+    from app.modules.appointments.skills import resolve_commission
+    comm_pct, comm_amt = await resolve_commission(
+        db, tenant_id, appointment.master_id, appointment.service_id, price,
+    )
 
     inv = AppointmentInvoice(
         tenant_id=tenant_id,
@@ -398,6 +413,8 @@ async def ensure_invoice(
         catalog_material_cost=_round2(catalog_cost),
         shortage_qty_cost=_round2(shortage_cost),
         gross_profit=_round2(price - total_cost),
+        commission_percent=comm_pct,
+        commission_amount=comm_amt,
         closed_by_id=user_id,
         closed_at=datetime.now(timezone.utc),
         notes=notes,

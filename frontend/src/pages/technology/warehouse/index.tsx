@@ -62,6 +62,23 @@ interface Material {
   updated_at?: string;
 }
 
+interface StockDocLine {
+  name: string;
+  qty: number;
+  delta: number;
+}
+
+interface StockDoc {
+  id: number;
+  doc_type: string;
+  document_no?: string | null;
+  signed_name: string;
+  signed_at?: string | null;
+  lines: StockDocLine[];
+}
+
+type IntakeLine = { material_id: number | null; qty: number };
+
 type MaterialForm = {
   name: string;
   sku: string;
@@ -138,6 +155,21 @@ export default function WarehousePage() {
   const [adjustDelta, setAdjustDelta] = useState<number>(1);
   const [adjusting, setAdjusting] = useState(false);
 
+  const [signerName, setSignerName] = useState('');
+  const [catalog, setCatalog] = useState<Material[]>([]);
+  const [docs, setDocs] = useState<StockDoc[]>([]);
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [intakeNo, setIntakeNo] = useState('');
+  const [intakeNote, setIntakeNote] = useState('');
+  const [intakeLines, setIntakeLines] = useState<IntakeLine[]>([{ material_id: null, qty: 0 }]);
+  const [intakeSign, setIntakeSign] = useState('');
+  const [intakeSaving, setIntakeSaving] = useState(false);
+  const [revNote, setRevNote] = useState('');
+  const [revCounts, setRevCounts] = useState<Record<number, number>>({});
+  const [revSign, setRevSign] = useState('');
+  const [revSaving, setRevSaving] = useState(false);
+
   const categoryLabel = useCallback(
     (key: string) => categories.find((c) => c.key === key)?.label || key,
     [categories],
@@ -176,9 +208,31 @@ export default function WarehousePage() {
     setLoading(false);
   }, [page, search, categoryFilter, lowStockOnly]);
 
+  const fetchCatalog = useCallback(async () => {
+    try {
+      const data = await apiFetch<{ items: Material[] }>('/api/materials?skip=0&limit=500');
+      setCatalog(data.items || []);
+    } catch {
+      setCatalog([]);
+    }
+  }, []);
+
+  const fetchDocs = useCallback(async () => {
+    try {
+      const data = await apiFetch<{ items: StockDoc[] }>('/api/inventory/documents?skip=0&limit=8');
+      setDocs(data.items || []);
+    } catch {
+      setDocs([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    fetchDocs();
+    apiFetch<{ full_name?: string }>('/api/me')
+      .then((me) => setSignerName(me.full_name || ''))
+      .catch(() => undefined);
+  }, [fetchCategories, fetchDocs]);
 
   useEffect(() => {
     fetchMaterials(1);
@@ -299,6 +353,95 @@ export default function WarehousePage() {
     setAdjusting(false);
   };
 
+  const openIntake = async () => {
+    await fetchCatalog();
+    setIntakeNo('');
+    setIntakeNote('');
+    setIntakeLines([{ material_id: null, qty: 0 }]);
+    setIntakeSign(signerName);
+    setIntakeOpen(true);
+  };
+
+  const openRevision = async () => {
+    const data = await apiFetch<{ items: Material[] }>('/api/materials?skip=0&limit=500').catch(() => ({ items: [] as Material[] }));
+    const list = data.items || [];
+    setCatalog(list);
+    const next: Record<number, number> = {};
+    list.forEach((m) => {
+      next[m.id] = Number(m.quantity);
+    });
+    setRevCounts(next);
+    setRevNote('');
+    setRevSign(signerName);
+    setRevisionOpen(true);
+  };
+
+  const handleIntake = async () => {
+    const lines = intakeLines
+      .filter((l) => l.material_id && l.qty > 0)
+      .map((l) => ({ material_id: l.material_id as number, qty: l.qty }));
+    if (!lines.length) {
+      message.warning('Добавьте хотя бы одну позицию с количеством');
+      return;
+    }
+    if (!intakeSign.trim()) {
+      message.warning('Подпись обязательна — имя как в профиле');
+      return;
+    }
+    setIntakeSaving(true);
+    try {
+      await apiFetch('/api/inventory/intake', {
+        method: 'POST',
+        body: JSON.stringify({
+          signed_name: intakeSign.trim(),
+          document_no: intakeNo.trim() || null,
+          note: intakeNote.trim() || null,
+          lines,
+        }),
+      });
+      message.success('Приёмка проведена');
+      setIntakeOpen(false);
+      fetchMaterials(page);
+      fetchDocs();
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : 'Не удалось провести приёмку');
+    }
+    setIntakeSaving(false);
+  };
+
+  const handleRevision = async () => {
+    if (!revSign.trim()) {
+      message.warning('Подпись обязательна — имя как в профиле');
+      return;
+    }
+    const lines = catalog.map((m) => ({
+      material_id: m.id,
+      qty: Number(revCounts[m.id] ?? m.quantity),
+    }));
+    if (!lines.length) {
+      message.warning('Нет позиций для ревизии');
+      return;
+    }
+    setRevSaving(true);
+    try {
+      await apiFetch('/api/inventory/revision', {
+        method: 'POST',
+        body: JSON.stringify({
+          signed_name: revSign.trim(),
+          note: revNote.trim() || null,
+          lines,
+        }),
+      });
+      message.success('Ревизия подписана');
+      setRevisionOpen(false);
+      fetchMaterials(page);
+      fetchDocs();
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : 'Не удалось провести ревизию');
+    }
+    setRevSaving(false);
+  };
+
   return (
     <>
       <div className="admin-section-head">
@@ -306,8 +449,14 @@ export default function WarehousePage() {
           <h3>Технология / Склад</h3>
         </div>
         <Space wrap>
-          <Button icon={<ReloadOutlined />} look="ghost" onClick={() => fetchMaterials(page)}>
+          <Button icon={<ReloadOutlined />} look="ghost" onClick={() => { fetchMaterials(page); fetchDocs(); }}>
             Обновить
+          </Button>
+          <Button look="ghost" onClick={openIntake}>
+            Приёмка
+          </Button>
+          <Button look="ghost" onClick={openRevision}>
+            Ревизия
           </Button>
           <Button type="primary" icon={<PlusOutlined />} look="gold" onClick={openCreate}>
             Добавить
@@ -500,6 +649,25 @@ export default function WarehousePage() {
         )}
       </Spin>
 
+      {docs.length > 0 && (
+        <Card variant="admin" style={{ marginTop: 16 }}>
+          <Text className="text-titanium" style={{ display: 'block', marginBottom: 10 }}>
+            Последние документы
+          </Text>
+          {docs.map((d) => (
+            <div key={d.id} className="text-titanium" style={{ marginBottom: 8, fontSize: 13 }}>
+              {d.doc_type === 'intake' ? 'Приёмка' : 'Ревизия'}
+              {d.document_no ? ` ${d.document_no}` : ''}
+              {' · '}
+              {d.signed_name}
+              {d.signed_at ? ` · ${new Date(d.signed_at).toLocaleString('ru-RU')}` : ''}
+              {' · '}
+              {d.lines.length} поз.
+            </div>
+          ))}
+        </Card>
+      )}
+
       <Modal
         title={(
           <Text className="text-gold-bold">
@@ -652,6 +820,144 @@ export default function WarehousePage() {
             </Button>
           </Space>
         )}
+      </Modal>
+
+      <Modal
+        title={<Text className="text-gold-bold">Приёмка</Text>}
+        open={intakeOpen}
+        onCancel={() => setIntakeOpen(false)}
+        footer={null}
+        className="modal-command"
+        destroyOnClose
+        width={560}
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Text className="text-titanium">
+            Оприходование прихода. Подпись — имя как в профиле.
+          </Text>
+          <div>
+            <span className="label-field">Номер документа</span>
+            <Input
+              size="large"
+              className="input-luxury"
+              value={intakeNo}
+              onChange={(e) => setIntakeNo(e.target.value)}
+              placeholder="ПН-12"
+            />
+          </div>
+          <div>
+            <span className="label-field">Комментарий</span>
+            <Input
+              size="large"
+              className="input-luxury"
+              value={intakeNote}
+              onChange={(e) => setIntakeNote(e.target.value)}
+            />
+          </div>
+          {intakeLines.map((line, idx) => (
+            <Space key={idx} wrap style={{ width: '100%' }}>
+              <Select
+                size="large"
+                className="input-luxury"
+                style={{ minWidth: 220 }}
+                placeholder="Материал"
+                value={line.material_id ?? undefined}
+                onChange={(v) => {
+                  const next = [...intakeLines];
+                  next[idx] = { ...next[idx], material_id: v };
+                  setIntakeLines(next);
+                }}
+                options={catalog.map((m) => ({ value: m.id, label: m.name }))}
+              />
+              <InputNumber
+                size="large"
+                className="input-luxury"
+                min={0}
+                value={line.qty}
+                onChange={(v) => {
+                  const next = [...intakeLines];
+                  next[idx] = { ...next[idx], qty: Number(v) || 0 };
+                  setIntakeLines(next);
+                }}
+              />
+            </Space>
+          ))}
+          <Button look="ghost" onClick={() => setIntakeLines([...intakeLines, { material_id: null, qty: 0 }])}>
+            + позиция
+          </Button>
+          <div>
+            <span className="label-field">Подпись (как в профиле)</span>
+            <Input
+              size="large"
+              className="input-luxury"
+              value={intakeSign}
+              onChange={(e) => setIntakeSign(e.target.value)}
+              placeholder={signerName}
+            />
+          </div>
+          <Button type="primary" look="gold" loading={intakeSaving} onClick={handleIntake}>
+            Провести приёмку
+          </Button>
+        </Space>
+      </Modal>
+
+      <Modal
+        title={<Text className="text-gold-bold">Ревизия склада</Text>}
+        open={revisionOpen}
+        onCancel={() => setRevisionOpen(false)}
+        footer={null}
+        className="modal-command"
+        destroyOnClose
+        width={640}
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Text className="text-titanium">
+            Укажите фактический остаток. Разница спишется или оприходуется. Подпись обязательна.
+          </Text>
+          <div>
+            <span className="label-field">Комментарий</span>
+            <Input
+              size="large"
+              className="input-luxury"
+              value={revNote}
+              onChange={(e) => setRevNote(e.target.value)}
+            />
+          </div>
+          {catalog.length === 0 ? (
+            <Text className="text-titanium">Склад пуст — сначала добавьте позиции</Text>
+          ) : (
+            catalog.map((m) => (
+              <div key={m.id} style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Text className="text-white" style={{ minWidth: 160 }}>
+                  {m.name}
+                </Text>
+                <Text className="text-titanium" style={{ minWidth: 90 }}>
+                  сист. {Number(m.quantity).toLocaleString('ru-RU')} {unitLabel(m.unit)}
+                </Text>
+                <InputNumber
+                  size="large"
+                  className="input-luxury"
+                  min={0}
+                  value={revCounts[m.id]}
+                  onChange={(v) => setRevCounts((prev) => ({ ...prev, [m.id]: Number(v) || 0 }))}
+                />
+              </div>
+            ))
+          )}
+          <div>
+            <span className="label-field">Подпись (как в профиле)</span>
+            <Input
+              size="large"
+              className="input-luxury"
+              value={revSign}
+              onChange={(e) => setRevSign(e.target.value)}
+              placeholder={signerName}
+            />
+          </div>
+          <Button type="primary" look="gold" loading={revSaving} onClick={handleRevision}>
+            Подписать ревизию
+          </Button>
+        </Space>
       </Modal>
     </>
   );

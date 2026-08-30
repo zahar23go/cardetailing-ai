@@ -48,6 +48,7 @@ class TechCard(Base):
     name = Column(String(255), nullable=True, comment="Название техкарты (по умолчанию — имя услуги)")
     notes = Column(Text, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
+    current_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -73,6 +74,12 @@ class TechCard(Base):
         back_populates="tech_card",
         order_by="TechCardItem.id",
         viewonly=True,
+    )
+    versions = relationship(
+        "TechCardVersion",
+        back_populates="tech_card",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     def __repr__(self) -> str:
@@ -146,4 +153,36 @@ class TechCardItem(Base):
 
     def __repr__(self) -> str:
         return f"<TechCardItem(card={self.tech_card_id}, material={self.material_id}, qty={self.quantity})>"
+
+
+class TechCardVersion(Base):
+    """Снимок техкарты: какая норма и инструкция действовали."""
+    __tablename__ = "tech_card_versions"
+    __table_args__ = (
+        UniqueConstraint("tech_card_id", "version_no", name="uq_tech_card_versions_card_no"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    tech_card_id = Column(
+        Integer,
+        ForeignKey("tech_cards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    version_no = Column(Integer, nullable=False)
+    snapshot = Column(JSONB, nullable=False, default=dict)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    tech_card = relationship("TechCard", back_populates="versions")
 

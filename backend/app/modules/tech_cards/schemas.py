@@ -77,6 +77,7 @@ class TechCardOut(BaseModel):
     blocks: list[TechCardBlockOut] = []
     blocks_count: int = 0
     total_duration_minutes: int = 0
+    current_version: int = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -88,4 +89,18 @@ class TechCardReorderIn(BaseModel):
 class TechCardPhotoOut(BaseModel):
     url: str
     thumbnail_url: Optional[str] = None
+
+
+class TechCardVersionOut(BaseModel):
+    id: int
+    version_no: int
+    created_at: Optional[datetime] = None
+    blocks_count: int = 0
+    items_count: int = 0
+    estimated_cost: float = 0
+    name: Optional[str] = None
+
+
+class TechCardVersionDetailOut(TechCardVersionOut):
+    snapshot: dict = {}
 

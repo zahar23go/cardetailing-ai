@@ -43,6 +43,9 @@ class Car(Base):
     year = Column(Integer, nullable=True)
     license_plate = Column(String(20), nullable=True, index=True)
     color = Column(String(30), nullable=True)
+    vin = Column(String(17), nullable=True, index=True)
+    body_type = Column(String(40), nullable=True)
+    mileage = Column(Integer, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(
         DateTime(timezone=True),

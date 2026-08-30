@@ -90,6 +90,68 @@ async def broadcast_happy_hours(
 
     return {"sent": sent, "message": f"Рассылка отправлена {sent} клиентам"}
 
+
+@router.get("/api/discounts/smart")
+async def get_smart_discounts(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Погода сегодня, какие погодные акции сработают, клиенты для win-back."""
+    from app.modules.discounts.smart import smart_overview
+
+    tenant_id = UUID(current_user["tenant_id"])
+    return await smart_overview(db, tenant_id)
+
+
+@router.post("/api/discounts/broadcast-win-back")
+async def broadcast_win_back(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Написать клиентам, которые давно не были (по активному правилу win-back)."""
+    from app.core.notification_service import create_notification
+    from app.modules.discounts.smart import list_win_back_candidates
+
+    tenant_id = UUID(current_user["tenant_id"])
+    now = datetime.now(timezone.utc)
+    rules_result = await db.execute(
+        select(DiscountRule).where(
+            DiscountRule.tenant_id == tenant_id,
+            DiscountRule.is_active == True,
+            DiscountRule.type == "win_back",
+            (DiscountRule.valid_until == None) | (DiscountRule.valid_until >= now),
+        )
+    )
+    rules = list(rules_result.scalars().all())
+    if not rules:
+        raise HTTPException(status_code=400, detail="Нет активного правила «возврат клиентов»")
+
+    min_days = min(int((r.conditions or {}).get("max_recency_days", 60)) for r in rules)
+    best = max(rules, key=lambda r: r.discount_percent)
+    clients = await list_win_back_candidates(db, tenant_id, min_days, now=now)
+    if not clients:
+        return {"sent": 0, "message": "Сейчас нет клиентов для возврата"}
+
+    title = "Давно не виделись"
+    message = (
+        f"Вас не было {min_days}+ дней. Вернитесь — скидка {best.discount_percent}% "
+        f"по акции «{best.name}»."
+    )
+    sent = 0
+    for c in clients:
+        await create_notification(
+            db,
+            user_id=c["id"],
+            tenant_id=tenant_id,
+            title=title,
+            message=message,
+            type="promo",
+            channel="in_app",
+        )
+        sent += 1
+    return {"sent": sent, "message": f"Рассылка отправлена {sent} клиентам"}
+
+
 @router.get("/api/discounts")
 async def get_discount_rules(
     current_user: dict = Depends(_require_admin),

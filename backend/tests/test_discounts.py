@@ -7,9 +7,18 @@
 - Скидка НЕ применяется в выходные
 """
 
-import pytest
 from datetime import datetime, timezone, timedelta
+from unittest.mock import AsyncMock, patch
+
+import pytest
 from httpx import AsyncClient
+
+from app.models import Appointment
+from app.modules.ai.financier_service import WeatherDay
+from app.modules.discounts.smart import (
+    weather_rule_matches,
+    win_back_applies,
+)
 
 
 class TestDiscounts:
@@ -662,3 +671,249 @@ class TestSegmentDiscount:
         # Скидка не должна быть применена
         assert data["discount_applied"] == 0, f"Скидка ошибочно применена: {data}"
         assert data["total_price"] == test_service.price
+
+
+def _tomorrow_16():
+    return (datetime.now(timezone.utc) + timedelta(days=1)).replace(
+        hour=16, minute=0, second=0, microsecond=0,
+    )
+
+
+class TestSmartDiscountMatchers:
+    def test_win_back_naive_last_visit(self):
+        now = datetime(2026, 8, 30, 12, 0, tzinfo=timezone.utc)
+        old = datetime(2026, 6, 1, 10, 0)  # naive, 90 days earlier
+        assert win_back_applies(old, now, 60) is True
+        recent = datetime(2026, 8, 20, 10, 0)
+        assert win_back_applies(recent, now, 60) is False
+        assert win_back_applies(None, now, 60) is False
+
+    def test_weather_kinds(self):
+        rain = WeatherDay("2026-08-30", 18, 12, 8)
+        freeze = WeatherDay("2026-08-30", 1, -4, 0)
+        heat = WeatherDay("2026-08-30", 31, 20, 0)
+        dry = WeatherDay("2026-08-30", 22, 14, 0.2)
+        assert weather_rule_matches({"weather": "rain"}, rain) is True
+        assert weather_rule_matches({"weather": "rain"}, dry) is False
+        assert weather_rule_matches({"weather": "freeze"}, freeze) is True
+        assert weather_rule_matches({"weather": "heat"}, heat) is True
+        assert weather_rule_matches({"weather": "dry"}, dry) is True
+        assert weather_rule_matches({"weather": "rain"}, None) is False
+
+
+class TestWinBackAndWeather:
+    async def test_win_back_applies_when_last_visit_old(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        admin_headers: dict,
+        db_session,
+        default_tenant,
+        test_user,
+        test_service,
+        test_car,
+    ):
+        past = datetime.now(timezone.utc) - timedelta(days=70)
+        db_session.add(Appointment(
+            client_id=test_user.id,
+            car_id=test_car.id,
+            service_id=test_service.id,
+            tenant_id=default_tenant.id,
+            start_time=past,
+            end_time=past + timedelta(hours=2),
+            status="completed",
+            total_price=5000,
+        ))
+        await db_session.commit()
+
+        rule = await client.post("/api/discounts", json={
+            "name": "Вернёмся",
+            "type": "win_back",
+            "conditions": {"max_recency_days": 60},
+            "discount_percent": 15,
+            "is_active": True,
+        }, headers=admin_headers)
+        assert rule.status_code == 200, rule.text
+
+        resp = await client.post("/api/appointments", json={
+            "service_id": test_service.id,
+            "car_id": test_car.id,
+            "start_time": _tomorrow_16().isoformat(),
+        }, headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        price = float(test_service.price)
+        assert data["discount_applied"] == round(price * 0.15, 2)
+        assert data["total_price"] == round(price * 0.85, 2)
+
+    async def test_win_back_skips_recent_visit(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        admin_headers: dict,
+        db_session,
+        default_tenant,
+        test_user,
+        test_service,
+        test_car,
+    ):
+        past = datetime.now(timezone.utc) - timedelta(days=10)
+        db_session.add(Appointment(
+            client_id=test_user.id,
+            car_id=test_car.id,
+            service_id=test_service.id,
+            tenant_id=default_tenant.id,
+            start_time=past,
+            end_time=past + timedelta(hours=2),
+            status="completed",
+            total_price=5000,
+        ))
+        await db_session.commit()
+
+        rule = await client.post("/api/discounts", json={
+            "name": "Вернёмся недавно",
+            "type": "win_back",
+            "conditions": {"max_recency_days": 60},
+            "discount_percent": 15,
+            "is_active": True,
+        }, headers=admin_headers)
+        assert rule.status_code == 200, rule.text
+
+        resp = await client.post("/api/appointments", json={
+            "service_id": test_service.id,
+            "car_id": test_car.id,
+            "start_time": _tomorrow_16().isoformat(),
+        }, headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["discount_applied"] == 0
+        assert data["total_price"] == test_service.price
+
+    async def test_weather_rain_applies(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        admin_headers: dict,
+        test_service,
+        test_car,
+    ):
+        rule = await client.post("/api/discounts", json={
+            "name": "Мойка в дождь",
+            "type": "weather",
+            "conditions": {"weather": "rain", "precip_mm_min": 2},
+            "discount_percent": 10,
+            "is_active": True,
+        }, headers=admin_headers)
+        assert rule.status_code == 200, rule.text
+
+        rainy = WeatherDay("2026-08-30", 18, 12, 9)
+        with patch(
+            "app.modules.discounts.smart.weather_day_for",
+            new_callable=AsyncMock,
+            return_value=rainy,
+        ):
+            resp = await client.post("/api/appointments", json={
+                "service_id": test_service.id,
+                "car_id": test_car.id,
+                "start_time": _tomorrow_16().isoformat(),
+            }, headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        price = float(test_service.price)
+        assert data["discount_applied"] == round(price * 0.1, 2)
+        assert data["total_price"] == round(price * 0.9, 2)
+
+    async def test_weather_dry_does_not_match_rain_rule(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        admin_headers: dict,
+        test_service,
+        test_car,
+    ):
+        rule = await client.post("/api/discounts", json={
+            "name": "Только дождь",
+            "type": "weather",
+            "conditions": {"weather": "rain", "precip_mm_min": 2},
+            "discount_percent": 10,
+            "is_active": True,
+        }, headers=admin_headers)
+        assert rule.status_code == 200, rule.text
+
+        dry = WeatherDay("2026-08-30", 22, 14, 0)
+        with patch(
+            "app.modules.discounts.smart.weather_day_for",
+            new_callable=AsyncMock,
+            return_value=dry,
+        ):
+            resp = await client.post("/api/appointments", json={
+                "service_id": test_service.id,
+                "car_id": test_car.id,
+                "start_time": _tomorrow_16().isoformat(),
+            }, headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["discount_applied"] == 0
+        assert data["total_price"] == test_service.price
+
+    async def test_smart_preview_lists_win_back_and_weather(
+        self,
+        client: AsyncClient,
+        admin_headers: dict,
+        db_session,
+        default_tenant,
+        test_user,
+        test_service,
+        test_car,
+    ):
+        past = datetime.now(timezone.utc) - timedelta(days=80)
+        db_session.add(Appointment(
+            client_id=test_user.id,
+            car_id=test_car.id,
+            service_id=test_service.id,
+            tenant_id=default_tenant.id,
+            start_time=past,
+            end_time=past + timedelta(hours=2),
+            status="completed",
+            total_price=5000,
+        ))
+        await db_session.commit()
+
+        assert (await client.post("/api/discounts", json={
+            "name": "Возврат 60",
+            "type": "win_back",
+            "conditions": {"max_recency_days": 60},
+            "discount_percent": 12,
+            "is_active": True,
+        }, headers=admin_headers)).status_code == 200
+
+        assert (await client.post("/api/discounts", json={
+            "name": "Дождь −10",
+            "type": "weather",
+            "conditions": {"weather": "rain", "precip_mm_min": 2},
+            "discount_percent": 10,
+            "is_active": True,
+        }, headers=admin_headers)).status_code == 200
+
+        from app.modules.discounts.smart import _local_date
+        today = _local_date(datetime.now(timezone.utc), "Europe/Moscow")
+        rainy = [WeatherDay(today.isoformat(), 17, 11, 6)]
+        with patch(
+            "app.modules.discounts.smart.fetch_weather_forecast",
+            new_callable=AsyncMock,
+            return_value=rainy,
+        ):
+            resp = await client.get("/api/discounts/smart", headers=admin_headers)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["weather"]["available"] is True
+        assert data["weather"]["kind"] == "rain"
+        match = next(m for m in data["weather_matches"] if m["name"] == "Дождь −10")
+        assert match["will_apply"] is True
+        names = [c["full_name"] for c in data["win_back"]["clients"]]
+        assert test_user.full_name in names
+        assert data["win_back"]["min_absent_days"] == 60
+
+    async def test_smart_requires_admin(self, client: AsyncClient, auth_headers: dict):
+        resp = await client.get("/api/discounts/smart", headers=auth_headers)
+        assert resp.status_code in (401, 403)

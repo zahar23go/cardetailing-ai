@@ -1,6 +1,6 @@
 /* CarDetailing AI — PWA service worker: оболочка + офлайн записей. */
 
-const CACHE_NAME = 'cardetailing-pwa-v2';
+const CACHE_NAME = 'cardetailing-pwa-v3';
 const SHELL = [
   '/offline.html',
   '/manifest.json',
@@ -41,6 +41,12 @@ self.addEventListener('fetch', (event) => {
   const url = req.url;
   if (url.includes('/uploads/')) return;
   if (url.includes('@vite') || url.includes('/src/') || url.includes('node_modules')) return;
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req).catch(() => caches.match('/offline.html').then((cached) => cached || Response.error())),
+    );
+    return;
+  }
 
   if (isAppointmentsMe(url)) {
     event.respondWith(

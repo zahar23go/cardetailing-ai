@@ -145,6 +145,7 @@ def _serialize_appointment(appointment):
             "make": appointment.car.make,
             "model": appointment.car.model,
             "license_plate": appointment.car.license_plate,
+            "vin": getattr(appointment.car, "vin", None),
         } if appointment.car else None,
         "service": {
             "id": appointment.service.id,
@@ -619,6 +620,16 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
 
     best_discount = 0
     best_rule = None
+    weather_day = None
+    weather_resolved = False
+
+    async def _weather_for_visit():
+        nonlocal weather_day, weather_resolved
+        if not weather_resolved:
+            from app.modules.discounts.smart import weather_day_for
+            weather_day = await weather_day_for(db, tenant_id, appointment.start_time or now)
+            weather_resolved = True
+        return weather_day
 
     for rule in rules:
         conditions = rule.conditions or {}
@@ -676,9 +687,10 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
                     best_rule = rule
 
         elif rule.type == "win_back":
-            # Скидка для возврата ушедших клиентов
+            from app.modules.discounts.smart import win_back_applies
+            if rule.service_id and rule.service_id != appointment.service_id:
+                continue
             max_recency_days = conditions.get("max_recency_days", 60)
-            # Ищем последнюю запись клиента
             last_result = await db.execute(
                 select(Appointment.start_time)
                 .where(
@@ -690,12 +702,20 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
                 .limit(1)
             )
             last_visit = last_result.scalar()
-            if last_visit:
-                days_since = (now - last_visit).days
-                if days_since >= max_recency_days:
-                    if rule.discount_percent > best_discount:
-                        best_discount = rule.discount_percent
-                        best_rule = rule
+            if win_back_applies(last_visit, now, max_recency_days):
+                if rule.discount_percent > best_discount:
+                    best_discount = rule.discount_percent
+                    best_rule = rule
+
+        elif rule.type == "weather":
+            from app.modules.discounts.smart import weather_rule_matches
+            if rule.service_id and rule.service_id != appointment.service_id:
+                continue
+            day = await _weather_for_visit()
+            if weather_rule_matches(conditions, day):
+                if rule.discount_percent > best_discount:
+                    best_discount = rule.discount_percent
+                    best_rule = rule
 
         elif rule.type == "service":
             # Скидка на конкретную услугу

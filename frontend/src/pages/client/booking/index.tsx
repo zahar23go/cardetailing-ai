@@ -87,6 +87,20 @@ export default function ClientBookingPage() {
   }, []);
 
   useEffect(() => {
+    if (!serviceId) return;
+    let cancelled = false;
+    apiFetch<{ items: Master[] }>(`/api/masters?service_id=${serviceId}`)
+      .then((d) => {
+        if (cancelled) return;
+        const list = d.items || [];
+        setMasters(list);
+        setMasterId((prev) => (prev && list.some((m) => m.id === prev) ? prev : undefined));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [serviceId]);
+
+  useEffect(() => {
     if (!date) return;
     let cancelled = false;
     const qs = new URLSearchParams({

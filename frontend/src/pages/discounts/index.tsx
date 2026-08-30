@@ -30,6 +30,7 @@ import {
 import dayjs from 'dayjs';
 import DiscountIntelligence from '../../components/DiscountIntelligence';
 import ServiceDiscountRecs from '../../components/ServiceDiscountRecs';
+import SmartDiscountPanel from '../../components/SmartDiscountPanel';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -102,6 +103,7 @@ const DISCOUNT_TYPE_LABELS: Record<string, string> = {
   frequency: 'За частоту',
   win_back: 'Возврат',
   cashback: 'Кэшбек',
+  weather: 'Погода',
 };
 
 const DISCOUNT_TYPE_COLORS: Record<string, string> = {
@@ -112,6 +114,7 @@ const DISCOUNT_TYPE_COLORS: Record<string, string> = {
   frequency: 'green',
   win_back: 'orange',
   cashback: 'purple',
+  weather: 'geekblue',
 };
 
 const emptyForm = {
@@ -128,6 +131,9 @@ const emptyForm = {
   maxRecencyDays: 60,
   pointsPercent: 5,
   segment: undefined as string | undefined,
+  weatherKind: 'rain' as string,
+  precipMmMin: 2,
+  tMaxMin: 25,
 };
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -226,6 +232,9 @@ export default function DiscountsPage() {
         maxRecencyDays: cond.max_recency_days || 60,
         pointsPercent: cond.points_percent || 5,
         segment: cond.segment || undefined,
+        weatherKind: cond.weather || 'rain',
+        precipMmMin: cond.precip_mm_min || 2,
+        tMaxMin: cond.t_max_min || (cond.weather === 'dry' ? 16 : 25),
       });
     } else {
       setEditingDiscount(null);
@@ -247,6 +256,13 @@ export default function DiscountsPage() {
         conditions.min_visits = discountForm.minVisits;
       } else if (discountForm.type === 'win_back') {
         conditions.max_recency_days = discountForm.maxRecencyDays;
+      } else if (discountForm.type === 'weather') {
+        conditions.weather = discountForm.weatherKind;
+        if (discountForm.weatherKind === 'rain') {
+          conditions.precip_mm_min = discountForm.precipMmMin;
+        } else if (discountForm.weatherKind === 'heat' || discountForm.weatherKind === 'dry') {
+          conditions.t_max_min = discountForm.tMaxMin;
+        }
       } else if (discountForm.type === 'cashback') {
         conditions.points_percent = discountForm.pointsPercent;
       } else if (discountForm.type === 'segment') {
@@ -325,11 +341,27 @@ export default function DiscountsPage() {
 
   return (
     <>
-      <div className="admin-section-head">
+      <div
+        className="admin-section-head"
+        style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}
+      >
         <div>
           <div className="admin-overview-kicker">Лояльность</div>
           <h3>Скидки и бонусы</h3>
         </div>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          look="gold"
+          style={{ width: 'auto' }}
+          onClick={() => openDiscountModal()}
+        >
+          Создать правило
+        </Button>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <SmartDiscountPanel />
       </div>
 
       <DiscountIntelligence onCreateSuggestion={createDiscountFromSuggestion} />
@@ -339,18 +371,6 @@ export default function DiscountsPage() {
       </div>
 
       <Spin spinning={discountsLoading || loyaltyLoading}>
-        <div className="toolbar-right mb-12" style={{ marginTop: 16 }}>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            look="gold"
-            style={{ width: 'auto' }}
-            onClick={() => openDiscountModal()}
-          >
-            Создать правило вручную
-          </Button>
-        </div>
-
         <Card className="card-luxury" style={{ marginBottom: '16px' }}>
           <Text className="title-gold text-16 d-block mb-8">Правила скидок</Text>
           {discountRules.length === 0 && !discountsLoading ? (
@@ -666,6 +686,7 @@ export default function DiscountsPage() {
                 <Option value="segment">По сегменту (VIP, Лояльные...)</Option>
                 <Option value="frequency">За частоту визитов</Option>
                 <Option value="win_back">Возврат клиентов</Option>
+                <Option value="weather">Погода (дождь / жара / мороз)</Option>
                 <Option value="cashback">Кэшбек</Option>
               </Select>
             </Col>
@@ -818,7 +839,7 @@ export default function DiscountsPage() {
 
           {discountForm.type === 'win_back' && (
             <div>
-              <span className="label-field">Максимум дней без записи</span>
+              <span className="label-field">Не был (дней и больше)</span>
               <InputNumber
                 size="large"
                 className="w-full input-luxury"
@@ -829,7 +850,56 @@ export default function DiscountsPage() {
                 style={{ width: '100%' }}
               />
               <Text className="text-titanium text-12 d-block" style={{ marginTop: 4 }}>
-                Если клиент не был больше указанного количества дней — применяется скидка
+                Если клиент не был указанное количество дней и дольше — применяется скидка
+              </Text>
+            </div>
+          )}
+
+          {discountForm.type === 'weather' && (
+            <div>
+              <span className="label-field">Условие погоды</span>
+              <Select
+                size="large"
+                className="w-full"
+                value={discountForm.weatherKind}
+                onChange={(v) => setDiscountForm((prev) => ({ ...prev, weatherKind: v }))}
+              >
+                <Option value="rain">Дождь</Option>
+                <Option value="freeze">Мороз</Option>
+                <Option value="heat">Жара</Option>
+                <Option value="dry">Сухо и тепло</Option>
+              </Select>
+              {discountForm.weatherKind === 'rain' && (
+                <div style={{ marginTop: 12 }}>
+                  <span className="label-field">Осадки от, мм</span>
+                  <InputNumber
+                    size="large"
+                    className="w-full input-luxury"
+                    min={0.5}
+                    max={50}
+                    step={0.5}
+                    value={discountForm.precipMmMin}
+                    onChange={(v) => setDiscountForm((prev) => ({ ...prev, precipMmMin: v || 2 }))}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              )}
+              {(discountForm.weatherKind === 'heat' || discountForm.weatherKind === 'dry') && (
+                <div style={{ marginTop: 12 }}>
+                  <span className="label-field">Температура от, °C</span>
+                  <InputNumber
+                    size="large"
+                    className="w-full input-luxury"
+                    min={-20}
+                    max={45}
+                    value={discountForm.tMaxMin}
+                    onChange={(v) => setDiscountForm((prev) => ({ ...prev, tMaxMin: v || 25 }))}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              )}
+              <Text className="text-titanium text-12 d-block" style={{ marginTop: 4 }}>
+                Скидка применится, если прогноз на день записи совпадёт с условием
               </Text>
             </div>
           )}

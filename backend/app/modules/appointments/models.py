@@ -261,6 +261,8 @@ class AppointmentInvoice(Base):
     catalog_material_cost = Column(Numeric(10, 2), nullable=False, default=0)
     shortage_qty_cost = Column(Numeric(10, 2), nullable=False, default=0)
     gross_profit = Column(Numeric(10, 2), nullable=False, default=0)
+    commission_percent = Column(Integer, nullable=False, default=0, server_default="0")
+    commission_amount = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
     closed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     closed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     notes = Column(Text, nullable=True)

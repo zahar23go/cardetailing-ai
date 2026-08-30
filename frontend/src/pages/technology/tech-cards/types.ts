@@ -52,6 +52,17 @@ export interface TechCard {
   blocks: TechCardBlock[];
   blocks_count: number;
   total_duration_minutes: number;
+  current_version?: number;
+}
+
+export interface TechCardVersion {
+  id: number;
+  version_no: number;
+  created_at?: string | null;
+  blocks_count: number;
+  items_count: number;
+  estimated_cost: number;
+  name?: string | null;
 }
 
 export type DraftItem = {
@@ -89,6 +100,26 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   }
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+export async function downloadTechCardPdf(cardId: number, version?: number) {
+  const token = localStorage.getItem('token');
+  const qs = version ? `?version=${version}` : '';
+  const res = await fetch(`${API_BASE}/api/tech-cards/${cardId}/pdf${qs}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    throw new Error('Не удалось скачать PDF');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tech-card-${cardId}${version ? `-v${version}` : ''}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function formatCurrency(val: number) {

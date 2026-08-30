@@ -56,6 +56,20 @@
       <div class="pwa-splash-title">CAR DETAILING AI</div>
     </div>
     <div id="root"></div>
+    <script>
+      (function () {
+        var local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        if (!local || !('serviceWorker' in navigator)) return;
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) { r.unregister(); });
+        });
+        if (window.caches) {
+          caches.keys().then(function (keys) {
+            keys.forEach(function (k) { caches.delete(k); });
+          });
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -38,20 +38,127 @@ router = APIRouter()
 async def list_masters(
     current_user: dict = Depends(_get_current_user),
     db: AsyncSession = Depends(get_db),
+    service_id: int | None = Query(None, description="Только мастера этой услуги (без навыков = все)"),
 ):
     """Список мастеров салона для записи клиента."""
+    from app.modules.appointments.skills import eligible_master_ids
+
+    tenant_id = UUID(current_user["tenant_id"])
     result = await db.execute(
         select(User)
         .where(
-            User.tenant_id == UUID(current_user["tenant_id"]),
+            User.tenant_id == tenant_id,
             User.role == UserRole.master.value,
         )
         .order_by(User.full_name)
     )
-    masters = result.scalars().all()
+    masters = list(result.scalars().all())
+    if service_id:
+        allowed = await eligible_master_ids(
+            db, tenant_id, service_id, [u.id for u in masters],
+        )
+        masters = [u for u in masters if u.id in allowed]
     return {
         "items": [{"id": u.id, "full_name": u.full_name} for u in masters],
         "total": len(masters),
+    }
+
+
+@router.get("/api/masters/{master_id}/skills")
+async def get_master_skills(
+    master_id: int,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.modules.appointments.skills import get_master_or_404, list_skills, tech_card_service_ids
+
+    tenant_id = UUID(current_user["tenant_id"])
+    master = await get_master_or_404(db, tenant_id, master_id)
+    if not master:
+        raise HTTPException(status_code=404, detail="Мастер не найден")
+    skills = await list_skills(db, tenant_id, master_id)
+    has_cards = await tech_card_service_ids(db, tenant_id, [s.service_id for s in skills])
+    return {
+        "master_id": master.id,
+        "full_name": master.full_name,
+        "commission_percent": int(master.commission_percent or 0),
+        "items": [
+            {
+                "service_id": s.service_id,
+                "service_name": s.service.name if s.service else "",
+                "has_tech_card": s.service_id in has_cards,
+                "commission_percent": int(s.commission_percent or 0),
+            }
+            for s in skills
+        ],
+    }
+
+
+@router.put("/api/masters/{master_id}/skills")
+async def put_master_skills(
+    master_id: int,
+    request: MasterSkillsPut,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.modules.appointments.skills import clamp_percent, get_master_or_404, list_skills, tech_card_service_ids
+
+    tenant_id = UUID(current_user["tenant_id"])
+    master = await get_master_or_404(db, tenant_id, master_id)
+    if not master:
+        raise HTTPException(status_code=404, detail="Мастер не найден")
+
+    default_pct = clamp_percent(request.commission_percent)
+    master.commission_percent = default_pct
+
+    service_ids = [it.service_id for it in request.items]
+    if service_ids:
+        svc_result = await db.execute(
+            select(Service.id).where(
+                Service.tenant_id == tenant_id,
+                Service.id.in_(service_ids),
+            )
+        )
+        found = {row[0] for row in svc_result.all()}
+        missing = [sid for sid in service_ids if sid not in found]
+        if missing:
+            raise HTTPException(status_code=404, detail="Услуга не найдена")
+
+    await db.execute(
+        delete(MasterSkill).where(
+            MasterSkill.tenant_id == tenant_id,
+            MasterSkill.master_id == master_id,
+        )
+    )
+    seen: set[int] = set()
+    for it in request.items:
+        if it.service_id in seen:
+            continue
+        seen.add(it.service_id)
+        pct = clamp_percent(it.commission_percent if it.commission_percent is not None else default_pct)
+        db.add(MasterSkill(
+            tenant_id=tenant_id,
+            master_id=master_id,
+            service_id=it.service_id,
+            commission_percent=pct,
+        ))
+    await db.commit()
+
+    skills = await list_skills(db, tenant_id, master_id)
+    has_cards = await tech_card_service_ids(db, tenant_id, [s.service_id for s in skills])
+    return {
+        "master_id": master.id,
+        "full_name": master.full_name,
+        "commission_percent": int(master.commission_percent or 0),
+        "items": [
+            {
+                "service_id": s.service_id,
+                "service_name": s.service.name if s.service else "",
+                "has_tech_card": s.service_id in has_cards,
+                "commission_percent": int(s.commission_percent or 0),
+            }
+            for s in skills
+        ],
     }
 
 @router.get("/api/appointments")
@@ -199,6 +306,9 @@ async def create_appointment(
         )
         if not master_result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Мастер не найден")
+        from app.modules.appointments.skills import master_can_do
+        if not await master_can_do(db, tenant_id, master_id, request.service_id):
+            raise HTTPException(status_code=400, detail="Этот мастер не выполняет выбранную услугу")
 
     appointment = Appointment(
         client_id=current_user["id"],
@@ -278,6 +388,14 @@ async def update_appointment_status(
     if request.status is not None:
         appointment.status = request.status
     if request.master_id is not None:
+        from app.modules.appointments.skills import master_can_do
+        if not await master_can_do(
+            db,
+            UUID(current_user["tenant_id"]),
+            request.master_id,
+            appointment.service_id,
+        ):
+            raise HTTPException(status_code=400, detail="Этот мастер не выполняет услугу этой записи")
         appointment.master_id = request.master_id
     if request.master_brief is not None:
         appointment.master_brief = request.master_brief

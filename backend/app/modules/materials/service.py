@@ -139,6 +139,7 @@ async def _log_movement(
     reason: str | None = None,
     created_by_id: int | None = None,
     appointment_id: int | None = None,
+    document_id: int | None = None,
 ) -> None:
     db.add(
         MaterialMovement(
@@ -151,6 +152,7 @@ async def _log_movement(
             reason=reason,
             created_by_id=created_by_id,
             appointment_id=appointment_id,
+            document_id=document_id,
         )
     )
 
@@ -302,6 +304,8 @@ async def apply_stock_delta(
     reason: str | None = None,
     created_by_id: int | None = None,
     appointment_id: int | None = None,
+    document_id: int | None = None,
+    movement_type: str | None = None,
 ) -> tuple[Material | None, float]:
     """Как adjust_quantity, но без commit. Возвращает (материал, фактически применённый delta)."""
     material = await get_material(db, tenant_id, material_id)
@@ -320,9 +324,11 @@ async def apply_stock_delta(
             delta=applied,
             quantity_before=before,
             quantity_after=after,
+            movement_type=movement_type,
             reason=reason or ("Приход" if applied > 0 else "Расход"),
             created_by_id=created_by_id,
             appointment_id=appointment_id,
+            document_id=document_id,
         )
     await db.flush()
     return material, applied

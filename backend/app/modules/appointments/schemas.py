@@ -35,6 +35,16 @@ class AppointmentStatusUpdate(BaseModel):
 class MasterStatusUpdate(BaseModel):
     status: str = Field(..., description="New status (in_progress or completed)")
 
+
+class MasterSkillItemIn(BaseModel):
+    service_id: int
+    commission_percent: Optional[int] = Field(None, ge=0, le=100)
+
+
+class MasterSkillsPut(BaseModel):
+    commission_percent: int = Field(default=0, ge=0, le=100)
+    items: list[MasterSkillItemIn] = Field(default_factory=list)
+
 class ClientAppointmentEdit(BaseModel):
     """Client can edit date/time/car of their pending/confirmed appointment."""
     start_time: Optional[str] = Field(None, description="ISO 8601 datetime string")
@@ -73,6 +83,7 @@ class CarRef(BaseModel):
     make: str
     model: str
     license_plate: Optional[str] = None
+    vin: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
