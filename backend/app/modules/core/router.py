@@ -283,6 +283,109 @@ async def update_me(
     await db.refresh(user)
     return UserOut.model_validate(user)
 
+@router.get("/api/onboarding", response_model=OnboardingStatus)
+async def get_onboarding(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Статус первого запуска салона (USM владельца)."""
+    tenant_id = UUID(current_user["tenant_id"])
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Тенант не найден")
+    boxes = (
+        await db.execute(select(func.count()).select_from(Box).where(Box.tenant_id == tenant_id))
+    ).scalar() or 0
+    services = (
+        await db.execute(select(func.count()).select_from(Service).where(Service.tenant_id == tenant_id))
+    ).scalar() or 0
+    masters = (
+        await db.execute(
+            select(func.count()).select_from(User).where(
+                User.tenant_id == tenant_id,
+                User.role == "master",
+            )
+        )
+    ).scalar() or 0
+    materials = (
+        await db.execute(
+            select(func.count()).select_from(Material).where(Material.tenant_id == tenant_id)
+        )
+    ).scalar() or 0
+    cfg = tenant.config if isinstance(tenant.config, dict) else {}
+    flagged = bool(cfg.get("onboarding_completed"))
+    completed = flagged or (int(boxes) > 0 and int(services) > 0)
+    return OnboardingStatus(
+        completed=completed,
+        needs_wizard=not completed,
+        salon_name=tenant.name or "",
+        boxes=int(boxes),
+        services=int(services),
+        masters=int(masters),
+        materials=int(materials),
+    )
+
+
+@router.post("/api/onboarding/complete", response_model=OnboardingStatus)
+async def complete_onboarding(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Закрыть мастер настройки — дальше Command Center."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    tenant_id = UUID(current_user["tenant_id"])
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Тенант не найден")
+    cfg = dict(tenant.config or {})
+    cfg["onboarding_completed"] = True
+    tenant.config = cfg
+    flag_modified(tenant, "config")
+    await db.commit()
+    return await get_onboarding(current_user, db)
+
+
+@router.post("/api/onboarding/demo-pack")
+async def onboarding_demo_pack(
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Загрузить 6 техкарт заказчика и номенклатуру склада."""
+    from app.modules.tech_cards.demo_pack import apply_demo_pack
+
+    tenant_id = UUID(current_user["tenant_id"])
+    stats = await apply_demo_pack(db, tenant_id, force=False)
+    await db.commit()
+    return stats
+
+
+@router.post("/api/users", response_model=UserOut, status_code=201)
+async def create_user(
+    request: UserCreate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Создать сотрудника или клиента в тенанте (онбординг / CRM)."""
+    role = (request.role or "master").strip()
+    if role not in ("client", "master", "admin"):
+        raise HTTPException(status_code=400, detail="Роль: client, master или admin")
+    existing = await db.execute(select(User).where(User.phone == request.phone))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Пользователь с этим телефоном уже есть")
+    user = User(
+        phone=request.phone,
+        password=_hash_password(request.password),
+        full_name=request.full_name,
+        role=role,
+        tenant_id=UUID(current_user["tenant_id"]),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return UserOut.model_validate(user)
+
+
 @router.get("/api/users")
 async def get_users(
     current_user: dict = Depends(_require_admin),

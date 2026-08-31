@@ -77,9 +77,24 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
+    """Run migrations in 'online' mode.
 
-    asyncio.run(run_async_migrations())
+    CLI (`alembic upgrade head`) uses asyncio.run().
+    The app must pass a sync connection — nested asyncio.run() deadlocks uvicorn.
+    """
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        do_run_migrations(connection)
+        return
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(run_async_migrations())
+        return
+    raise RuntimeError(
+        "Cannot run Alembic asyncio.run() inside the server event loop. "
+        "Use `alembic upgrade head` from the shell, or pass attributes['connection']."
+    )
 
 
 if context.is_offline_mode():

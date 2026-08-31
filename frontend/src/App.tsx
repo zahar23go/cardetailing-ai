@@ -108,8 +108,23 @@ function App() {
     }
   };
 
-  const goAfterAuth = (role?: string) => {
+  const goAfterAuth = async (role?: string) => {
     if (role === 'admin' || role === 'super_admin') {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE}/api/onboarding`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.needs_wizard) {
+            navigate('/onboarding');
+            return;
+          }
+        }
+      } catch {
+        /* дашборд */
+      }
       navigate('/dashboard');
       return;
     }

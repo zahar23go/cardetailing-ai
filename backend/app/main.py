@@ -39,33 +39,34 @@ __all__ = [
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    # Только id — полный Tenant в сессии тянет cascade-коллекции при commit/close
+    # и на Windows/asyncpg старт может навсегда зависнуть: логин не отвечает.
     async with async_session_maker() as db:
-        tenant_result = await db.execute(select(Tenant).limit(1))
-        default_tenant = tenant_result.scalar_one_or_none()
-        if not default_tenant:
-            default_tenant = Tenant(
-                name="Default Workshop",
-                subdomain="default",
-            )
-            db.add(default_tenant)
-            await db.commit()
-            await db.refresh(default_tenant)
+        tenant_id = (await db.execute(select(Tenant.id).limit(1))).scalar_one_or_none()
+        if tenant_id is None:
+            tenant = Tenant(name="Default Workshop", subdomain="default")
+            db.add(tenant)
+            await db.flush()
+            tenant_id = tenant.id
             print("[OK] Default tenant created")
-        result = await db.execute(select(User).where(User.phone == "+79999999999"))
-        super_admin = result.scalar_one_or_none()
-        if not super_admin:
-            super_admin = User(
-                phone="+79999999999",
-                password=_hash_password("admin123"),
-                full_name="Super Admin",
-                role="super_admin",
-                tenant_id=default_tenant.id,
+        admin_id = (
+            await db.execute(select(User.id).where(User.phone == "+79999999999"))
+        ).scalar_one_or_none()
+        if admin_id is None:
+            db.add(
+                User(
+                    phone="+79999999999",
+                    password=_hash_password("admin123"),
+                    full_name="Super Admin",
+                    role="super_admin",
+                    tenant_id=tenant_id,
+                )
             )
-            db.add(super_admin)
-            await db.commit()
             print("[OK] Super-admin created (phone: +79999999999, password: admin123)")
         else:
             print("[OK] Super-admin already exists")
+        await db.commit()
+    print("[OK] Application ready")
     yield
 
 

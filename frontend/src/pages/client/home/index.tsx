@@ -22,6 +22,12 @@ import CarCard from '../../../components/CarCard';
 dayjs.locale('ru');
 const { Text } = Typography;
 
+const INTENT_CHIPS = [
+  { label: 'Просто помыть', prompt: 'Хочу просто помыть машину. Что подойдёт?' },
+  { label: 'Убрать царапину', prompt: 'На кузове царапина. Что делать и сколько стоит?' },
+  { label: 'Обновить керамику', prompt: 'Пора обновить керамическое покрытие. Расскажи и запиши.' },
+];
+
 function recommendFromHistory(appointments: Appointment[], services: Service[]): Service[] {
   const completed = appointments.filter((a) => a.status === 'completed');
   const recentIds = new Set(
@@ -109,7 +115,7 @@ export default function ClientHomePage() {
         <div>
           <h3>Главная</h3>
           <Badge variant="gold">
-            {offline ? 'Нет сети · показаны сохранённые записи' : 'Ваши записи и рекомендованные услуги'}
+            {offline ? 'Нет сети · показаны сохранённые записи' : 'Твой эксперт по уходу за авто'}
           </Badge>
         </div>
         <div className="client-section-actions">
@@ -129,7 +135,31 @@ export default function ClientHomePage() {
             <CarCard carId={cars[0].id} compact readonly />
           </div>
         </>
-      ) : null}
+      ) : (
+        <Card variant="admin" className="client-block">
+          <div className="client-appt-name">Добавьте ваш автомобиль</div>
+          <Text className="text-titanium">BMW, госномер, фото — чтобы Детейлер знал машину.</Text>
+          <div className="client-section-actions" style={{ marginTop: 12 }}>
+            <Button type="primary" look="gold" onClick={() => navigate('/client/settings')}>
+              Добавить авто
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <div className="client-section-title">Что хотите сделать с автомобилем?</div>
+      <div className="client-intent-chips">
+        {INTENT_CHIPS.map((chip) => (
+          <button
+            key={chip.label}
+            type="button"
+            className="client-intent-chip"
+            onClick={() => navigate('/client/chat', { state: { prompt: chip.prompt } })}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
 
       <div className="client-section-title">Текущие записи</div>
       {upcoming.length === 0 ? (

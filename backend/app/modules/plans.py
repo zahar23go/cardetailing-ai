@@ -10,6 +10,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 
 from app.core.config import settings
 
@@ -245,7 +246,9 @@ async def load_tenant(db: AsyncSession, tenant_id: str | UUID | None):
         tid = tenant_id if isinstance(tenant_id, UUID) else UUID(str(tenant_id))
     except (ValueError, TypeError):
         return None
-    result = await db.execute(select(Tenant).where(Tenant.id == tid))
+    result = await db.execute(
+        select(Tenant).options(noload("*")).where(Tenant.id == tid)
+    )
     return result.scalar_one_or_none()
 
 

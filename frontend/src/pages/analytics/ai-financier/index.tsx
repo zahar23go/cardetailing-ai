@@ -3,6 +3,7 @@
  * Сводка сезон/погода + причина → действие → эффект ₽. Чат POST /api/ai/financier без изменений.
  */
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Spin } from 'antd';
 import { Button, Input } from '../../../components/ui';
 import { BulbOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons';
@@ -72,6 +73,7 @@ interface FinancierBrief {
 }
 
 export default function AiFinancierPage() {
+  const navigate = useNavigate();
   const [financierMessages, setFinancierMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
   const [financierInput, setFinancierInput] = useState('');
   const [financierLoading, setFinancierLoading] = useState(false);
@@ -123,6 +125,12 @@ export default function AiFinancierPage() {
     setFinancierLoading(false);
   };
 
+  const applyRec = (kind: string) => {
+    if (kind === 'box') navigate('/upload/boxes');
+    else if (kind === 'pnl') navigate('/analytics/finances');
+    else navigate('/discounts');
+  };
+
   const askAboutRec = (rec: FinancierRec) => {
     handleFinancierQuestion(
       `Разбери рекомендацию. Причина: ${rec.cause} Действие: ${rec.action} Эффект: ${formatRub(rec.effect_rub)}.`,
@@ -169,26 +177,34 @@ export default function AiFinancierPage() {
             ) : null}
             <div className="financier-rec-grid">
               {brief.recommendations.map((rec) => (
-                <button
-                  key={rec.id}
-                  type="button"
-                  className="financier-rec-card"
-                  onClick={() => askAboutRec(rec)}
-                >
-                  <div className="financier-rec-meta">
-                    <span>{KIND_LABEL[rec.kind] || rec.kind}</span>
-                    <span>{rec.horizon}</span>
-                  </div>
-                  <div className="financier-rec-row">
-                    <span>Причина</span>
-                    <p>{rec.cause}</p>
-                  </div>
-                  <div className="financier-rec-row">
-                    <span>Действие</span>
-                    <p>{rec.action}</p>
-                  </div>
-                  <div className="financier-rec-effect">{formatRub(rec.effect_rub)}</div>
-                </button>
+                <div key={rec.id} className="financier-rec-wrap">
+                  <button
+                    type="button"
+                    className="financier-rec-card"
+                    onClick={() => askAboutRec(rec)}
+                  >
+                    <div className="financier-rec-meta">
+                      <span>{KIND_LABEL[rec.kind] || rec.kind}</span>
+                      <span>{rec.horizon}</span>
+                    </div>
+                    <div className="financier-rec-row">
+                      <span>Причина</span>
+                      <p>{rec.cause}</p>
+                    </div>
+                    <div className="financier-rec-row">
+                      <span>Действие</span>
+                      <p>{rec.action}</p>
+                    </div>
+                    <div className="financier-rec-effect">{formatRub(rec.effect_rub)}</div>
+                  </button>
+                  <Button
+                    size="small"
+                    look="gold"
+                    onClick={() => applyRec(rec.kind)}
+                  >
+                    Применить рекомендацию
+                  </Button>
+                </div>
               ))}
             </div>
           </>

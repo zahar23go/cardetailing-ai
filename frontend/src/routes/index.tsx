@@ -11,6 +11,7 @@ import ConceptPage from '../components/ConceptPage';
 import AdminLayout from '../components/AdminLayout';
 import MasterDashboard from '../MasterDashboard';
 
+import OwnerOnboardingPage from '../pages/onboarding';
 import DashboardPage from '../pages/dashboard';
 import AiFinancierPage from '../pages/analytics/ai-financier';
 import FinancesPage from '../pages/analytics/finances';
@@ -113,7 +114,18 @@ export default function AppRoutes({
         }
       />
 
-      {/* Админ-layout: оболочка + pages/* по URL */}
+      <Route
+        path="/onboarding"
+        element={
+          isAuthenticated && user && isAdmin ? (
+            <OwnerOnboardingPage />
+          ) : !isAuthenticated ? (
+            loginEl
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
       <Route
         element={
           isAuthenticated && user && isAdmin ? (

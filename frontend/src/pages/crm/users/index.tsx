@@ -3,6 +3,7 @@
  * Клиенты (RFM) / мастера / админы + карточка клиента. Без state OwnerDashboard.
  */
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Typography,
   Card,
@@ -36,6 +37,7 @@ interface UserRow {
   full_name: string;
   role: string;
   created_at?: string;
+  commission_percent?: number;
 }
 
 interface ServiceOption {
@@ -139,7 +141,9 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 const formatCurrency = (val: number) => `${val.toLocaleString()} ₽`;
 
 export default function UsersPage() {
-  const [roleTab, setRoleTab] = useState('clients');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const roleTab = tabFromUrl === 'masters' || tabFromUrl === 'admins' ? tabFromUrl : 'clients';
   const [clients, setClients] = useState<RfmClient[]>([]);
   const [segments, setSegments] = useState<SegmentCount[]>([]);
   const [segmentFilter, setSegmentFilter] = useState('');
@@ -166,6 +170,14 @@ export default function UsersPage() {
   const [allServices, setAllServices] = useState<ServiceOption[]>([]);
   const [skillHasCard, setSkillHasCard] = useState<Record<number, boolean>>({});
 
+  const setRoleTab = (key: string) => {
+    if (key === 'clients') {
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    setSearchParams({ tab: key }, { replace: true });
+  };
+
   const fetchClients = async (segment?: string) => {
     setClientsLoading(true);
     try {
@@ -186,7 +198,9 @@ export default function UsersPage() {
     try {
       const data = await apiFetch<{ items: UserRow[]; total: number }>('/api/users?limit=500');
       setAllUsers(data.items);
-    } catch { /* ignore */ }
+    } catch {
+      message.error('Не удалось загрузить мастеров и админов');
+    }
     setStaffLoading(false);
   };
 
@@ -249,6 +263,7 @@ export default function UsersPage() {
       });
       message.success('Услуги и комиссия сохранены');
       setSkillModal(false);
+      fetchStaff();
     } catch (e: any) {
       message.error(e.message || 'Не удалось сохранить');
     }
@@ -287,6 +302,9 @@ export default function UsersPage() {
           <div className="admin-overview-kicker">Команда и клиенты</div>
           <h3>Пользователи</h3>
         </div>
+        <Button look="ghost" onClick={() => setRoleTab('masters')}>
+          Мастера · навыки и комиссия
+        </Button>
       </div>
 
       <Tabs
@@ -437,8 +455,11 @@ export default function UsersPage() {
 
         <TabPane tab="🔧 Мастера" key="masters">
           <Spin spinning={staffLoading}>
+            <Text className="text-titanium d-block" style={{ marginBottom: 12 }}>
+              Навыки — какие услуги делает мастер. Комиссия % попадает в чек при закрытии заезда.
+            </Text>
             {masters.length === 0 ? (
-              <Empty description={<Text className="text-titanium">Нет мастеров</Text>} />
+              <Empty description={<Text className="text-titanium">Нет мастеров. Добавьте на шаге онбординга или здесь.</Text>} />
             ) : (
               <Table
                 dataSource={masters}
@@ -460,28 +481,18 @@ export default function UsersPage() {
                     ),
                   },
                   {
-                    title: <Text className="text-gold">Роль</Text>,
-                    dataIndex: 'role',
-                    key: 'role',
-                    width: 140,
-                    render: (val: string) => (
-                      <Tag color="cyan" className="tag-status">{ROLE_LABELS[val] || val}</Tag>
-                    ),
-                  },
-                  {
-                    title: <Text className="text-gold">Дата рег.</Text>,
-                    dataIndex: 'created_at',
-                    key: 'created_at',
-                    render: (val) => (
-                      <Text className="text-titanium">
-                        {val ? dayjs(val).format('DD.MM.YYYY') : '—'}
-                      </Text>
+                    title: <Text className="text-gold">Комиссия</Text>,
+                    dataIndex: 'commission_percent',
+                    key: 'commission_percent',
+                    width: 110,
+                    render: (val: number | undefined) => (
+                      <Text className="text-gold-bold">{val || 0}%</Text>
                     ),
                   },
                   {
                     title: '',
                     key: 'skills',
-                    width: 120,
+                    width: 200,
                     render: (_: unknown, record: UserRow) => (
                       <Button
                         size="small"
@@ -490,7 +501,7 @@ export default function UsersPage() {
                         onClick={() => openSkills(record)}
                         style={{ width: 'auto' }}
                       >
-                        Услуги
+                        Навыки и комиссия
                       </Button>
                     ),
                   },

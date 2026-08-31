@@ -115,24 +115,64 @@ const PdfFrame = styled.iframe`
 
 const SCREENS = [
   {
-    title: 'Главный экран',
-    desc: 'Макет клиента П3.1 — авто, запись, AI Детейлер',
-    path: '/main',
+    title: 'Онбординг салона',
+    desc: 'Ольга: бренд, боксы, услуги, мастера, склад — 15 минут',
+    path: '/onboarding',
   },
   {
-    title: 'Вход',
-    desc: 'Экран логина с телефоном и паролем',
+    title: 'Command Center',
+    desc: 'Записи, загрузка, прибыль недели, контур боксов, инсайт AI',
+    path: '/dashboard',
+  },
+  {
+    title: 'Календарь и боксы',
+    desc: 'Расписание и живая сетка Gold / Amber / Red',
+    path: '/upload/calendar',
+  },
+  {
+    title: 'Склад и техкарты',
+    desc: 'Остатки, порог заказа, нормы расхода',
+    path: '/technology/warehouse',
+  },
+  {
+    title: 'Финансы P&L',
+    desc: 'Выручка, маржа услуг и боксов',
+    path: '/analytics/finances',
+  },
+  {
+    title: 'AI-финансист',
+    desc: 'Причина → действие → эффект ₽ → применить',
+    path: '/analytics/ai-financier',
+  },
+  {
+    title: 'Мастера',
+    desc: 'Команда, навыки, комиссия',
+    path: '/crm/users?tab=masters',
+  },
+  {
+    title: 'Скидки и лояльность',
+    desc: 'Happy Hours, погода, win-back, баллы',
+    path: '/discounts',
+  },
+  {
+    title: 'Кабинет клиента',
+    desc: 'Алексей: авто, чипы «помыть / царапина / керамика»',
+    path: '/client',
+  },
+  {
+    title: 'AI Детейлер',
+    desc: 'Запись за минуту, допродажи, выбор мастера',
+    path: '/client/chat',
+  },
+  {
+    title: 'Портфолио мастеров',
+    desc: 'Работы и рейтинг перед записью',
+    path: '/client/portfolio',
+  },
+  {
+    title: 'PWA и вход',
+    desc: 'Телефон, пароль, установка на домашний экран',
     path: '/',
-  },
-  {
-    title: 'Регистрация',
-    desc: 'Создание аккаунта нового клиента',
-    path: '/register',
-  },
-  {
-    title: 'Брендинг',
-    desc: 'Пресеты goldMetal / goldGlow / silver',
-    path: '/settings/branding',
   },
 ];
 
@@ -150,10 +190,10 @@ export default function ConceptPage({ onLogout, isAuthenticated }: ConceptPagePr
       <Wrap>
         <Top>
           <div>
-            <h1>Смотреть концепцию</h1>
+            <h1>Карта историй</h1>
             <p>
-              Документ CARDET и превью экранов приложения. Отсюда можно открыть любой макет
-              без тупика на главной.
+              Два персонажа — Ольга (владелец) и Алексей (клиент). Карточки ведут на рабочие экраны,
+              не на макеты.
             </p>
           </div>
           <Actions>

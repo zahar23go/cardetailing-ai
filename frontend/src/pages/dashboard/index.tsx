@@ -18,7 +18,7 @@ import {
 } from 'antd';
 import { Button } from '../../components/ui';
 import {
-  TeamOutlined, ToolOutlined, CalendarOutlined, ClockCircleOutlined,
+  CalendarOutlined, ClockCircleOutlined,
   CheckCircleOutlined, DollarOutlined, ReloadOutlined, InsertRowAboveOutlined,
 } from '@ant-design/icons';
 import {
@@ -45,6 +45,9 @@ interface KpiData {
   month_revenue: number;
   pending_appointments: number;
   completed_month: number;
+  occupancy_pct?: number;
+  week_revenue?: number;
+  week_change_percent?: number;
   sparkline_revenue?: SparkPoint[];
   sparkline_appointments?: SparkPoint[];
   sparkline_completed?: SparkPoint[];
@@ -63,7 +66,15 @@ interface LiveBoxChip {
   name: string;
   state: string;
   state_label: string;
-  current?: { service_name: string } | null;
+  current?: { service_name: string; overrun?: boolean } | null;
+}
+
+interface FinancierRec {
+  id: string;
+  cause: string;
+  action: string;
+  effect_rub: number;
+  kind: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -83,6 +94,20 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Отменена',
   no_show: 'Не явился',
 };
+
+function boxTone(b: LiveBoxChip): 'free' | 'gold' | 'amber' | 'red' {
+  if (b.current?.overrun) return 'red';
+  if (b.state === 'free') return 'free';
+  if (b.state === 'preparing') return 'amber';
+  if (b.state === 'inactive') return 'amber';
+  return 'gold';
+}
+
+function recPath(kind: string) {
+  if (kind === 'box') return '/upload/boxes';
+  if (kind === 'pnl') return '/analytics/finances';
+  return '/discounts';
+}
 
 function KpiSpark({ data, warn }: { data?: SparkPoint[]; warn?: boolean }) {
   if (!data || data.length < 2) return null;
@@ -121,14 +146,18 @@ export default function DashboardPage() {
   const [kpiLoading, setKpiLoading] = useState(false);
   const [pendingList, setPendingList] = useState<PendingAppt[]>([]);
   const [liveBoxes, setLiveBoxes] = useState<LiveBoxChip[]>([]);
+  const [insight, setInsight] = useState<FinancierRec | null>(null);
 
   const refresh = useCallback(async () => {
     setKpiLoading(true);
     try {
-      const [kpiData, appts, live] = await Promise.all([
+      const [kpiData, appts, live, brief] = await Promise.all([
         apiFetch<KpiData>('/api/analytics/kpi'),
         apiFetch<{ items: PendingAppt[] }>('/api/appointments?skip=0&limit=100'),
         apiFetch<{ boxes: LiveBoxChip[] }>('/api/boxes/live').catch(() => ({ boxes: [] })),
+        apiFetch<{ recommendations?: FinancierRec[] }>('/api/ai/financier/brief').catch(() => ({
+          recommendations: [],
+        })),
       ]);
       setKpi(kpiData);
       setPendingList(
@@ -137,6 +166,7 @@ export default function DashboardPage() {
           .slice(0, 5),
       );
       setLiveBoxes(live.boxes || []);
+      setInsight(brief.recommendations?.[0] || null);
     } catch { /* ignore */ }
     setKpiLoading(false);
   }, []);
@@ -154,10 +184,10 @@ export default function DashboardPage() {
     <div className="admin-overview">
       <div className="admin-overview-hero">
         <div>
-          <div className="admin-overview-kicker">Обзор салона</div>
-          <h2>Ключевые показатели</h2>
+          <div className="admin-overview-kicker">Command Center</div>
+          <h2>Контроль салона</h2>
           <p className="admin-overview-date">
-            {dayjs().format('D MMMM YYYY, dddd')} · все ключевые показатели в одном месте
+            {dayjs().format('D MMMM YYYY, dddd')} · загрузка, прибыль и боксы в одном месте
           </p>
         </div>
         <Space wrap>
@@ -170,16 +200,19 @@ export default function DashboardPage() {
           <Button look="ghost" icon={<InsertRowAboveOutlined />} onClick={() => navigate('/upload/boxes')}>
             Боксы
           </Button>
+          <Button look="ghost" onClick={() => navigate('/onboarding')}>
+            Настройка салона
+          </Button>
         </Space>
       </div>
 
       <Spin spinning={kpiLoading}>
         <Row gutter={[14, 14]} className="admin-kpi-row">
           {[
-            { label: 'Клиенты', value: kpi?.total_clients || 0, icon: <TeamOutlined />, tone: 'gold', spark: undefined as SparkPoint[] | undefined },
-            { label: 'Мастера', value: kpi?.total_masters || 0, icon: <ToolOutlined />, tone: 'gold', spark: undefined },
-            { label: 'Записи', value: kpi?.today_appointments || 0, icon: <CalendarOutlined />, tone: 'gold', spark: kpi?.sparkline_appointments },
-            { label: 'Выручка', value: formatRevenue(kpi?.month_revenue || 0), icon: <DollarOutlined />, tone: 'gold', spark: kpi?.sparkline_revenue },
+            { label: 'Записи сегодня', value: kpi?.today_appointments || 0, icon: <CalendarOutlined />, tone: 'gold', spark: kpi?.sparkline_appointments },
+            { label: 'Загрузка боксов', value: `${Number(kpi?.occupancy_pct || 0).toLocaleString('ru-RU')}%`, icon: <InsertRowAboveOutlined />, tone: 'gold', spark: undefined as SparkPoint[] | undefined },
+            { label: 'Выручка недели', value: formatRevenue(kpi?.week_revenue || 0), icon: <DollarOutlined />, tone: (kpi?.week_change_percent || 0) < 0 ? 'warn' : 'gold', spark: kpi?.sparkline_revenue },
+            { label: 'К прошлой неделе', value: `${(kpi?.week_change_percent || 0) > 0 ? '+' : ''}${kpi?.week_change_percent || 0}%`, icon: <DollarOutlined />, tone: (kpi?.week_change_percent || 0) < 0 ? 'warn' : 'ok', spark: undefined },
             { label: 'Ожидают', value: kpi?.pending_appointments || 0, icon: <ClockCircleOutlined />, tone: 'warn', spark: undefined },
             { label: 'Закрыто за месяц', value: kpi?.completed_month || 0, icon: <CheckCircleOutlined />, tone: 'gold', spark: kpi?.sparkline_completed },
           ].map((m) => (
@@ -211,18 +244,43 @@ export default function DashboardPage() {
         >
           <Space wrap>
             {liveBoxes.map((b) => (
-              <Tag
+              <span
                 key={b.box_id}
-                style={{ cursor: 'pointer', padding: '4px 10px' }}
+                className={`box-live-chip box-live-chip--${boxTone(b)}`}
                 onClick={() => navigate('/upload/boxes')}
+                role="button"
+                tabIndex={0}
               >
                 {b.name}: {b.state_label}
                 {b.current?.service_name ? ` · ${b.current.service_name}` : ''}
-              </Tag>
+                {b.current?.overrun ? ' · задержка' : ''}
+              </span>
             ))}
           </Space>
         </Card>
       )}
+
+      {insight ? (
+        <Card
+          className="admin-panel-card admin-insight-card"
+          bordered={false}
+          style={{ marginTop: 16 }}
+          title={<span className="admin-panel-title">Инсайт AI-финансиста</span>}
+          extra={
+            <Button size="small" look="gold" onClick={() => navigate(recPath(insight.kind))}>
+              Применить рекомендацию
+            </Button>
+          }
+        >
+          <p className="admin-insight-cause">{insight.cause}</p>
+          <p className="admin-insight-action">{insight.action}</p>
+          {insight.effect_rub ? (
+            <p className="admin-insight-effect">
+              Ожидаемый эффект: +{insight.effect_rub.toLocaleString('ru-RU')} ₽
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={24}>

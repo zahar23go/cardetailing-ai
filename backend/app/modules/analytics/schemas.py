@@ -26,6 +26,9 @@ class KpiOut(BaseModel):
     sparkline_revenue: list[SparklinePoint] = []
     sparkline_appointments: list[SparklinePoint] = []
     sparkline_completed: list[SparklinePoint] = []
+    occupancy_pct: float = 0
+    week_revenue: float = 0
+    week_change_percent: float = 0
 
 class RevenuePoint(BaseModel):
     date: str

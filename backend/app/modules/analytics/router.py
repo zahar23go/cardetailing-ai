@@ -98,9 +98,51 @@ async def get_kpi(
     pending_count = len(pending_result.scalars().all())
 
     from app.modules.analytics.spec import sparkline_series
+    from app.modules.appointments.live_service import build_live_floor
 
     tenant_id = UUID(current_user["tenant_id"])
     spark_rev, spark_n, spark_done = await sparkline_series(db, tenant_id)
+
+    week_start = (now - timedelta(days=now.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    prev_week_start = week_start - timedelta(days=7)
+    week_rows = (
+        await db.execute(
+            select(Appointment).where(
+                Appointment.tenant_id == tenant_id,
+                Appointment.status == "completed",
+                Appointment.start_time >= prev_week_start,
+            )
+        )
+    ).scalars().all()
+    def _aware(dt):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    week_revenue = sum(
+        float(a.total_price or 0)
+        for a in week_rows
+        if _aware(a.start_time) and _aware(a.start_time) >= week_start
+    )
+    prev_week_revenue = sum(
+        float(a.total_price or 0)
+        for a in week_rows
+        if _aware(a.start_time) and prev_week_start <= _aware(a.start_time) < week_start
+    )
+    week_change = (
+        round((week_revenue - prev_week_revenue) / prev_week_revenue * 100, 1)
+        if prev_week_revenue
+        else 0.0
+    )
+
+    live = await build_live_floor(db, tenant_id)
+    active_boxes = [b for b in live.get("boxes", []) if b.get("is_active")]
+    busy = [b for b in active_boxes if b.get("state") in ("occupied", "preparing", "booked")]
+    occupancy_pct = round((len(busy) / len(active_boxes) * 100), 1) if active_boxes else 0.0
 
     return KpiOut(
         total_clients=total_clients,
@@ -113,6 +155,9 @@ async def get_kpi(
         sparkline_revenue=spark_rev,
         sparkline_appointments=spark_n,
         sparkline_completed=spark_done,
+        occupancy_pct=occupancy_pct,
+        week_revenue=round(week_revenue, 2),
+        week_change_percent=week_change,
     )
 
 

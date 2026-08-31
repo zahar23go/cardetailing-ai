@@ -97,12 +97,37 @@ class UserListOut(BaseModel):
     phone: str
     full_name: str
     role: str
+    commission_percent: int = 0
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
+    @field_validator("commission_percent", mode="before")
+    @classmethod
+    def _commission(cls, v):
+        if v is None or v == "":
+            return 0
+        return v
+
 class UserRoleUpdate(BaseModel):
     role: str = Field(..., description="New role: client, master, admin, super_admin")
+
+
+class UserCreate(BaseModel):
+    phone: str = Field(..., min_length=1, max_length=20)
+    password: str = Field(..., min_length=4, max_length=255)
+    full_name: str = Field(..., min_length=1, max_length=150)
+    role: str = Field(default="master")
+
+
+class OnboardingStatus(BaseModel):
+    completed: bool = False
+    needs_wizard: bool = False
+    salon_name: str = ""
+    boxes: int = 0
+    services: int = 0
+    masters: int = 0
+    materials: int = 0
 
 class UserDetailOut(BaseModel):
     id: int

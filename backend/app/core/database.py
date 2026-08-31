@@ -5,8 +5,6 @@ PostgreSQL connection using SQLAlchemy with async support.
 Supports SQLite for testing (aiosqlite).
 """
 
-import asyncio
-
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import StaticPool
@@ -66,20 +64,53 @@ async def get_db() -> AsyncSession:
 
 
 async def init_db() -> None:
-    """
-    Initialize database tables using Alembic migrations.
+    """Bring schema to head without nesting asyncio.run() inside uvicorn.
 
-    Runs `alembic upgrade head` in a thread to avoid
-    event loop conflict (Alembic uses asyncio.run internally).
+    `alembic upgrade` via env.py uses asyncio.run(); that deadlocks the
+    server loop on Windows + asyncpg, so login never gets an answer.
     """
+    if _is_sqlite:
+        print("[OK] SQLite: skip Alembic on startup")
+        return
+
     from alembic.config import Config
-    from alembic import command
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import text
 
-    def _run_migrations() -> None:
-        alembic_cfg = Config("alembic.ini")
-        command.upgrade(alembic_cfg, "head")
+    cfg = Config("alembic.ini")
+    script = ScriptDirectory.from_config(cfg)
+    heads = set(script.get_heads())
 
-    await asyncio.to_thread(_run_migrations)
+    async with engine.connect() as conn:
+        try:
+            rows = await conn.execute(text("select version_num from alembic_version"))
+            current = {row[0] for row in rows}
+        except Exception as exc:
+            print(f"[WARN] Cannot read alembic_version ({exc}); skip auto-migrate")
+            return
+
+    if current == heads:
+        print(f"[OK] Alembic at head ({', '.join(sorted(heads))})")
+        return
+
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    backend_root = Path(__file__).resolve().parents[2]
+    print(f"[..] Migrating {current or '-'} -> {heads}")
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=str(backend_root),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if result.returncode != 0:
+        print(result.stdout)
+        print(result.stderr)
+        print("[WARN] alembic upgrade failed; starting anyway")
+        return
     print("[OK] Alembic migrations applied (upgrade head)")
 
 

@@ -32,7 +32,7 @@ const SUGGESTIONS = [
   'Подберите услугу и запишите меня',
 ];
 
-type LocState = { inspect?: boolean } | null;
+type LocState = { inspect?: boolean; prompt?: string } | null;
 type ChatMsg = {
   role: 'user' | 'ai';
   text: string;
@@ -160,6 +160,14 @@ export default function ClientChatPage() {
     }
     setLoading(false);
   };
+
+  const bootPrompt = (location.state as LocState)?.prompt;
+  const askedRef = useRef(false);
+  useEffect(() => {
+    if (!bootPrompt || askedRef.current) return;
+    askedRef.current = true;
+    void ask(bootPrompt);
+  }, [bootPrompt]);
 
   const bookOffer = (offer: DetailerOffer | Service, inspectData?: DetailerInspect) => {
     const serviceId = 'service_id' in offer ? offer.service_id : offer.id;
