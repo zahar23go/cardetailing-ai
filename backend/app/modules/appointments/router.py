@@ -476,6 +476,7 @@ async def close_appointment(
         user_id=current_user["id"],
         steps_in=[s.model_dump() for s in body.steps],
         materials_in=[m.model_dump() for m in body.materials],
+        actual_time=body.actual_time,
         notes=body.notes,
     )
     await db.commit()

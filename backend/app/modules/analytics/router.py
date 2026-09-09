@@ -469,6 +469,47 @@ async def get_pl_report(
         period="month",
     )
 
+@router.get("/api/analytics/box-margins", response_model=list[BoxMargin])
+async def get_box_margins_report(
+    period: str = Query("month", pattern="^(day|week|month)$", description="Период: day/week/month"),
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Маржинальность по боксам за период (аналог box_margins из P&L, но с периодом)."""
+    tenant_id = UUID(current_user["tenant_id"])
+    now = datetime.now(timezone.utc)
+    days = {"day": 1, "week": 7, "month": 30}[period]
+    start = now - timedelta(days=days)
+    start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    from app.modules.appointments.close_service import compute_box_margins
+
+    appts_result = await db.execute(
+        select(Appointment)
+        .options(
+            selectinload(Appointment.service),
+            selectinload(Appointment.box),
+            selectinload(Appointment.invoice).selectinload(AppointmentInvoice.box),
+        )
+        .where(
+            Appointment.start_time >= start,
+            Appointment.status == "completed",
+            Appointment.tenant_id == tenant_id,
+        )
+    )
+    completed = appts_result.scalars().all()
+
+    expenses_result = await db.execute(
+        select(Expense).where(
+            Expense.tenant_id == tenant_id,
+            Expense.expense_date >= start,
+        )
+    )
+    total_expenses = sum(float(e.amount or 0) for e in expenses_result.scalars().all())
+
+    rows = compute_box_margins(completed, total_expenses)
+    return [BoxMargin(**row) for row in rows]
+
 @router.get("/api/analytics/revenue", response_model=RevenueResponse)
 async def get_revenue_chart(
     start_date: str | None = Query(None, description="YYYY-MM-DD"),

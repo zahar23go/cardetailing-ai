@@ -4,7 +4,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  Typography, Card, Row, Col, Statistic, Table, Tag, Spin,
+  Typography, Card, Row, Col, Statistic, Table, Tag, Spin, Select,
 } from 'antd';
 import { DollarOutlined } from '@ant-design/icons';
 import ExpensesModule from '../../../components/ExpensesModule';
@@ -70,6 +70,9 @@ async function apiFetch<T>(path: string): Promise<T> {
 export default function FinancesPage() {
   const [plReport, setPlReport] = useState<PLReport | null>(null);
   const [plLoading, setPlLoading] = useState(false);
+  const [boxPeriod, setBoxPeriod] = useState<'day' | 'week' | 'month'>('month');
+  const [boxMargins, setBoxMargins] = useState<BoxMargin[]>([]);
+  const [boxLoading, setBoxLoading] = useState(false);
 
   useEffect(() => {
     setPlLoading(true);
@@ -78,6 +81,14 @@ export default function FinancesPage() {
       .catch(() => {})
       .finally(() => setPlLoading(false));
   }, []);
+
+  useEffect(() => {
+    setBoxLoading(true);
+    apiFetch<BoxMargin[]>(`/api/analytics/box-margins?period=${boxPeriod}`)
+      .then(setBoxMargins)
+      .catch(() => setBoxMargins([]))
+      .finally(() => setBoxLoading(false));
+  }, [boxPeriod]);
 
   return (
     <>
@@ -271,12 +282,26 @@ export default function FinancesPage() {
             </Card>
 
             <Card className="card-luxury" style={{ marginBottom: '16px' }}>
-              <Text className="title-gold text-16 d-block mb-8">Маржа по боксам</Text>
-              {!(plReport.box_margins && plReport.box_margins.length) ? (
-                <Text className="text-titanium text-13">Нет данных за месяц</Text>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text className="title-gold text-16">Маржа по боксам</Text>
+                <Select
+                  size="small"
+                  value={boxPeriod}
+                  onChange={(v) => setBoxPeriod(v)}
+                  style={{ width: 110 }}
+                  options={[
+                    { value: 'day', label: 'День' },
+                    { value: 'week', label: 'Неделя' },
+                    { value: 'month', label: 'Месяц' },
+                  ]}
+                />
+              </div>
+              <Spin spinning={boxLoading}>
+              {!boxMargins.length ? (
+                <Text className="text-titanium text-13">Нет данных за период</Text>
               ) : (
                 <Table
-                  dataSource={plReport.box_margins}
+                  dataSource={boxMargins}
                   rowKey={(r) => String(r.box_id ?? 'none')}
                   pagination={false}
                   size="small"
@@ -344,6 +369,7 @@ export default function FinancesPage() {
                   }}
                 />
               )}
+              </Spin>
             </Card>
           </>
         )}

@@ -224,6 +224,7 @@ class CloseMaterialIn(BaseModel):
 class AppointmentCloseRequest(BaseModel):
     steps: list[CloseStepIn] = []
     materials: list[CloseMaterialIn] = []
+    actual_time: int = Field(0, ge=0, description="Фактическая длительность заезда, минут")
     notes: Optional[str] = None
 
 

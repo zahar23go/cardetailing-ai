@@ -115,6 +115,8 @@ def serialize_invoice(inv: AppointmentInvoice) -> dict:
         "gross_profit": _round2(inv.gross_profit),
         "commission_percent": int(getattr(inv, "commission_percent", 0) or 0),
         "commission_amount": _round2(getattr(inv, "commission_amount", 0) or 0),
+        "actual_time": int(getattr(inv, "actual_time", 0) or 0),
+        "time_diff": int(getattr(inv, "time_diff", 0) or 0),
         "closed_at": inv.closed_at,
         "notes": inv.notes,
         "steps": [
@@ -268,6 +270,8 @@ async def preview_close(db: AsyncSession, appointment: Appointment, tenant_id: U
         data["has_tech_card"] = bool(data["steps"] or data["materials"])
         data["estimated_material_cost"] = data["material_cost"]
         data["estimated_gross_profit"] = data["gross_profit"]
+        norm_minutes = int(appointment.service.duration or 0) if appointment.service else 0
+        data["norm_time"] = norm_minutes
         return data
     card = await load_tech_card(db, tenant_id, appointment.service_id)
     data = build_preview(appointment, card)
@@ -288,6 +292,7 @@ async def ensure_invoice(
     user_id: int | None,
     steps_in: list[dict] | None = None,
     materials_in: list[dict] | None = None,
+    actual_time: int = 0,
     notes: str | None = None,
 ) -> AppointmentInvoice:
     """Создаёт чек один раз. Повторный вызов возвращает существующий (без второго списания)."""
@@ -401,6 +406,9 @@ async def ensure_invoice(
         db, tenant_id, appointment.master_id, appointment.service_id, price,
     )
 
+    norm_minutes = int(appointment.service.duration or 0) if appointment.service else 0
+    actual_time = int(actual_time or 0)
+
     inv = AppointmentInvoice(
         tenant_id=tenant_id,
         appointment_id=appointment.id,
@@ -415,6 +423,8 @@ async def ensure_invoice(
         gross_profit=_round2(price - total_cost),
         commission_percent=comm_pct,
         commission_amount=comm_amt,
+        actual_time=actual_time,
+        time_diff=(norm_minutes - actual_time) if actual_time else 0,
         closed_by_id=user_id,
         closed_at=datetime.now(timezone.utc),
         notes=notes,

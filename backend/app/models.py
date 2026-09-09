@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from app.modules.core.models import UserRole, Tenant, User, MasterSkill
-from app.modules.appointments.models import AppointmentStatus, Box, BoxService, Appointment, WorkingHours, AppointmentHistory, AppointmentInvoice, AppointmentCloseStep, AppointmentCloseMaterial
+from app.modules.boxes.models import Box, BoxService
+from app.modules.appointments.models import AppointmentStatus, Appointment, WorkingHours, AppointmentHistory, AppointmentInvoice, AppointmentCloseStep, AppointmentCloseMaterial
 from app.modules.cars.models import Car
 from app.modules.services.models import Service
 from app.modules.photos.models import EntityType, Photo

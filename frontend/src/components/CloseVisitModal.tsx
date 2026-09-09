@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Checkbox, Spin, Typography, message } from 'antd';
 import { Button, Input, Modal } from './ui';
+import { ClockCircleOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
@@ -65,6 +66,9 @@ export interface ClosePreview {
   commission_amount?: number;
   has_tech_card: boolean;
   already_closed: boolean;
+  norm_time?: number;
+  actual_time?: number;
+  time_diff?: number;
   steps: CloseStep[];
   materials: CloseMaterial[];
 }
@@ -106,6 +110,7 @@ export default function CloseVisitModal({
   const [steps, setSteps] = useState<CloseStep[]>([]);
   const [qty, setQty] = useState<Record<number, number>>({});
   const [edited, setEdited] = useState<Record<number, boolean>>({});
+  const [actualTime, setActualTime] = useState('');
 
   useEffect(() => {
     if (!open || !appointmentId) {
@@ -113,6 +118,7 @@ export default function CloseVisitModal({
       setSteps([]);
       setQty({});
       setEdited({});
+      setActualTime('');
       return;
     }
     let cancelled = false;
@@ -128,6 +134,7 @@ export default function CloseVisitModal({
         });
         setQty(next);
         setEdited({});
+        setActualTime('');
       })
       .catch((e: Error) => {
         if (!cancelled) message.error(e.message || 'Не удалось загрузить чек');
@@ -189,6 +196,7 @@ export default function CloseVisitModal({
             material_id: m.material_id,
             actual_qty: Number(m.actual_qty || 0),
           })),
+          actual_time: Number(actualTime) || 0,
         }),
       });
       message.success('Заезд закрыт, чек зафиксирован');
@@ -200,6 +208,7 @@ export default function CloseVisitModal({
   };
 
   const already = Boolean(preview?.already_closed);
+  const timeDiff = Number(preview?.time_diff ?? 0);
   const shortageCount = materials.filter((m) => m.shortage > 0).length;
 
   return (
@@ -237,6 +246,19 @@ export default function CloseVisitModal({
               {preview.discount ? ` · скидка ${money(preview.discount)}` : ''}
               {!preview.has_tech_card ? ' · техкарта не привязана, себестоимость из каталога' : ''}
             </Text>
+
+            <div className="mb-12" style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 8, alignItems: 'center' }}>
+              <Text className="text-white text-13">Фактическое время (мин)</Text>
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                disabled={already}
+                placeholder="мин"
+                value={actualTime}
+                onChange={(e) => setActualTime(e.target.value)}
+              />
+            </div>
 
             {steps.length > 0 && (
               <div className="mb-12">
@@ -314,6 +336,60 @@ export default function CloseVisitModal({
             <Text className="text-titanium text-12 d-block">
               Каталог услуги: {money(preview.catalog_material_cost)}
             </Text>
+
+            {already && (
+              <div
+                style={{
+                  marginTop: 12,
+                  border: '1px solid rgba(200,169,119,0.25)',
+                  borderRadius: 12,
+                  padding: '10px 12px',
+                }}
+              >
+                <Text className="title-gold text-13 d-block mb-8">
+                  <ClockCircleOutlined style={{ marginRight: 6 }} />
+                  Время выполнения
+                </Text>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  <div>
+                    <Text className="text-titanium text-12 d-block">Норматив</Text>
+                    <Text className="text-white text-13 d-block">
+                      {Number(preview.norm_time || 0)} мин
+                    </Text>
+                  </div>
+                  <div>
+                    <Text className="text-titanium text-12 d-block">Факт</Text>
+                    <Text className="text-white text-13 d-block">
+                      {Number(preview.actual_time || 0)} мин
+                    </Text>
+                  </div>
+                  <div>
+                    <Text className="text-titanium text-12 d-block">Отклонение</Text>
+                    <Text
+                      className="text-13 d-block"
+                      style={{
+                        color: timeDiff > 0 ? '#4ECB71' : timeDiff < 0 ? '#ff4d4f' : '#AAB2BF',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {timeDiff} мин{' '}
+                      {timeDiff > 0 ? (
+                        <CheckCircleOutlined />
+                      ) : timeDiff < 0 ? (
+                        <ExclamationCircleOutlined />
+                      ) : null}
+                    </Text>
+                    <Text className="text-titanium text-12 d-block">
+                      {timeDiff > 0
+                        ? 'быстрее нормы'
+                        : timeDiff < 0
+                          ? 'медленнее нормы'
+                          : 'точно по норме'}
+                    </Text>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Spin>
