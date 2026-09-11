@@ -24,7 +24,7 @@ import { Button, Modal, Input } from '../../../components/ui';
 import {
   ToolOutlined, CalendarOutlined, ClockCircleOutlined, ReloadOutlined,
   CarOutlined, UserOutlined, SearchOutlined, PlayCircleOutlined,
-  CheckCircleOutlined, CloseCircleOutlined, EditOutlined,
+  CheckCircleOutlined, CloseCircleOutlined, EditOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ru';
@@ -655,6 +655,16 @@ export default function RecordsPage() {
                         </Button>
                       </Popconfirm>
                     )}
+                    {item.status === 'completed' && (
+                      <Button
+                        size="small"
+                        look="gold"
+                        icon={<FileTextOutlined />}
+                        onClick={() => setCloseAppt(item)}
+                      >
+                        Чек
+                      </Button>
+                    )}
                     <Button
                       size="small"
                       className="btn-action-gold"
@@ -735,14 +745,30 @@ export default function RecordsPage() {
               />
             </div>
 
-            <Button
-              type="primary"
-              size="large"
-              onClick={handleUpdateAppointment}
-              look="gold"
-            >
-              Сохранить
-            </Button>
+            <Space wrap>
+              <Button
+                type="primary"
+                size="large"
+                onClick={handleUpdateAppointment}
+                look="gold"
+              >
+                Сохранить
+              </Button>
+              {selectedAppt.status === 'completed' && (
+                <Button
+                  size="large"
+                  look="ghost"
+                  icon={<FileTextOutlined />}
+                  onClick={() => {
+                    const appt = selectedAppt;
+                    setApptStatusModal(false);
+                    setCloseAppt(appt);
+                  }}
+                >
+                  Чек
+                </Button>
+              )}
+            </Space>
           </Space>
         )}
       </Modal>

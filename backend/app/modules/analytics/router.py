@@ -486,15 +486,15 @@ async def get_box_margins_report(
 
     appts_result = await db.execute(
         select(Appointment)
+        .join(AppointmentInvoice, AppointmentInvoice.appointment_id == Appointment.id)
         .options(
             selectinload(Appointment.service),
             selectinload(Appointment.box),
             selectinload(Appointment.invoice).selectinload(AppointmentInvoice.box),
         )
         .where(
-            Appointment.start_time >= start,
-            Appointment.status == "completed",
-            Appointment.tenant_id == tenant_id,
+            AppointmentInvoice.closed_at >= start,
+            AppointmentInvoice.tenant_id == tenant_id,
         )
     )
     completed = appts_result.scalars().all()

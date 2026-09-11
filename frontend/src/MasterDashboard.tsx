@@ -788,9 +788,18 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                           </Space>
                         </Col>
                         <Col xs={24} md={8} className="text-right">
-                          <Text className="text-gold-bold text-14">
-                            {formatCurrency(item.total_price)}
-                          </Text>
+                          <Space direction="vertical" size={4} className="w-full" style={{ alignItems: 'flex-end' }}>
+                            <Text className="text-gold-bold text-14">
+                              {formatCurrency(item.total_price)}
+                            </Text>
+                            <Button
+                              size="small"
+                              icon={<FileTextOutlined />}
+                              onClick={() => setCloseAppt(item)}
+                              look="gold"
+                              style={{ width: 'auto', height: 32, fontSize: 12 }}
+                            >Чек</Button>
+                          </Space>
                         </Col>
                       </Row>
                     </Card>
