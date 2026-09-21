@@ -71,3 +71,7 @@ frontend/dist/
 # Backend build output
 backend/server.log
 backend/__pycache__/
+
+# Пользовательские загрузки и локальные бэкапы
+backend/uploads/
+backend/app/_legacy_backup/
