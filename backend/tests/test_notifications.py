@@ -122,24 +122,65 @@ class TestNotifications:
     # ------------------------------------------------------------------
     # 8. Напоминания о записях
     # ------------------------------------------------------------------
-    async def test_send_reminders(self, db_session, default_tenant, test_user, test_service, test_car):
-        """✅ Отправка напоминаний о предстоящих записях."""
+    @staticmethod
+    def _appt(tenant, user, car, service, hours_ahead, status="confirmed"):
         from app.models import Appointment
+
+        return Appointment(
+            client_id=user.id,
+            tenant_id=tenant.id,
+            car_id=car.id,
+            service_id=service.id,
+            start_time=datetime.now(timezone.utc) + timedelta(hours=hours_ahead),
+            end_time=datetime.now(timezone.utc) + timedelta(hours=hours_ahead + 2),
+            total_price=5000,
+            status=status,
+        )
+
+    async def test_send_reminder_due(self, db_session, default_tenant, test_user, test_service, test_car):
+        """✅ За час до визита напоминание отправляется (дефолт — 1 час)."""
         from app.core.notification_service import send_appointment_reminders
 
-        # Создаём запись на завтра
-        appt = Appointment(
-            client_id=test_user.id,
-            tenant_id=default_tenant.id,
-            car_id=test_car.id,
-            service_id=test_service.id,
-            start_time=datetime.now(timezone.utc) + timedelta(hours=25),
-            end_time=datetime.now(timezone.utc) + timedelta(hours=27),
-            total_price=5000,
-            status="confirmed",
-        )
-        db_session.add(appt)
+        db_session.add(self._appt(default_tenant, test_user, test_car, test_service, 0.5))
         await db_session.commit()
 
-        sent = await send_appointment_reminders(db_session, hours_before=24)
-        assert sent >= 1
+        assert await send_appointment_reminders(db_session) == 1
+
+    async def test_send_reminder_not_due(self, db_session, default_tenant, test_user, test_service, test_car):
+        """✅ За 3 часа при дефолте 1 час напоминание ещё не отправляется."""
+        from app.core.notification_service import send_appointment_reminders
+
+        db_session.add(self._appt(default_tenant, test_user, test_car, test_service, 3))
+        await db_session.commit()
+
+        assert await send_appointment_reminders(db_session) == 0
+
+    async def test_send_reminder_not_duplicated(self, db_session, default_tenant, test_user, test_service, test_car):
+        """✅ Повторный прогон не дублирует напоминание по той же записи."""
+        from app.core.notification_service import send_appointment_reminders
+
+        db_session.add(self._appt(default_tenant, test_user, test_car, test_service, 0.5))
+        await db_session.commit()
+
+        assert await send_appointment_reminders(db_session) == 1
+        assert await send_appointment_reminders(db_session) == 0
+
+    async def test_send_reminder_respects_user_lead_time(self, db_session, default_tenant, test_user, test_service, test_car):
+        """✅ Личная настройка remind_hours_before меняет момент отправки."""
+        from app.core.notification_service import send_appointment_reminders, upsert_settings
+
+        await upsert_settings(db_session, test_user.id, remind_hours_before=4)
+        db_session.add(self._appt(default_tenant, test_user, test_car, test_service, 3))
+        await db_session.commit()
+
+        assert await send_appointment_reminders(db_session) == 1
+
+    async def test_send_reminder_opt_out(self, db_session, default_tenant, test_user, test_service, test_car):
+        """✅ Клиент отключил напоминания — уведомление не создаётся."""
+        from app.core.notification_service import send_appointment_reminders, upsert_settings
+
+        await upsert_settings(db_session, test_user.id, notify_appointment_reminder=False)
+        db_session.add(self._appt(default_tenant, test_user, test_car, test_service, 0.5))
+        await db_session.commit()
+
+        assert await send_appointment_reminders(db_session) == 0

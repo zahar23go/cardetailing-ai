@@ -82,6 +82,16 @@ async def create_car(
     return CarOut.model_validate(new_car)
 
 
+@router.get("/api/cars/condition-catalog", response_model=ConditionCatalogOut)
+async def get_condition_catalog(
+    current_user: dict = Depends(_get_current_user),
+):
+    """Справочники состояния авто: тип краски, дефекты стекла, требования."""
+    from app.modules.cars.condition import catalog
+
+    return catalog()
+
+
 @router.get("/api/cars/{car_id}", response_model=CarCardOut)
 async def get_car_card(
     car_id: int,
@@ -118,6 +128,36 @@ async def update_car(
     update_data = car_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(car, key, value)
+    await db.commit()
+    await db.refresh(car)
+    return CarOut.model_validate(car)
+
+
+@router.put("/api/cars/{car_id}/condition", response_model=CarOut)
+async def update_car_condition(
+    car_id: int,
+    condition: CarCondition,
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Состояние авто (тип краски, сколы, требования) — владелец или сотрудник."""
+    from app.modules.cars.card_service import can_access_car, load_car
+    from app.modules.cars.condition import clean_condition
+
+    car = await load_car(db, car_id, UUID(current_user["tenant_id"]))
+    if not car or not can_access_car(current_user, car):
+        raise HTTPException(status_code=404, detail="Машина не найдена")
+
+    cleaned = clean_condition(
+        condition.paint_type,
+        condition.glass_defects,
+        condition.care_requirements,
+        condition.notes,
+    )
+    car.paint_type = cleaned["paint_type"]
+    car.glass_defects = cleaned["glass_defects"]
+    car.care_requirements = cleaned["care_requirements"]
+    car.condition_notes = cleaned["notes"]
     await db.commit()
     await db.refresh(car)
     return CarOut.model_validate(car)

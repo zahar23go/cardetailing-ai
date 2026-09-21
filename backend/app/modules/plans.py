@@ -39,6 +39,7 @@ BASIC_MODULES = [
 
 PRO_MODULES = BASIC_MODULES + [
     "ai",
+    "reviews",
     "analytics",
     "expenses",
     "tech_cards",
@@ -58,6 +59,7 @@ BUSINESS_MODULES = [
     "expenses",
     "analytics",
     "ai",
+    "reviews",
     "discounts",
     "notifications",
     "payments",
@@ -97,6 +99,7 @@ PLANS: dict[str, dict] = {
 API_PREFIX_MODULE: list[tuple[str, str]] = [
     ("/api/ai/financier", "feature:financier"),
     ("/api/ai", "ai"),
+    ("/api/reviews", "reviews"),
     ("/api/analytics", "analytics"),
     ("/api/expenses", "expenses"),
     ("/api/discounts", "discounts"),

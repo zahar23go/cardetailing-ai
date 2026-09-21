@@ -12,6 +12,7 @@ export type AdminTabKey =
   | 'financier'
   | 'finances'
   | 'analytics'
+  | 'reviews'
   | 'discounts'
   | 'reports'
   | 'notifications'
@@ -62,6 +63,7 @@ export const PATH_TO_TAB: Record<string, AdminTabKey | 'branding'> = {
   '/upload/boxes': 'boxes',
   '/crm/users': 'users',
   '/crm/services': 'services',
+  '/reviews': 'reviews',
   '/discounts': 'discounts',
   '/technology/warehouse': 'warehouse',
   '/technology/tech-cards': 'tech-cards',
@@ -84,6 +86,7 @@ export const TAB_TO_PATH: Record<AdminTabKey | 'branding', string> = {
   boxes: '/upload/boxes',
   users: '/crm/users',
   services: '/crm/services',
+  reviews: '/reviews',
   discounts: '/discounts',
   warehouse: '/technology/warehouse',
   'tech-cards': '/technology/tech-cards',
@@ -170,6 +173,14 @@ export const ADMIN_NAV: NavEntry[] = [
     label: 'Скидки',
     icon: 'discounts',
     module: 'discounts',
+  },
+  {
+    type: 'leaf',
+    key: 'reviews',
+    path: '/reviews',
+    label: 'Отзывы',
+    icon: 'reviews',
+    module: 'reviews',
   },
   {
     type: 'group',

@@ -50,6 +50,10 @@ class CarOut(BaseModel):
     body_type: Optional[str] = None
     mileage: Optional[int] = None
     notes: Optional[str] = None
+    paint_type: Optional[str] = None
+    glass_defects: list[str] = []
+    care_requirements: list[str] = []
+    condition_notes: Optional[str] = None
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
@@ -85,3 +89,23 @@ class CarVisitOut(BaseModel):
 class CarCardOut(CarOut):
     photos: list[PhotoOut] = []
     timeline: list[CarVisitOut] = []
+
+
+class CarCondition(BaseModel):
+    """Состояние авто: тип краски, дефекты стекла, требования + комментарий."""
+
+    paint_type: Optional[str] = None
+    glass_defects: list[str] = []
+    care_requirements: list[str] = []
+    notes: Optional[str] = None
+
+
+class ConditionCatalogItem(BaseModel):
+    id: str
+    label: str
+
+
+class ConditionCatalogOut(BaseModel):
+    paint_types: list[ConditionCatalogItem]
+    glass_defects: list[ConditionCatalogItem]
+    care_requirements: list[ConditionCatalogItem]

@@ -84,6 +84,10 @@ class CarRef(BaseModel):
     model: str
     license_plate: Optional[str] = None
     vin: Optional[str] = None
+    paint_type: Optional[str] = None
+    glass_defects: list[str] = []
+    care_requirements: list[str] = []
+    condition_notes: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

@@ -794,6 +794,45 @@ async def update_master_appointment_notes(
     await db.commit()
     return _serialize_appointment(appointment)
 
+
+@router.put("/api/appointments/{appointment_id}/car-condition", response_model=AppointmentOut)
+async def set_appointment_car_condition(
+    appointment_id: int,
+    condition: CarCondition,
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Снимок состояния авто на визит — владелец записи или сотрудник."""
+    from app.modules.cars.condition import clean_condition
+
+    tenant_id = UUID(current_user["tenant_id"])
+    result = await db.execute(
+        select(Appointment).options(*_APPT_LOAD).where(
+            Appointment.id == appointment_id,
+            Appointment.tenant_id == tenant_id,
+        )
+    )
+    appointment = result.scalar_one_or_none()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    is_staff = current_user["role"] in ("admin", "super_admin", "master")
+    if appointment.client_id != current_user["id"] and not is_staff:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+
+    appointment.car_condition = clean_condition(
+        condition.paint_type,
+        condition.glass_defects,
+        condition.care_requirements,
+        condition.notes,
+    )
+    await db.commit()
+
+    refreshed = await db.execute(
+        select(Appointment).options(*_APPT_LOAD).where(Appointment.id == appointment_id)
+    )
+    return _serialize_appointment(refreshed.scalar_one())
+
+
 @router.get("/api/masters/me/appointments/{appointment_id}/detailer-brief", response_model=DetailerBriefResponse)
 async def get_master_detailer_brief(
     appointment_id: int,
@@ -801,9 +840,13 @@ async def get_master_detailer_brief(
     db: AsyncSession = Depends(get_db),
 ):
     """Сводка детейлера к заезду: состояние, допродажи, фото."""
+    from app.modules.cars.condition import effective_condition
+
     tenant_id = UUID(current_user["tenant_id"])
     result = await db.execute(
-        select(Appointment).where(
+        select(Appointment)
+        .options(selectinload(Appointment.car))
+        .where(
             Appointment.id == appointment_id,
             Appointment.tenant_id == tenant_id,
         )
@@ -829,6 +872,7 @@ async def get_master_detailer_brief(
         "findings": (row.findings if row else None) or [],
         "upsells": (row.upsells if row else None) or [],
         "photo_count": len(row.photo_ids or []) if row else 0,
+        "car_condition": effective_condition(appointment.car, appointment.car_condition),
     }
 
 @router.get("/api/boxes", response_model=list[BoxOut])

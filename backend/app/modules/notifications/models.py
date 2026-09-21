@@ -73,7 +73,7 @@ class UserNotificationSettings(Base):
     notify_appointment_reminder = Column(Boolean, nullable=False, default=True)
     notify_status_change = Column(Boolean, nullable=False, default=True)
     notify_promo = Column(Boolean, nullable=False, default=False)
-    remind_hours_before = Column(Integer, nullable=False, default=24)
+    remind_hours_before = Column(Integer, nullable=False, default=1)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

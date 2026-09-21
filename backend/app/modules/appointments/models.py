@@ -85,6 +85,7 @@ class Appointment(Base):
     discount_applied = Column(Numeric(10, 2), nullable=False, default=0)
     client_notes = Column(Text, nullable=True)
     master_brief = Column(Text, nullable=True)
+    car_condition = Column(JSONB, nullable=True, comment="Снимок состояния авто на визит")
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

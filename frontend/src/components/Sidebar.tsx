@@ -11,7 +11,7 @@ import {
   SettingOutlined, GiftOutlined, BellOutlined, DownOutlined, RightOutlined,
   ToolOutlined, BgColorsOutlined, AppstoreOutlined, ExperimentOutlined,
   DatabaseOutlined, ProfileOutlined, FundOutlined, LineChartOutlined,
-  InsertRowAboveOutlined, CrownOutlined,
+  InsertRowAboveOutlined, CrownOutlined, CommentOutlined,
 } from '@ant-design/icons';
 import {
   ADMIN_NAV,
@@ -38,6 +38,7 @@ const ICONS: Record<string, React.ReactNode> = {
   users: <TeamOutlined />,
   services: <ToolOutlined />,
   discounts: <GiftOutlined />,
+  reviews: <CommentOutlined />,
   technology: <ExperimentOutlined />,
   warehouse: <DatabaseOutlined />,
   'tech-cards': <ProfileOutlined />,

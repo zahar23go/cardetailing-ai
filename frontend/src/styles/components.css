@@ -991,6 +991,109 @@
   word-break: break-all;
 }
 
+/* ---- Состояние авто (CarCondition) ---- */
+.apple-car-condition {
+  padding: 4px 16px 8px;
+}
+
+.car-condition-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.car-condition-title {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-gold, #D4AF37);
+}
+
+.car-condition-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.car-condition-notes {
+  display: block;
+  margin-top: 8px;
+  color: var(--color-titanium, #9BA3B5);
+  font-size: 13px;
+}
+
+.car-condition-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+/* ---- Отзывы и ИИ-вердикт ---- */
+.reviews-header {
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reviews-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reviews-verdict-head {
+  margin-bottom: 10px;
+}
+
+.reviews-verdict-summary {
+  display: block;
+  color: var(--color-white, #F0F2F5);
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.reviews-verdict-themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.reviews-verdict-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.reviews-verdict-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--color-titanium, #9BA3B5);
+  font-size: 13px;
+}
+
+.reviews-verdict-recs .reviews-verdict-list {
+  color: var(--color-gold, #D4AF37);
+}
+
+.reviews-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.reviews-item-text {
+  display: block;
+  font-size: 14px;
+}
+
 .apple-car-upload {
   padding: 0 16px 16px;
 }

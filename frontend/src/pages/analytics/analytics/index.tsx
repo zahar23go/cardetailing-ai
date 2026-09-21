@@ -31,6 +31,7 @@ import {
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import SpecPanels, { type SpecData } from './SpecPanels';
+import ReviewsVerdictCard from '../../../components/ReviewsVerdict';
 
 dayjs.locale('ru');
 
@@ -424,6 +425,10 @@ export default function AnalyticsPage() {
           <div className="admin-overview-kicker">Метрики</div>
           <h3>Аналитика</h3>
         </div>
+      </div>
+
+      <div className="mb-12">
+        <ReviewsVerdictCard />
       </div>
 
       <SpecPanels data={specData} />

@@ -47,6 +47,11 @@ class Car(Base):
     body_type = Column(String(40), nullable=True)
     mileage = Column(Integer, nullable=True)
     notes = Column(Text, nullable=True)
+    # Состояние и особенности, важные мастеру
+    paint_type = Column(String(20), nullable=True, comment="lacquer, ceramic, film, unknown")
+    glass_defects = Column(JSONB, nullable=False, default=list, server_default="'[]'", comment="Сколы/трещины на лобовом")
+    care_requirements = Column(JSONB, nullable=False, default=list, server_default="'[]'", comment="Особые требования к уходу")
+    condition_notes = Column(Text, nullable=True, comment="Комментарий по состоянию авто")
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

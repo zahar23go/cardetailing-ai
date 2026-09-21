@@ -35,6 +35,8 @@ async def create_notification(
             Notification.user_id == user_id,
             Notification.tenant_id == tenant_id,
             Notification.title == title,
+            Notification.related_entity_type == related_entity_type,
+            Notification.related_entity_id == related_entity_id,
             Notification.created_at > now - timedelta(minutes=5)
         )
     )
@@ -167,18 +169,47 @@ async def upsert_settings(
 # Фоновые задачи (напоминания)
 # =========================================================================
 
-async def send_appointment_reminders(db: AsyncSession, hours_before: int = 24):
-    """Отправить напоминания о предстоящих записях."""
+# Верхняя граница горизонта напоминаний: схема настроек разрешает до 168 ч (неделя).
+MAX_REMIND_HOURS = 168
+REMINDER_TYPE = "appointment_reminder"
+
+
+def _as_aware(value: datetime) -> datetime:
+    """SQLite отдаёт naive datetime — считаем его UTC, чтобы сравнивать с now."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+async def _reminder_already_sent(db: AsyncSession, appt: Appointment) -> bool:
+    """Есть ли уже напоминание клиенту по этой записи."""
+    result = await db.execute(
+        select(Notification.id).where(
+            Notification.user_id == appt.client_id,
+            Notification.tenant_id == appt.tenant_id,
+            Notification.type == REMINDER_TYPE,
+            Notification.related_entity_id == appt.id,
+        ).limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def send_appointment_reminders(db: AsyncSession, hours_before: int = 1) -> int:
+    """Отправить напоминания о предстоящих записях.
+
+    За сколько напоминать — из личных настроек клиента (remind_hours_before),
+    иначе из hours_before. Каналы: in-app всегда, Telegram/SMS — если включены.
+    Повторный вызов по той же записи напоминание не дублирует.
+    """
     now = datetime.now(timezone.utc)
-    window_start = now + timedelta(hours=hours_before)
-    window_end = window_start + timedelta(hours=1)
+    lookahead = now + timedelta(hours=MAX_REMIND_HOURS)
 
     result = await db.execute(
         select(Appointment)
         .options(selectinload(Appointment.client), selectinload(Appointment.service))
         .where(
-            Appointment.start_time >= window_start,
-            Appointment.start_time <= window_end,
+            Appointment.start_time > now,
+            Appointment.start_time <= lookahead,
             Appointment.status.in_(["pending", "confirmed"]),
         )
     )
@@ -188,22 +219,32 @@ async def send_appointment_reminders(db: AsyncSession, hours_before: int = 24):
     for appt in appts:
         if not appt.client:
             continue
+
+        settings = await get_settings(db, appt.client_id)
+        if settings and not settings.notify_appointment_reminder:
+            continue
+        remind_hours = settings.remind_hours_before if settings else hours_before
+        start_time = _as_aware(appt.start_time)
+        if now < start_time - timedelta(hours=remind_hours):
+            continue
+        if await _reminder_already_sent(db, appt):
+            continue
+
         title = "Напоминание о записи"
         message = (
-            f"Напоминаем, что завтра в {appt.start_time.strftime('%H:%M')} "
+            f"Напоминаем, что в {start_time.strftime('%H:%M')} "
             f"у вас запись на «{appt.service.name if appt.service else 'услугу'}». "
             f"Ждём вас!"
         )
         await create_notification(
             db, appt.client_id, appt.tenant_id,
             title, message,
-            type="appointment_reminder",
+            type=REMINDER_TYPE,
             related_entity_type="appointment",
             related_entity_id=appt.id,
         )
 
-        # Получаем настройки для Telegram/SMS
-        settings = await get_settings(db, appt.client_id)
+        # Telegram/SMS — если клиент их включил и настроил
         if settings:
             if settings.telegram_enabled and settings.telegram_chat_id:
                 try:

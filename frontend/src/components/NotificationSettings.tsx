@@ -109,7 +109,7 @@ export default function NotificationSettingsPage() {
             <InputNumber
               min={1}
               max={168}
-              value={settings?.remind_hours_before || 24}
+              value={settings?.remind_hours_before || 1}
               onChange={handleHoursChange}
               size="small"
             />

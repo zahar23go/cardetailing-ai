@@ -32,6 +32,7 @@ import NotificationsPage from '../pages/settings/notifications';
 import BrandingPage from '../pages/settings/branding';
 import TariffsPage from '../pages/settings/tariffs';
 import ServiceAnalyticsPage from '../pages/analytics/service-analytics';
+import ReviewsPage from '../pages/reviews';
 import ClientLayout from '../pages/client/layout';
 import ClientHomePage from '../pages/client/home';
 import ClientBookingPage from '../pages/client/booking';
@@ -166,6 +167,8 @@ export default function AppRoutes({
         </Route>
 
         <Route path="discounts" element={<DiscountsPage />} />
+
+        <Route path="reviews" element={<ReviewsPage />} />
 
         <Route path="technology">
           <Route index element={<Navigate to="warehouse" replace />} />

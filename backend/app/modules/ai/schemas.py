@@ -118,4 +118,5 @@ class DetailerBriefResponse(BaseModel):
     findings: list[DetailerFindingOut] = []
     upsells: list[DetailerOfferOut] = []
     photo_count: int = 0
+    car_condition: Optional[dict] = None
 

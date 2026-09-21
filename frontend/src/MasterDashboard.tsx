@@ -39,6 +39,8 @@ import NotificationList from './components/NotificationList';
 import NotificationSettings from './components/NotificationSettings';
 import CloseVisitModal from './components/CloseVisitModal';
 import CarCard from './components/CarCard';
+import CarCondition from './components/CarCondition';
+import { saveAppointmentCarCondition } from './api/carCondition';
 
 dayjs.locale('ru');
 
@@ -66,7 +68,16 @@ interface Appointment {
   service_name: string | null;
   client?: { id: number; full_name: string; phone: string };
   master?: { id: number; full_name: string };
-  car?: { id: number; make: string; model: string; license_plate: string };
+  car?: {
+    id: number;
+    make: string;
+    model: string;
+    license_plate: string;
+    paint_type?: string | null;
+    glass_defects?: string[];
+    care_requirements?: string[];
+    condition_notes?: string | null;
+  };
   service?: { id: number; name: string; price: number };
 }
 
@@ -332,7 +343,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
               <Card className="card-luxury client-car-card" styles={{ body: { padding: 0 } }}>
                 {firstCar ? (
                   <>
-                    <CarCard carId={firstCar.id} readonly compact />
+                    <CarCard carId={firstCar.id} readonly compact canEditCondition />
                     <div style={{ padding: '12px 16px 16px' }}>
                       <Row justify="space-between" align="middle">
                         <Col>
@@ -690,6 +701,17 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                                 <CarOutlined /> {item.car.make} {item.car.model}
                                 {item.car.license_plate ? ` (${item.car.license_plate})` : ''}
                               </Text>
+                            )}
+                            {item.car && (
+                              <CarCondition
+                                value={item.car}
+                                editable
+                                onSave={async (data) => {
+                                  await saveAppointmentCarCondition(item.id, data);
+                                  await fetchAppointments();
+                                }}
+                                title="Состояние авто"
+                              />
                             )}
                             {item.client_notes && (
                               <Text className="text-titanium text-12 opacity-70">

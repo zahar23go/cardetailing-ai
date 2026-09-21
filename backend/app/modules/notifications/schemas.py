@@ -33,7 +33,7 @@ class NotificationSettingsOut(BaseModel):
     notify_appointment_reminder: bool = True
     notify_status_change: bool = True
     notify_promo: bool = False
-    remind_hours_before: int = 24
+    remind_hours_before: int = 1
 
     model_config = {"from_attributes": True}
 

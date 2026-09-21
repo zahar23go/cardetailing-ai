@@ -21,6 +21,7 @@ MODULE_ORDER = [
     "expenses",
     "analytics",
     "ai",
+    "reviews",
     "discounts",
     "notifications",
     "payments",

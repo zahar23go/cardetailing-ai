@@ -10,6 +10,8 @@ import 'dayjs/locale/ru';
 import { getPhotos, deletePhoto, setPrimaryPhoto, type Photo } from '../api/photos';
 import UploadButton from './UploadButton';
 import { Button } from './ui';
+import CarCondition from './CarCondition';
+import { saveCarCondition, type CarCondition as CarConditionData } from '../api/carCondition';
 
 dayjs.locale('ru');
 const { Text } = Typography;
@@ -42,6 +44,10 @@ export type CarCardData = {
   vin?: string | null;
   body_type?: string | null;
   mileage?: number | null;
+  paint_type?: string | null;
+  glass_defects?: string[] | null;
+  care_requirements?: string[] | null;
+  condition_notes?: string | null;
   photos: Photo[];
   timeline: CarVisit[];
 };
@@ -50,6 +56,7 @@ interface CarCardProps {
   carId: number;
   readonly?: boolean;
   compact?: boolean;
+  canEditCondition?: boolean;
 }
 
 async function fetchCard(carId: number): Promise<CarCardData> {
@@ -72,7 +79,7 @@ function formatKm(n?: number | null) {
   return `${n.toLocaleString('ru-RU')} км`;
 }
 
-export default function CarCard({ carId, readonly = false, compact = false }: CarCardProps) {
+export default function CarCard({ carId, readonly = false, compact = false, canEditCondition = !readonly }: CarCardProps) {
   const [card, setCard] = useState<CarCardData | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [idx, setIdx] = useState(0);
@@ -105,6 +112,11 @@ export default function CarCard({ carId, readonly = false, compact = false }: Ca
 
   const handleSetPrimary = async (photoId: number) => {
     await setPrimaryPhoto(photoId);
+    await load();
+  };
+
+  const handleSaveCondition = async (data: CarConditionData) => {
+    await saveCarCondition(carId, data);
     await load();
   };
 
@@ -185,6 +197,16 @@ export default function CarCard({ carId, readonly = false, compact = false }: Ca
                 <span className="apple-car-spec-value">{row.value}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {card && (
+          <div className="apple-car-condition">
+            <CarCondition
+              value={card}
+              editable={canEditCondition}
+              onSave={canEditCondition ? handleSaveCondition : undefined}
+            />
           </div>
         )}
 

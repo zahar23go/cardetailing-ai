@@ -25,6 +25,7 @@ from app.core.deepseek_client import (
 from app.models import Tenant, User
 from app.modules.registry import include_modules
 from app.core.plan_gate import TenantPlanMiddleware
+from app.core.reminder_scheduler import start_reminder_scheduler, stop_reminder_scheduler
 
 __all__ = [
     "app",
@@ -66,8 +67,12 @@ async def lifespan(app: FastAPI):
         else:
             print("[OK] Super-admin already exists")
         await db.commit()
+    start_reminder_scheduler()
     print("[OK] Application ready")
-    yield
+    try:
+        yield
+    finally:
+        await stop_reminder_scheduler()
 
 
 app = FastAPI(title="CarDetailing AI", version="1.0.0", lifespan=lifespan)

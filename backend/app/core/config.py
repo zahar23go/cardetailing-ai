@@ -123,6 +123,10 @@ class Settings(BaseSettings):
     # Модули: "all" или список через запятую (materials,tech_cards,...)
     ENABLED_MODULES: str = "all"
 
+    # Напоминания о визитах: фоновый планировщик
+    REMINDERS_ENABLED: bool = True
+    REMINDER_INTERVAL_MINUTES: int = 5
+
 
 @lru_cache
 def get_settings() -> Settings:
