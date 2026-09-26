@@ -802,7 +802,11 @@ async def set_appointment_car_condition(
     current_user: dict = Depends(_get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Снимок состояния авто на визит — владелец записи или сотрудник."""
+    """Снимок состояния авто на визит (фиксирует мастер).
+
+    Профиль авто (car.paint_type и т.п.) НЕ трогаем — это данные клиента.
+    Разделение ответственности: профиль — клиент, снимок — мастер.
+    """
     from app.modules.cars.condition import clean_condition
 
     tenant_id = UUID(current_user["tenant_id"])
@@ -840,7 +844,7 @@ async def get_master_detailer_brief(
     db: AsyncSession = Depends(get_db),
 ):
     """Сводка детейлера к заезду: состояние, допродажи, фото."""
-    from app.modules.cars.condition import effective_condition
+    from app.modules.cars.condition import condition_from_car, snapshot_condition
 
     tenant_id = UUID(current_user["tenant_id"])
     result = await db.execute(
@@ -872,7 +876,9 @@ async def get_master_detailer_brief(
         "findings": (row.findings if row else None) or [],
         "upsells": (row.upsells if row else None) or [],
         "photo_count": len(row.photo_ids or []) if row else 0,
-        "car_condition": effective_condition(appointment.car, appointment.car_condition),
+        # Снимок визита (мастер) и профиль авто (клиент) — раздельно.
+        "car_condition": snapshot_condition(appointment.car_condition),
+        "car_profile": condition_from_car(appointment.car),
     }
 
 @router.get("/api/boxes", response_model=list[BoxOut])

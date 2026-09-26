@@ -114,11 +114,10 @@ async def _paginate(db: AsyncSession, stmt, skip: int = 0, limit: int = 20):
     return items, total
 
 def _serialize_appointment(appointment):
-    from app.modules.cars.condition import effective_condition
+    from app.modules.cars.condition import condition_from_car, snapshot_condition
 
-    condition = effective_condition(
-        appointment.car, getattr(appointment, "car_condition", None)
-    )
+    car_profile = condition_from_car(appointment.car)
+    car_snapshot = snapshot_condition(getattr(appointment, "car_condition", None))
     return {
         "id": appointment.id,
         "client_id": appointment.client_id,
@@ -151,10 +150,10 @@ def _serialize_appointment(appointment):
             "model": appointment.car.model,
             "license_plate": appointment.car.license_plate,
             "vin": getattr(appointment.car, "vin", None),
-            "paint_type": condition["paint_type"],
-            "glass_defects": condition["glass_defects"],
-            "care_requirements": condition["care_requirements"],
-            "condition_notes": condition["notes"],
+            # Профиль авто (заполняет клиент) — справка для мастера.
+            "profile": car_profile,
+            # Снимок состояния на визит (фиксирует мастер) — или None.
+            "condition": car_snapshot,
         } if appointment.car else None,
         "service": {
             "id": appointment.service.id,

@@ -73,10 +73,18 @@ interface Appointment {
     make: string;
     model: string;
     license_plate: string;
-    paint_type?: string | null;
-    glass_defects?: string[];
-    care_requirements?: string[];
-    condition_notes?: string | null;
+    profile?: {
+      paint_type?: string | null;
+      glass_defects?: string[];
+      care_requirements?: string[];
+      notes?: string | null;
+    };
+    condition?: {
+      paint_type?: string | null;
+      glass_defects?: string[];
+      care_requirements?: string[];
+      notes?: string | null;
+    } | null;
   };
   service?: { id: number; name: string; price: number };
 }
@@ -343,7 +351,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
               <Card className="card-luxury client-car-card" styles={{ body: { padding: 0 } }}>
                 {firstCar ? (
                   <>
-                    <CarCard carId={firstCar.id} readonly compact canEditCondition />
+                    <CarCard carId={firstCar.id} readonly compact />
                     <div style={{ padding: '12px 16px 16px' }}>
                       <Row justify="space-between" align="middle">
                         <Col>
@@ -704,13 +712,21 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                             )}
                             {item.car && (
                               <CarCondition
-                                value={item.car}
+                                value={item.car.condition}
                                 editable
                                 onSave={async (data) => {
                                   await saveAppointmentCarCondition(item.id, data);
                                   await fetchAppointments();
                                 }}
-                                title="Состояние авто"
+                                title="Снимок визита"
+                                emptyHint="Мастер ещё не зафиксировал состояние на этот визит"
+                              />
+                            )}
+                            {item.car && (
+                              <CarCondition
+                                value={item.car.profile}
+                                title="Профиль авто"
+                                emptyHint="Клиент не заполнил профиль авто"
                               />
                             )}
                             {item.client_notes && (

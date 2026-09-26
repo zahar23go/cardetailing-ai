@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Checkbox, Select, Typography, message } from 'antd';
+import { AlertOutlined, WarningOutlined } from '@ant-design/icons';
 import { Button, Modal, Input } from './ui';
 import Badge from './Badge';
 import {
@@ -22,6 +23,8 @@ export type CarConditionValue = {
   paint_type?: string | null;
   glass_defects?: string[] | null;
   care_requirements?: string[] | null;
+  /** Профиль Car отдаёт `condition_notes`; снимок визита — `notes`. */
+  notes?: string | null;
   condition_notes?: string | null;
 };
 
@@ -30,6 +33,7 @@ interface CarConditionProps {
   editable?: boolean;
   onSave?: (data: CarConditionData) => Promise<void>;
   title?: string;
+  emptyHint?: string;
 }
 
 const EMPTY: CarConditionData = {
@@ -44,6 +48,7 @@ export default function CarCondition({
   editable = false,
   onSave,
   title = 'Состояние авто',
+  emptyHint,
 }: CarConditionProps) {
   const [catalog, setCatalog] = useState<ConditionCatalog | null>(null);
   const [open, setOpen] = useState(false);
@@ -64,7 +69,7 @@ export default function CarCondition({
   const paintLabel = value?.paint_type ? labelOf(catalog?.paint_types, value.paint_type) : null;
   const glass = value?.glass_defects || [];
   const care = value?.care_requirements || [];
-  const notes = value?.condition_notes || '';
+  const notes = value?.condition_notes ?? value?.notes ?? '';
   const empty = !paintLabel && glass.length === 0 && care.length === 0 && !notes;
 
   const openModal = () => {
@@ -72,7 +77,7 @@ export default function CarCondition({
       paint_type: value?.paint_type ?? null,
       glass_defects: [...(value?.glass_defects || [])],
       care_requirements: [...(value?.care_requirements || [])],
-      notes: value?.condition_notes ?? '',
+      notes: value?.condition_notes ?? value?.notes ?? '',
     });
     setOpen(true);
   };
@@ -92,16 +97,36 @@ export default function CarCondition({
   };
 
   return (
-    <div className="car-condition">
+    <div
+      className={[
+        'car-condition',
+        empty && editable ? 'car-condition--empty' : null,
+        !editable ? 'car-condition--readonly' : null,
+      ].filter(Boolean).join(' ')}
+    >
       <div className="car-condition-head">
-        <Text className="car-condition-title">{title}</Text>
+        <span className="car-condition-title">
+          <AlertOutlined /> {title}
+        </span>
         {editable && onSave && (
-          <Button size="small" look="ghost" onClick={openModal}>Изменить</Button>
+          <Button
+            size="small"
+            type={empty ? 'primary' : 'default'}
+            onClick={openModal}
+          >
+            {empty ? 'Заполнить' : 'Изменить'}
+          </Button>
         )}
       </div>
 
       {empty ? (
-        <Text className="text-titanium text-13">Не заполнено</Text>
+        <span className={`car-condition-empty${editable ? '' : ' car-condition-empty--muted'}`}>
+          {editable && <WarningOutlined />}{' '}
+          {emptyHint
+            || (editable
+              ? 'Не заполнено — укажите тип краски, сколы и требования'
+              : 'Не заполнено')}
+        </span>
       ) : (
         <div className="car-condition-chips">
           {paintLabel && <Badge variant="gold" size="sm">{paintLabel}</Badge>}

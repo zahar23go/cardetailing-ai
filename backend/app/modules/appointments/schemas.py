@@ -84,10 +84,10 @@ class CarRef(BaseModel):
     model: str
     license_plate: Optional[str] = None
     vin: Optional[str] = None
-    paint_type: Optional[str] = None
-    glass_defects: list[str] = []
-    care_requirements: list[str] = []
-    condition_notes: Optional[str] = None
+    # Профиль авто (от клиента) — справка.
+    profile: dict = Field(default_factory=dict)
+    # Снимок состояния на визит (от мастера) — или None.
+    condition: Optional[dict] = None
 
     model_config = {"from_attributes": True}
 

@@ -119,4 +119,5 @@ class DetailerBriefResponse(BaseModel):
     upsells: list[DetailerOfferOut] = []
     photo_count: int = 0
     car_condition: Optional[dict] = None
+    car_profile: Optional[dict] = None
 

@@ -206,6 +206,10 @@ export default function CarCard({ carId, readonly = false, compact = false, canE
               value={card}
               editable={canEditCondition}
               onSave={canEditCondition ? handleSaveCondition : undefined}
+              title="Профиль авто"
+              emptyHint={canEditCondition
+                ? 'Не заполнено — укажите тип краски, сколы и требования'
+                : 'Клиент не заполнил профиль авто'}
             />
           </div>
         )}

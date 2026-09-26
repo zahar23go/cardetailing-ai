@@ -84,3 +84,15 @@ def effective_condition(car, snapshot) -> dict:
             snapshot.get("notes"),
         )
     return condition_from_car(car)
+
+
+def snapshot_condition(snapshot) -> dict | None:
+    """Снимок состояния на визит (от мастера). None, если не зафиксирован."""
+    if not snapshot:
+        return None
+    return clean_condition(
+        snapshot.get("paint_type"),
+        snapshot.get("glass_defects"),
+        snapshot.get("care_requirements"),
+        snapshot.get("notes"),
+    )

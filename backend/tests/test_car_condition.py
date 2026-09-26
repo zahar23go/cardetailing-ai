@@ -102,11 +102,11 @@ class TestCarCondition:
 
 
 class TestAppointmentCarCondition:
-    async def test_snapshot_overrides_profile(
+    async def test_snapshot_and_profile_stay_separate(
         self, client, db_session, default_tenant, test_user, test_master,
         test_car, test_service, auth_headers, master_headers,
     ):
-        """✅ Снимок на визит перекрывает профиль авто и виден мастеру в brief."""
+        """✅ Снимок визита и профиль авто живут раздельно, не перекрывая друг друга."""
         await client.put(
             f"/api/cars/{test_car.id}/condition",
             json={"paint_type": "lacquer", "glass_defects": ["chips"]},
@@ -116,28 +116,32 @@ class TestAppointmentCarCondition:
             db_session, default_tenant, test_user, test_master, test_car, test_service
         )
 
-        # до снимка показывается профиль авто
+        # снимка ещё нет -> condition = None, profile = данные клиента
         r = await client.get(f"/api/appointments/{appt.id}", headers=auth_headers)
-        assert r.json()["car"]["paint_type"] == "lacquer"
-        assert r.json()["car"]["glass_defects"] == ["chips"]
+        assert r.json()["car"]["condition"] is None
+        assert r.json()["car"]["profile"]["paint_type"] == "lacquer"
+        assert r.json()["car"]["profile"]["glass_defects"] == ["chips"]
 
-        # снимок на визит перекрывает профиль
+        # мастер фиксирует снимок визита
         r = await client.put(
             f"/api/appointments/{appt.id}/car-condition",
             json={"paint_type": "ceramic", "glass_defects": ["cracks"], "notes": "новый скол"},
-            headers=auth_headers,
+            headers=master_headers,
         )
         assert r.status_code == 200
-        assert r.json()["car"]["paint_type"] == "ceramic"
-        assert r.json()["car"]["glass_defects"] == ["cracks"]
+        assert r.json()["car"]["condition"]["paint_type"] == "ceramic"
+        # профиль клиента не тронут
+        assert r.json()["car"]["profile"]["paint_type"] == "lacquer"
+        assert r.json()["car"]["profile"]["glass_defects"] == ["chips"]
 
-        # мастер видит снимок в сводке
+        # brief: снимок и профиль раздельно
         r = await client.get(
             f"/api/masters/me/appointments/{appt.id}/detailer-brief", headers=master_headers
         )
         assert r.status_code == 200
         assert r.json()["car_condition"]["paint_type"] == "ceramic"
         assert r.json()["car_condition"]["glass_defects"] == ["cracks"]
+        assert r.json()["car_profile"]["paint_type"] == "lacquer"
 
     async def test_foreign_client_forbidden(
         self, client, db_session, default_tenant, test_user, test_master,
@@ -154,3 +158,47 @@ class TestAppointmentCarCondition:
             headers=headers,
         )
         assert r.status_code == 403
+
+    async def test_snapshot_does_not_touch_profile(
+        self, client, db_session, default_tenant, test_user, test_master,
+        test_car, test_service, master_headers,
+    ):
+        """✅ Мастер в задании НЕ перезаписывает профиль клиента (разделение)."""
+        appt = await _make_appt(
+            db_session, default_tenant, test_user, test_master, test_car, test_service
+        )
+        r = await client.put(
+            f"/api/appointments/{appt.id}/car-condition",
+            json={
+                "paint_type": "ceramic",
+                "glass_defects": ["chips"],
+                "care_requirements": ["soft_wash"],
+                "notes": "из задания",
+            },
+            headers=master_headers,
+        )
+        assert r.status_code == 200
+
+        card = await client.get(f"/api/cars/{test_car.id}", headers=master_headers)
+        assert card.json()["paint_type"] is None
+        assert card.json()["glass_defects"] == []
+        assert card.json()["care_requirements"] == []
+        assert card.json()["condition_notes"] is None
+
+    async def test_profile_visible_as_reference(
+        self, client, db_session, default_tenant, test_user, test_master,
+        test_car, test_service, auth_headers,
+    ):
+        """✅ Профиль клиента приходит в задании отдельно от снимка (справка)."""
+        await client.put(
+            f"/api/cars/{test_car.id}/condition",
+            json={"paint_type": "film", "glass_defects": ["cracks"]},
+            headers=auth_headers,
+        )
+        appt = await _make_appt(
+            db_session, default_tenant, test_user, test_master, test_car, test_service
+        )
+        r = await client.get(f"/api/appointments/{appt.id}", headers=auth_headers)
+        assert r.json()["car"]["profile"]["paint_type"] == "film"
+        assert r.json()["car"]["profile"]["glass_defects"] == ["cracks"]
+        assert r.json()["car"]["condition"] is None

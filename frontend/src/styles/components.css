@@ -993,7 +993,22 @@
 
 /* ---- Состояние авто (CarCondition) ---- */
 .apple-car-condition {
-  padding: 4px 16px 8px;
+  padding: 4px 16px 12px;
+}
+
+.car-condition {
+  background: var(--color-elevated, #1A1E23);
+  border: 1px solid var(--color-gold-border, rgba(212, 175, 55, 0.3));
+  border-left: 3px solid var(--color-gold, #D4AF37);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+/* Пусто: акцент внимания — тёплый предупреждающий тон */
+.car-condition--empty {
+  background: var(--color-warning-bg, rgba(183, 106, 41, 0.15));
+  border-color: var(--color-warning-border, rgba(232, 168, 60, 0.3));
+  border-left-color: var(--color-warning-text, #E8A83C);
 }
 
 .car-condition-head {
@@ -1005,11 +1020,47 @@
 }
 
 .car-condition-title {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-gold, #D4AF37);
+  color: var(--color-gold-text, #D4AF37);
+}
+
+.car-condition--empty .car-condition-title {
+  color: var(--color-warning-text, #E8A83C);
+}
+
+.car-condition-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-warning-text, #E8A83C);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.car-condition-empty--muted {
+  color: var(--color-titanium, #9BA3B5);
+  font-weight: 500;
+}
+
+/* Справка (только чтение): приглушённый серый акцент вместо золотого */
+.car-condition--readonly {
+  border-color: var(--color-divider, #2D333B);
+  border-left-color: var(--color-titanium, #9BA3B5);
+}
+
+.car-condition--readonly .car-condition-title {
+  color: var(--color-titanium, #9BA3B5);
+}
+
+/* Два блока подряд: снимок визита + профиль авто */
+.car-condition + .car-condition {
+  margin-top: 8px;
 }
 
 .car-condition-chips {
