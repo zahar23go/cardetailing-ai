@@ -47,6 +47,7 @@ const PATH_PREFIX_MODULE: { prefix: string; module: AppModuleName }[] = [
   { prefix: '/dashboard', module: 'core' },
   { prefix: '/client/booking', module: 'appointments' },
   { prefix: '/client/portfolio', module: 'photos' },
+  { prefix: '/client/reviews', module: 'reviews' },
   { prefix: '/client/chat', module: 'ai' },
   { prefix: '/client/discounts', module: 'discounts' },
   { prefix: '/client/settings', module: 'core' },

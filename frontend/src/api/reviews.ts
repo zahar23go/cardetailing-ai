@@ -99,3 +99,14 @@ export function analyzeReviews(): Promise<ReviewVerdict> {
 export function getVerdict(): Promise<ReviewVerdict> {
   return apiFetch<ReviewVerdict>('/api/reviews/verdict');
 }
+
+export interface ReviewSummary {
+  average_rating?: number | null;
+  count: number;
+  items: ReviewItem[];
+}
+
+/** Публичный рейтинг и отзывы студии (клиентский кабинет). */
+export function getPublicReviews(): Promise<ReviewSummary> {
+  return apiFetch<ReviewSummary>('/api/reviews/public');
+}

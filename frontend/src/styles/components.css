@@ -1094,6 +1094,25 @@
   font-size: 14px;
 }
 
+.reviews-rating-hero {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.reviews-rating-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.reviews-rating-star {
+  color: var(--color-gold, #D4AF37);
+  font-size: 22px;
+}
+
 .apple-car-upload {
   padding: 0 16px 16px;
 }

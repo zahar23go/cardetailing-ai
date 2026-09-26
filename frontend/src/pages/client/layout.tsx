@@ -7,7 +7,7 @@ import { Layout, Space, Typography } from 'antd';
 import { Button } from '../../components/ui';
 import {
   CalendarOutlined, CameraOutlined, CommentOutlined, GiftOutlined,
-  HomeOutlined, LogoutOutlined, UserOutlined,
+  HomeOutlined, LogoutOutlined, StarOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { CLIENT_NAV, clientTabFromPath } from './navConfig';
 import { isModuleEnabled, type AppModuleName } from '../../modules';
@@ -21,6 +21,7 @@ const ICONS: Record<string, React.ReactNode> = {
   home: <HomeOutlined />,
   calendar: <CalendarOutlined />,
   camera: <CameraOutlined />,
+  star: <StarOutlined />,
   chat: <CommentOutlined />,
   gift: <GiftOutlined />,
   user: <UserOutlined />,

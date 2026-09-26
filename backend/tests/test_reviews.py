@@ -122,3 +122,29 @@ class TestReviewAccess:
         """❌ Мастер не может импортировать отзывы."""
         r = await client.post("/api/reviews/import", json=IMPORT_PAYLOAD, headers=master_headers)
         assert r.status_code in (401, 403)
+
+
+class TestPublicReviews:
+    async def test_client_sees_rating_and_list(self, client, admin_headers, auth_headers):
+        """✅ Клиент видит рейтинг студии и отзывы."""
+        await client.post("/api/reviews/import", json=IMPORT_PAYLOAD, headers=admin_headers)
+        r = await client.get("/api/reviews/public", headers=auth_headers)
+        assert r.status_code == 200
+        data = r.json()
+        assert data["count"] == 2
+        assert data["average_rating"] == 3.5
+        assert {i["external_id"] for i in data["items"]} == {"r1", "r2"}
+
+    async def test_empty_summary(self, client, auth_headers):
+        """✅ Без отзывов рейтинг пустой, но эндпоинт отвечает."""
+        r = await client.get("/api/reviews/public", headers=auth_headers)
+        assert r.status_code == 200
+        data = r.json()
+        assert data["count"] == 0
+        assert data["average_rating"] is None
+        assert data["items"] == []
+
+    async def test_unauthorized(self, client):
+        """❌ Без токена публичный рейтинг недоступен."""
+        r = await client.get("/api/reviews/public")
+        assert r.status_code in (401, 403)

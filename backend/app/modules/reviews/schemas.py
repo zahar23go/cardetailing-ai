@@ -51,3 +51,11 @@ class ReviewVerdictOut(BaseModel):
     average_rating: Optional[float] = None
     source: str = "ai"
     created_at: Optional[datetime] = None
+
+
+class ReviewSummaryOut(BaseModel):
+    """Публичный рейтинг студии и отзывы (для клиентского кабинета)."""
+
+    average_rating: Optional[float] = None
+    count: int = 0
+    items: list[ReviewOut] = []

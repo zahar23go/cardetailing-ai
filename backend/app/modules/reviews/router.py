@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user as _get_current_user
 from app.core.auth import require_admin as _require_admin
 from app.core.database import get_db
 from app.core.endpoint_helpers import _paginate
@@ -17,6 +18,7 @@ from app.modules.reviews.schemas import (
     ReviewImportResult,
     ReviewIn,
     ReviewOut,
+    ReviewSummaryOut,
     ReviewVerdictOut,
 )
 
@@ -43,6 +45,27 @@ async def list_reviews(
     return PaginatedResponse[ReviewOut](
         items=[ReviewOut.model_validate(r) for r in items],
         total=total, skip=skip, limit=limit,
+    )
+
+
+@router.get("/api/reviews/public", response_model=ReviewSummaryOut)
+async def public_reviews(
+    limit: int = Query(50, ge=1, le=200),
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Публичный рейтинг и отзывы студии (для клиентского кабинета)."""
+    result = await db.execute(
+        select(Review)
+        .where(Review.tenant_id == UUID(current_user["tenant_id"]))
+        .order_by(Review.id.desc())
+    )
+    reviews = list(result.scalars().all())
+    rated = [r.rating for r in reviews if r.rating]
+    return ReviewSummaryOut(
+        average_rating=round(sum(rated) / len(rated), 2) if rated else None,
+        count=len(reviews),
+        items=[ReviewOut.model_validate(r) for r in reviews[:limit]],
     )
 
 

@@ -37,6 +37,7 @@ import ClientLayout from '../pages/client/layout';
 import ClientHomePage from '../pages/client/home';
 import ClientBookingPage from '../pages/client/booking';
 import ClientPortfolioPage from '../pages/client/portfolio';
+import ClientReviewsPage from '../pages/client/reviews';
 import ClientChatPage from '../pages/client/chat';
 import ClientDiscountsPage from '../pages/client/discounts';
 import ClientSettingsPage from '../pages/client/settings';
@@ -198,6 +199,7 @@ export default function AppRoutes({
         <Route path="client" element={<ClientHomePage />} />
         <Route path="client/booking" element={<ClientBookingPage />} />
         <Route path="client/portfolio" element={<ClientPortfolioPage />} />
+        <Route path="client/reviews" element={<ClientReviewsPage />} />
         <Route path="client/chat" element={<ClientChatPage />} />
         <Route path="client/discounts" element={<ClientDiscountsPage />} />
         <Route path="client/settings" element={<ClientSettingsPage />} />
