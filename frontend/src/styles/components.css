@@ -5201,6 +5201,13 @@
   color: var(--color-gold, #D4AF37);
 }
 
+.client-chat-image {
+  display: block;
+  max-width: 100%;
+  border-radius: 10px;
+  margin: 8px 0;
+}
+
 .client-chat-composer {
   display: flex;
   align-items: flex-end;

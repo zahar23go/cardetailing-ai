@@ -40,6 +40,26 @@ type ChatMsg = {
   inspect?: DetailerInspect;
 };
 
+// Ответ Максима может содержать фото из портфолио в виде ![описание](url).
+function renderRichText(text: string) {
+  const parts = text.split(/(!\[[^\]]*\]\([^)]+\))/g);
+  return parts.map((part, i) => {
+    const image = part.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (image) {
+      return (
+        <img
+          key={i}
+          className="client-chat-image"
+          src={image[2]}
+          alt={image[1] || 'Фото работы'}
+          loading="lazy"
+        />
+      );
+    }
+    return part;
+  });
+}
+
 export default function ClientChatPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -141,6 +161,9 @@ export default function ClientChatPage() {
     setMessages((prev) => [...prev, { role: 'user', text: question }]);
     setInput('');
     setLoading(true);
+    const history = messages
+      .filter((m) => m.role === 'user' || m.role === 'ai')
+      .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
     const catalog = services.length
       ? services
       : ((await apiFetch<{ items: Service[] }>('/api/services?skip=0&limit=200')).items || []);
@@ -148,7 +171,10 @@ export default function ClientChatPage() {
     try {
       const data = await apiFetch<{ response: string }>('/api/ai/consultant', {
         method: 'POST',
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({
+          messages: [...history, { role: 'user', content: question }],
+          tz_offset: tzOffsetMinutes(),
+        }),
       });
       const offers = matchServicesFromText(`${question} ${data.response}`, catalog);
       setMessages((prev) => [...prev, { role: 'ai', text: data.response, offers }]);
@@ -305,7 +331,7 @@ export default function ClientChatPage() {
                       {msg.inspect ? 'AI детейлер' : 'AI консультант'}
                     </div>
                   )}
-                  <div className="client-chat-bubble-text">{msg.text}</div>
+                  <div className="client-chat-bubble-text">{renderRichText(msg.text)}</div>
                   {msg.inspect?.upsells.length ? (
                     <div className="client-chat-offers">
                       {msg.inspect.primary ? (

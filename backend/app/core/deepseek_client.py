@@ -104,3 +104,23 @@ async def get_consultant_response(question: str, services_context: str) -> str:
         return response.choices[0].message.content
     except Exception as e:
         return f"❌ Ошибка при обращении к AI: {str(e)}"
+
+
+async def chat_with_tools(
+    messages: list[dict],
+    tools: list[dict] | None = None,
+    *,
+    temperature: float = 0.7,
+    max_tokens: int = 1200,
+):
+    """Функциональный вызов (tool calling): возвращает объект message с .content/.tool_calls."""
+    kwargs: dict = {
+        "model": "deepseek-v4-flash",
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if tools:
+        kwargs["tools"] = tools
+    response = await client.chat.completions.create(**kwargs)
+    return response.choices[0].message

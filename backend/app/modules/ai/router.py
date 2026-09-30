@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status, Body, Request
 from fastapi.responses import StreamingResponse, Response
-from sqlalchemy import func, or_, select, update, delete
+from sqlalchemy import or_, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -28,7 +28,8 @@ from app.core.image_service import (
     delete_file_local,
     resolve_portfolio_url,
 )
-from app.core.deepseek_client import get_ai_response, get_financier_response, get_consultant_response
+from app.core.deepseek_client import get_ai_response, get_financier_response
+from app.modules.ai.chat_service import run_consultant_chat
 from app.models import *  # noqa: F401,F403
 from app.schemas import *  # noqa: F401,F403
 
@@ -152,55 +153,30 @@ async def ai_financier_brief(
     tenant_id = UUID(current_user["tenant_id"])
     return await build_financier_brief(db, tenant_id)
 
-@router.post("/api/ai/consultant", response_model=FinancierResponse)
+@router.post("/api/ai/consultant", response_model=ChatResponse)
 async def ai_consultant(
-    request: FinancierRequest,
+    request: ConsultantChatRequest,
     current_user: dict = Depends(_get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """AI-консультант для клиентов: помогает выбрать услуги, отвечает на вопросы."""
+    """AI-консультант (Максим): промпт читается из prompts/detailer.yaml.
+
+    История диалога приходит от клиента; сервер без состояния. Промпт и набор
+    функций берутся из файла на каждом запросе (hot-reload без пересборки).
+    """
     tenant_id = UUID(current_user["tenant_id"])
+    messages = [message.model_dump() for message in request.messages]
+    if not messages and request.question:
+        messages = [{"role": "user", "content": request.question}]
 
-    # Загружаем все услуги салона
-    services_result = await db.execute(
-        select(Service).where(
-            Service.is_active == True,
-            Service.tenant_id == tenant_id,
-        ).order_by(Service.name)
+    result = await run_consultant_chat(
+        db,
+        tenant_id,
+        current_user,
+        messages,
+        tz_offset=request.tz_offset,
     )
-    services = services_result.scalars().all()
-
-    # Загружаем количество фото в портфолио по каждой услуге
-    portfolio_counts: dict[int, int] = {}
-    if services:
-        sids = [s.id for s in services]
-        count_result = await db.execute(
-            select(Photo.service_id, func.count(Photo.id))
-            .where(
-                Photo.tenant_id == tenant_id,
-                Photo.entity_type == "portfolio",
-                Photo.service_id.in_(sids),
-            )
-            .group_by(Photo.service_id)
-        )
-        for row in count_result.all():
-            portfolio_counts[row[0]] = row[1]
-
-    # Формируем контекст услуг
-    services_lines = []
-    for s in services:
-        cat = s.category or "Без категории"
-        photo_count = portfolio_counts.get(s.id, 0)
-        photo_hint = f", фото в портфолио: {photo_count}" if photo_count else ""
-        services_lines.append(
-            f"• {s.name} (категория: {cat}) — {s.price} руб., ~{s.duration} мин., "
-            f"описание: {s.description or '—'}{photo_hint}"
-        )
-
-    services_context = "\n".join(services_lines) if services_lines else "Услуги временно не загружены."
-
-    response = await get_consultant_response(request.question, services_context)
-    return FinancierResponse(response=response)
+    return ChatResponse(response=result["response"])
 
 
 async def _owned_photo_ids(

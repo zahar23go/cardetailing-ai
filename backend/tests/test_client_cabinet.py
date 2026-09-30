@@ -162,9 +162,9 @@ class TestClientCabinetE2E:
 
         fake_ai = f"Рекомендуем {test_service.name}. Можете записаться."
         with patch(
-            "app.modules.ai.router.get_consultant_response",
+            "app.modules.ai.router.run_consultant_chat",
             new_callable=AsyncMock,
-            return_value=fake_ai,
+            return_value={"response": fake_ai},
         ):
             for path in CLIENT_PAGES:
                 for method, url in page_calls[path]:

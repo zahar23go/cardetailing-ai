@@ -36,11 +36,14 @@ services:
       DATABASE_URL: postgresql://cardetailing:cardetailing@db:5432/cardetailing
       JWT_SECRET: ${JWT_SECRET}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      PROMPTS_DIR: /app/prompts
     ports:
       - "8000:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend:/app
+      # Промпты правятся в репозитории и подхватываются на лету (hot-reload).
+      - ./prompts:/app/prompts:ro
 
   # ================================================================
   # Frontend — React + Vite

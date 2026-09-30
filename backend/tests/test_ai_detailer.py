@@ -19,13 +19,13 @@ class TestAIDetailer:
     ):
         fake = "Рекомендуем комплексную мойку."
         with patch(
-            "app.modules.ai.router.get_consultant_response",
+            "app.modules.ai.router.run_consultant_chat",
             new_callable=AsyncMock,
-            return_value=fake,
+            return_value={"response": fake},
         ):
             resp = await client.post(
                 "/api/ai/consultant",
-                json={"question": "Что есть в каталоге?"},
+                json={"messages": [{"role": "user", "content": "Что есть в каталоге?"}]},
                 headers=auth_headers,
             )
         assert resp.status_code == 200
