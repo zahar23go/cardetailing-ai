@@ -29,6 +29,7 @@ from app.core.image_service import (
     resolve_portfolio_url,
 )
 from app.core.deepseek_client import get_ai_response, get_financier_response
+from app.core.prompt_loader import prompt_path
 from app.modules.ai.chat_service import run_consultant_chat
 from app.models import *  # noqa: F401,F403
 from app.schemas import *  # noqa: F401,F403
@@ -46,8 +47,23 @@ async def ai_financier(
     current_user: dict = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """AI-финансист: аналитика бизнеса + рекомендации."""
+    """AI-финансист: аналитика бизнеса + рекомендации.
+
+    Если в prompts/ есть financier.yaml — отвечает prompt-driven ассистент
+    (run_consultant_chat + функции финансиста), иначе — прежний get_financier_response.
+    """
     tenant_id = UUID(current_user["tenant_id"])
+
+    if prompt_path("financier").is_file():
+        result = await run_consultant_chat(
+            db,
+            tenant_id,
+            current_user,
+            [{"role": "user", "content": request.question}],
+            prompt_name="financier",
+        )
+        return FinancierResponse(response=result["response"])
+
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

@@ -55,8 +55,12 @@ class TestFinancierEndpoint:
         test_car,
         test_master,
         fixture_data,
+        monkeypatch,
     ):
-        """Эндпоинт собирает KPI и передаёт их в get_financier_response."""
+        """Эндпоинт собирает KPI и передаёт их в get_financier_response (legacy-ветка)."""
+        # prompts/financier.yaml существует → по умолчанию эндпоинт идёт в prompt-driven ветку.
+        # Форсируем legacy: проверяем сбор контекста и вызов get_financier_response.
+        monkeypatch.setattr("app.modules.ai.router.prompt_path", lambda name: Path("/nonexistent.yaml"))
         now = datetime.now(timezone.utc)
         appt = Appointment(
             client_id=test_user.id,

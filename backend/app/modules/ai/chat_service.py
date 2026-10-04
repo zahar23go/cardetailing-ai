@@ -19,9 +19,16 @@ from app.core.deepseek_client import chat_with_tools
 from app.core.prompt_loader import load_prompt
 from app.models import MasterSkill, User
 from app.modules.ai.detailer_service import load_catalog
-from app.modules.ai.detailer_tools import DetailerTools, dispatch
+from app.modules.ai.detailer_tools import DetailerTools, dispatch as detailer_dispatch
+from app.modules.ai.financier_tools import FinancierTools, dispatch as financier_dispatch
 
 MAX_TOOL_ITERATIONS = 5
+
+# Имя промпта → (класс инструментов, диспетчер). detailer — режим по умолчанию.
+TOOL_RUNNERS = {
+    "detailer": (DetailerTools, detailer_dispatch),
+    "financier": (FinancierTools, financier_dispatch),
+}
 
 
 def build_tools(functions: list[dict] | None) -> list[dict]:
@@ -131,7 +138,8 @@ async def run_consultant_chat(
             chat_messages.append({"role": role, "content": content})
 
     tools = build_tools(section.get("functions"))
-    runner = DetailerTools(db, tenant_id, client, tz_offset)
+    runner_cls, dispatcher = TOOL_RUNNERS.get(prompt_name, TOOL_RUNNERS["detailer"])
+    runner = runner_cls(db, tenant_id, client, tz_offset)
     last_text = ""
 
     for _ in range(MAX_TOOL_ITERATIONS):
@@ -146,7 +154,7 @@ async def run_consultant_chat(
 
         chat_messages.append(_assistant_tool_message(message))
         for call in tool_calls:
-            result = await dispatch(runner, call.function.name, _parse_arguments(call))
+            result = await dispatcher(runner, call.function.name, _parse_arguments(call))
             chat_messages.append(
                 {
                     "role": "tool",
