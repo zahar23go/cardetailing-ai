@@ -1,0 +1,69 @@
+# Prod-стек CarDetailing AI.
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Остановка:
+#   docker compose -f docker-compose.prod.yml down
+#
+# Переменные (JWT_SECRET, DEEPSEEK_API_KEY, POSTGRES_*) берутся из .env в корне репозитория.
+services:
+  # ================================================================
+  # Database — PostgreSQL 15
+  # ================================================================
+  db:
+    image: postgres:15
+    container_name: cardetailing_db_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cardetailing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cardetailing}
+      POSTGRES_DB: ${POSTGRES_DB:-cardetailing}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cardetailing}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ================================================================
+  # Backend — FastAPI (образ собирается из корня репозитория:
+  # копируются backend/ и prompts/, см. backend/Dockerfile.prod)
+  # ================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.prod
+    container_name: cardetailing_backend_prod
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cardetailing}:${POSTGRES_PASSWORD:-cardetailing}@db:5432/${POSTGRES_DB:-cardetailing}
+      JWT_SECRET: ${JWT_SECRET}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      PROMPTS_DIR: /app/prompts
+    volumes:
+      # Загрузки (фото) — общий том с фронтендом, чтобы nginx отдавал /uploads/.
+      - uploads_data:/app/uploads
+
+  # ================================================================
+  # Frontend — React (сборка) + nginx (раздача; /api/ проксирует на backend:8000)
+  # ================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: cardetailing_frontend_prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    volumes:
+      - uploads_data:/app/uploads:ro
+
+volumes:
+  postgres_data:
+  uploads_data:

@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build backend image
-        run: docker build -t cardetailing-backend:latest -f backend/Dockerfile.prod backend/
+        run: docker build -t cardetailing-backend:latest -f backend/Dockerfile.prod .
 
       - name: Build frontend image
         run: |

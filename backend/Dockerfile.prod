@@ -6,10 +6,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+# Оптимизация слоёв: сначала только зависимости.
+# Контекст сборки — корень репозитория (см. .github/workflows/deploy.yml).
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY backend/ .
+
+# Промпты лежат в корне репозитория — копируем в образ, чтобы hot-reload читал их из /app/prompts.
+COPY prompts/ /app/prompts/
+ENV PROMPTS_DIR=/app/prompts
 
 RUN adduser --disabled-password --gecos '' appuser
 USER appuser

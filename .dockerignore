@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Frontend build
+frontend/dist/
+frontend/.vite/
+frontend/node_modules/
+
+# Загрузки и бэкапы
+backend/uploads/
+backend/app/_legacy_backup/
+backend/server.log
+backend/tests/
+
+# Git
+.git/
+.gitignore
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Окружение и секреты
+.env
+.env.*
+*.env
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Прочее
+*.log
+*.pdf
+.DS_Store
+Thumbs.db
+README.md
+docs/
