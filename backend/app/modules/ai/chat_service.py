@@ -21,6 +21,7 @@ from app.models import MasterSkill, User
 from app.modules.ai.detailer_service import load_catalog
 from app.modules.ai.detailer_tools import DetailerTools, dispatch as detailer_dispatch
 from app.modules.ai.financier_tools import FinancierTools, dispatch as financier_dispatch
+from app.modules.ai.tool_text import extract_tool_calls, strip_tool_markup
 
 MAX_TOOL_ITERATIONS = 5
 
@@ -109,6 +110,50 @@ def _parse_arguments(call) -> dict:
         return {}
 
 
+def _normalize_message(message) -> tuple[list[dict], dict | None, str]:
+    """Привести ответ модели к единому виду.
+
+    Вызов функции может прийти двумя способами: структурно (``message.tool_calls``)
+    или служебной разметкой прямо в тексте. Во втором случае парсим разметку, чтобы
+    выполнить вызов, и вырезаем её, чтобы не показать клиенту.
+
+    Возвращает ``(вызовы, assistant-сообщение, сырой текст)``.
+    """
+    text = message.content or ""
+    structured = getattr(message, "tool_calls", None)
+    if structured:
+        calls = [
+            {"id": call.id, "name": call.function.name, "arguments": _parse_arguments(call)}
+            for call in structured
+        ]
+        return calls, _assistant_tool_message(message), text
+
+    parsed = extract_tool_calls(text)
+    if parsed:
+        calls = [
+            {"id": f"call_text_{i}", "name": item["name"], "arguments": item["arguments"]}
+            for i, item in enumerate(parsed)
+        ]
+        assistant_message = {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": call["id"],
+                    "type": "function",
+                    "function": {
+                        "name": call["name"],
+                        "arguments": json.dumps(call["arguments"], ensure_ascii=False),
+                    },
+                }
+                for call in calls
+            ],
+        }
+        return calls, assistant_message, text
+
+    return [], None, text
+
+
 async def run_consultant_chat(
     db: AsyncSession,
     tenant_id: UUID,
@@ -148,24 +193,27 @@ async def run_consultant_chat(
         except Exception as exc:  # сеть/ключ/лимиты — не роняем чат
             return {"response": last_text or f"Ошибка при обращении к AI: {exc}"}
 
-        tool_calls = getattr(message, "tool_calls", None)
-        if not tool_calls:
-            return {"response": message.content or last_text or greeting}
+        calls, assistant_message, text = _normalize_message(message)
+        if not calls:
+            return {"response": strip_tool_markup(text) or last_text or greeting}
 
-        chat_messages.append(_assistant_tool_message(message))
-        for call in tool_calls:
-            result = await dispatcher(runner, call.function.name, _parse_arguments(call))
+        chat_messages.append(assistant_message)
+        for call in calls:
+            try:
+                result = await dispatcher(runner, call["name"], call["arguments"])
+            except Exception as exc:  # неверные аргументы вызова не должны ронять чат
+                result = {"ok": False, "error": f"Функция '{call['name']}' вызвана неверно: {exc}"}
             chat_messages.append(
                 {
                     "role": "tool",
-                    "tool_call_id": call.id,
+                    "tool_call_id": call["id"],
                     "content": json.dumps(result, ensure_ascii=False, default=str),
                 }
             )
-        last_text = message.content or last_text
+        last_text = strip_tool_markup(text) or last_text
 
     try:
         message = await chat_with_tools(chat_messages, None)
-        return {"response": message.content or last_text}
+        return {"response": strip_tool_markup(message.content) or last_text}
     except Exception as exc:
         return {"response": last_text or f"Ошибка при обращении к AI: {exc}"}
