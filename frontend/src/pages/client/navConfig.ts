@@ -12,7 +12,7 @@ export const CLIENT_NAV: { key: ClientTabKey; path: string; label: string; icon:
   { key: 'booking', path: '/client/booking', label: 'Запись', icon: 'calendar', module: 'appointments' },
   { key: 'portfolio', path: '/client/portfolio', label: 'Портфолио', icon: 'camera', module: 'photos' },
   { key: 'reviews', path: '/client/reviews', label: 'Отзывы', icon: 'star', module: 'reviews' },
-  { key: 'chat', path: '/client/chat', label: 'Детейлер', icon: 'chat', module: 'ai' },
+  { key: 'chat', path: '/client/chat', label: 'ИИ Макс — ответит на все вопросы', icon: 'chat', module: 'ai' },
   { key: 'discounts', path: '/client/discounts', label: 'Скидки', icon: 'gift', module: 'discounts' },
   { key: 'settings', path: '/client/settings', label: 'Профиль', icon: 'user' },
 ];

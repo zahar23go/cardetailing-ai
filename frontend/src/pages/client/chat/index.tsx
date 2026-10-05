@@ -223,7 +223,7 @@ export default function ClientChatPage() {
     <>
       <div className="client-section-head">
         <div>
-          <h3>Детейлер</h3>
+          <h3>ИИ Макс — ответит на все вопросы</h3>
           <Badge variant="gold">Оценка, допродажи, запись</Badge>
         </div>
         <Button
@@ -300,7 +300,7 @@ export default function ClientChatPage() {
           {showSuggestions && !messages.length ? (
             <div className="client-chat-empty">
               <div className="client-chat-empty-icon"><BulbOutlined /></div>
-              <div className="client-chat-empty-title">Детейлер знает каталог и загрузку боксов</div>
+              <div className="client-chat-empty-title">ИИ Макс знает каталог и загрузку боксов</div>
               <div className="client-chat-empty-hint">
                 Отметьте состояние авто или спросите про технологию — запишем на свободный слот
               </div>
@@ -328,7 +328,7 @@ export default function ClientChatPage() {
                 <div className="client-chat-bubble">
                   {msg.role === 'ai' && (
                     <div className="client-chat-bubble-label">
-                      {msg.inspect ? 'AI детейлер' : 'AI консультант'}
+                      {msg.inspect ? 'ИИ Макс' : 'AI консультант'}
                     </div>
                   )}
                   <div className="client-chat-bubble-text">{renderRichText(msg.text)}</div>
@@ -389,7 +389,7 @@ export default function ClientChatPage() {
                 <BulbOutlined />
               </div>
               <div className="client-chat-bubble">
-                <div className="client-chat-bubble-label">AI детейлер</div>
+                <div className="client-chat-bubble-label">ИИ Макс</div>
                 <div className="client-chat-bubble-text is-typing">
                   {inspecting ? 'Сверяю каталог и свободные боксы…' : 'Подбираю ответ…'}
                 </div>

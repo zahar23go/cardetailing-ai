@@ -138,7 +138,7 @@ export default function ClientHomePage() {
       ) : (
         <Card variant="admin" className="client-block">
           <div className="client-appt-name">Добавьте ваш автомобиль</div>
-          <Text className="text-titanium">BMW, госномер, фото — чтобы Детейлер знал машину.</Text>
+          <Text className="text-titanium">BMW, госномер, фото — чтобы ИИ Макс знал машину.</Text>
           <div className="client-section-actions" style={{ marginTop: 12 }}>
             <Button type="primary" look="gold" onClick={() => navigate('/client/settings')}>
               Добавить авто

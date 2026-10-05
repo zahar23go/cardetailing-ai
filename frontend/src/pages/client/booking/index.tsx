@@ -183,7 +183,7 @@ export default function ClientBookingPage() {
         <div>
           <h3>Запись</h3>
           <Badge variant="gold">
-            {inspectId ? 'Сводка детейлера уйдёт мастеру' : 'Услуга, мастер, дата и время'}
+            {inspectId ? 'Сводка ИИ Макса уйдёт мастеру' : 'Услуга, мастер, дата и время'}
           </Badge>
         </div>
       </div>
