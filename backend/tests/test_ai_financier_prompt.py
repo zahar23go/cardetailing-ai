@@ -1,7 +1,7 @@
-"""Тесты финансового ассистента: загрузка промпта, mock-функции, chat_service, эндпоинт.
+"""Тесты финансового ассистента: загрузка промпта, базовые функции, chat_service, эндпоинт.
 
-prompts/financier.yaml ещё не написан — файл подменяется через tmp PROMPTS_DIR,
-а эндпоинт проверяется и на legacy-ветке, и на prompt-driven ветке.
+Промпт подменяется через tmp PROMPTS_DIR, эндпоинт проверяется на legacy- и prompt-driven ветках.
+Развёрнутые тесты реальных расчётов — в test_ai_financier_tools.py.
 """
 
 from unittest.mock import AsyncMock
@@ -64,23 +64,34 @@ class TestFinancierPromptLoader:
 
 
 # --------------------------------------------------------------- functions
-class TestFinancierMockFunctions:
-    async def test_mock_shapes(self, db_session, default_tenant, test_user):
+class TestFinancierToolsEmptyDb:
+    """На пустой БД функции не падают и возвращают нулевые/пустые значения."""
+
+    async def test_empty_db_returns_zeros(self, db_session, default_tenant, test_user):
         tools = FinancierTools(db_session, default_tenant.id, _client(test_user, default_tenant))
-        assert await tools.get_kpi() == {"revenue": 0, "occupancy": 0, "retention": 0}
-        assert await tools.get_revenue_breakdown() == {"services": [], "masters": [], "days": []}
-        assert await tools.get_occupancy() == {"salon": 0, "masters": []}
-        assert await tools.get_customer_retention() == {"cohorts": []}
-        assert await tools.forecast() == {"revenue": 0, "occupancy": 0}
+
+        kpi = await tools.get_kpi()
+        assert kpi["revenue"] == 0
+        assert kpi["occupancy"] == 0
+        assert kpi["retention"] == 0
+
+        breakdown = await tools.get_revenue_breakdown()
+        assert breakdown["services"] == [] and breakdown["masters"] == [] and breakdown["days"] == []
+
+        occupancy = await tools.get_occupancy()
+        assert occupancy["salon"] == 0 and occupancy["masters"] == []
+
+        retention = await tools.get_customer_retention()
+        assert isinstance(retention["cohorts"], list)
+
+        forecast = await tools.forecast()
+        assert forecast["revenue"] == 0 and forecast["occupancy"] == 0
 
     async def test_dispatch_routes_and_tolerates_args(self, db_session, default_tenant, test_user):
         tools = FinancierTools(db_session, default_tenant.id, _client(test_user, default_tenant))
-        # Лишние аргументы от модели не ломают заглушку.
-        assert await dispatch(tools, "get_kpi", {"period": "month"}) == {
-            "revenue": 0,
-            "occupancy": 0,
-            "retention": 0,
-        }
+        # Возвращает словарь с ключами KPI и не падает на лишних аргументах модели.
+        result = await dispatch(tools, "get_kpi", {"period": "month"})
+        assert {"revenue", "occupancy", "retention"} <= set(result)
         assert (await dispatch(tools, "launch_rocket", {}))["ok"] is False
 
 
