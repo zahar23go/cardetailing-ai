@@ -99,7 +99,8 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET: str = "v0JyqT6MUks2G-GM4UB-BKJva1iyZssWxOhNqSzgMko"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 30
+    # Срок жизни JWT access-token, минуты. 480 = 8 часов (временно увеличено с 30).
+    JWT_EXPIRE_MINUTES: int = 480
 
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
