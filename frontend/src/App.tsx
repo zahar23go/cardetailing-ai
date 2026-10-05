@@ -4,6 +4,7 @@ import { message } from 'antd';
 import AppRoutes, { type AppUser } from './routes';
 import { EnabledModulesProvider } from './ModulesContext';
 import { PLAN_UPDATED_EVENT } from './pages/settings/tariffs';
+import { AUTH_EXPIRED_EVENT } from './pages/client/api';
 import PwaInstallBanner from './PwaInstallBanner';
 import { applyPwaBrand, hidePwaSplash, type PwaBrand } from './pwa';
 
@@ -81,6 +82,16 @@ function App() {
     };
     window.addEventListener(PLAN_UPDATED_EVENT, onPlan);
     return () => window.removeEventListener(PLAN_UPDATED_EVENT, onPlan);
+  }, []);
+
+  useEffect(() => {
+    const onExpired = () => {
+      localStorage.removeItem('token');
+      setUser(null);
+      setIsAuthenticated(false);
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
   }, []);
 
   useEffect(() => {

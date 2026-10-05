@@ -1,6 +1,10 @@
 /**
  * Общий fetch и типы клиентского кабинета.
  */
+
+/** Событие истечения сессии: App по нему разлогинивает и показывает экран входа. */
+export const AUTH_EXPIRED_EVENT = 'auth:expired';
+
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token');
   const headers = new Headers(options?.headers);
@@ -10,6 +14,11 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const res = await fetch(path, { ...options, headers });
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+      throw new Error('Сессия истекла — войдите заново.');
+    }
     const body = await res.json().catch(() => ({}));
     const detail = (body as { detail?: unknown }).detail;
     const msg = Array.isArray(detail)
