@@ -169,6 +169,28 @@ async def ai_financier_brief(
     tenant_id = UUID(current_user["tenant_id"])
     return await build_financier_brief(db, tenant_id)
 
+@router.post("/api/ai/manager", response_model=ChatResponse)
+async def ai_manager(
+    request: ManagerRequest,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """AI-управляющий студией: расписание, загрузка боксов и мастеров, операционка.
+
+    Промпт и функции берутся из prompts/manager.yaml (hot-reload без пересборки).
+    """
+    tenant_id = UUID(current_user["tenant_id"])
+    result = await run_consultant_chat(
+        db,
+        tenant_id,
+        current_user,
+        [{"role": "user", "content": request.question}],
+        tz_offset=request.tz_offset,
+        prompt_name="manager",
+    )
+    return ChatResponse(response=result["response"])
+
+
 @router.post("/api/ai/consultant", response_model=ChatResponse)
 async def ai_consultant(
     request: ConsultantChatRequest,

@@ -40,6 +40,12 @@ class FinancierResponse(BaseModel):
     response: str
 
 
+class ManagerRequest(BaseModel):
+    """Запрос к ИИ-управляющему студией (админ): операционный вопрос."""
+    question: str = Field(..., min_length=1, max_length=2000)
+    tz_offset: int = Field(0, ge=-840, le=840, description="Минуты к востоку от UTC")
+
+
 class FinancierWeatherDayOut(BaseModel):
     date: str
     t_max: float
