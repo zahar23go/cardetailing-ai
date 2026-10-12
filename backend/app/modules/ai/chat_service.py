@@ -22,6 +22,7 @@ from app.modules.ai.detailer_service import load_catalog
 from app.modules.ai.detailer_tools import DetailerTools, dispatch as detailer_dispatch
 from app.modules.ai.financier_tools import FinancierTools, dispatch as financier_dispatch
 from app.modules.ai.manager_tools import ManagerTools, dispatch as manager_dispatch
+from app.modules.ai.admin_tools import AdminTools, dispatch as admin_dispatch
 from app.modules.ai.tool_text import extract_tool_calls, strip_tool_markup
 
 MAX_TOOL_ITERATIONS = 5
@@ -31,6 +32,7 @@ TOOL_RUNNERS = {
     "detailer": (DetailerTools, detailer_dispatch),
     "financier": (FinancierTools, financier_dispatch),
     "manager": (ManagerTools, manager_dispatch),
+    "admin": (AdminTools, admin_dispatch),
 }
 
 
