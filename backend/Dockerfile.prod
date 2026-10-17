@@ -17,7 +17,12 @@ COPY backend/ .
 COPY prompts/ /app/prompts/
 ENV PROMPTS_DIR=/app/prompts
 
-RUN adduser --disabled-password --gecos '' appuser
+# appuser — non-root. /app/uploads создаём заранее и отдаём ему: при первом
+# монтировании именованного тома Docker копирует права каталога из образа,
+# поэтому appuser сможет писать в /app/uploads.
+RUN adduser --disabled-password --gecos '' appuser \
+    && mkdir -p /app/uploads \
+    && chown -R appuser:appuser /app/uploads
 USER appuser
 
 EXPOSE 8000

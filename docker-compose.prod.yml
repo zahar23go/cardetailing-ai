@@ -43,9 +43,14 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cardetailing}:${POSTGRES_PASSWORD:-cardetailing}@db:5432/${POSTGRES_DB:-cardetailing}
       JWT_SECRET: ${JWT_SECRET}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      SMS_PROVIDER: ${SMS_PROVIDER:-smsru}
+      SMS_API_KEY: ${SMS_API_KEY:-}
+      SMS_SENDER: ${SMS_SENDER:-CarDetailing}
       PROMPTS_DIR: /app/prompts
     volumes:
       # Загрузки (фото) — общий том с фронтендом, чтобы nginx отдавал /uploads/.
+      # Владелец каталога appuser задаётся в образе: при создании нового тома
+      # Docker копирует права из /app/uploads (Dockerfile.prod).
       - uploads_data:/app/uploads
 
   # ================================================================

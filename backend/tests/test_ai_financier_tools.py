@@ -194,6 +194,26 @@ class TestForecast:
         assert data["occupancy"] >= 0
 
 
+class TestPercentPrecision:
+    async def test_percentages_are_percent_not_fraction(
+        self, db_session, default_tenant, test_user, test_master, test_service, test_car,
+    ):
+        box = await _make_box(db_session, default_tenant)
+        now = datetime.now(timezone.utc)
+        db_session.add(_appointment(
+            default_tenant, client=test_user, car=test_car, service=test_service,
+            master=test_master, box=box, start=now - timedelta(hours=1), minutes=120,
+        ))
+        await db_session.commit()
+
+        data = await _tools(db_session, default_tenant, test_user).get_occupancy(period="day")
+
+        # 120 мин при ёмкости бокса 540 мин → 22.22%, а не доля 0.22.
+        assert data["salon"] == 22.22
+        assert data["load"]["salon_pct"] == 22.22
+        assert data["masters"][0]["occupancy"] == 22.2  # точность из analytics.spec
+
+
 class TestDispatch:
     async def test_dispatch_unknown_function(self, db_session, default_tenant, test_user):
         from app.modules.ai.financier_tools import dispatch

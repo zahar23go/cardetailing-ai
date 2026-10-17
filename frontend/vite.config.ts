@@ -18,4 +18,22 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // antd — один крупный vendor-чанк (~1.2 МБ, 363 КБ gzip): это сама библиотека.
+    // Код приложения разбит по роутам (React.lazy), поэтому порог предупреждения
+    // поднят под размер вендора, а не под размер приложения.
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        // Крупные библиотеки — отдельными чанками: кэшируются и грузятся параллельно.
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'antd-vendor': ['antd'],
+          'icons-vendor': ['@ant-design/icons'],
+          'charts-vendor': ['recharts'],
+          'motion-vendor': ['framer-motion'],
+        },
+      },
+    },
+  },
 });

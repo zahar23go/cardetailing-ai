@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import AppRoutes, { type AppUser } from './routes';
@@ -198,14 +198,16 @@ function App() {
       features={user?.features}
       plan={user?.plan}
     >
-      <AppRoutes
-        isAuthenticated={isAuthenticated}
-        user={user}
-        onLogin={handleLogin}
-        onRegistered={handleRegistered}
-        onLogout={handleLogout}
-        navigateToRegister={() => navigate('/register')}
-      />
+      <Suspense fallback={<div style={{ padding: 48, textAlign: 'center' }}>Загрузка…</div>}>
+        <AppRoutes
+          isAuthenticated={isAuthenticated}
+          user={user}
+          onLogin={handleLogin}
+          onRegistered={handleRegistered}
+          onLogout={handleLogout}
+          navigateToRegister={() => navigate('/register')}
+        />
+      </Suspense>
       {isAuthenticated ? <PwaInstallBanner /> : null}
     </EnabledModulesProvider>
   );

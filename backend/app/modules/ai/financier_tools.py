@@ -85,6 +85,15 @@ def _horizon_days(horizon: str | None) -> int:
     return int(digits) if digits else 30
 
 
+def _percent(value: float) -> float:
+    """Проценты (0..100) с точностью до 2 знаков.
+
+    Функции всегда отдают проценты, а не доли: модель не должна сама
+    пересчитывать 0.83 в 83% и терять точность при округлении.
+    """
+    return round(value, 2)
+
+
 class FinancierTools:
     """Диспетчер функций финансиста: реальные агрегаты по БД (tenant-scoped)."""
 
@@ -123,18 +132,23 @@ class FinancierTools:
         spec = await build_spec(self.db, self.tenant_id, load_days=load_days)
         busy = sum(b.busy_minutes for b in spec.boxes)
         capacity = sum(b.capacity_minutes for b in spec.boxes)
-        salon = round(100.0 * busy / capacity, 1) if capacity else 0.0
+        salon = _percent(100.0 * busy / capacity) if capacity else 0.0
         masters = [
             {
                 "name": m.name,
-                "occupancy": m.occupancy_pct,
+                "occupancy": _percent(m.occupancy_pct),
                 "busy_minutes": m.busy_minutes,
                 "capacity_minutes": m.capacity_minutes,
                 "appointments": m.appointments,
             }
             for m in spec.masters
         ]
-        return salon, masters, {"boxes": len(spec.boxes), "busy_minutes": busy, "capacity_minutes": capacity}
+        return salon, masters, {
+            "boxes": len(spec.boxes),
+            "busy_minutes": busy,
+            "capacity_minutes": capacity,
+            "salon_pct": salon,
+        }
 
     async def _retention(self, start: datetime, end: datetime) -> dict:
         """Доля клиентов с повторными визитами (по разным месяцам) за окно."""
@@ -154,7 +168,7 @@ class FinancierTools:
         total = len(months_by_client)
         repeat = sum(1 for months in months_by_client.values() if len(months) >= 2)
         return {
-            "rate": round(100.0 * repeat / total, 1) if total else 0.0,
+            "rate": _percent(100.0 * repeat / total) if total else 0.0,
             "returning_clients": repeat,
             "total_clients": total,
         }
@@ -249,7 +263,7 @@ class FinancierTools:
                 "cohort": c.cohort,
                 "size": c.size,
                 "cells": [
-                    {"offset": cell.offset, "clients": cell.clients, "rate": cell.rate}
+                    {"offset": cell.offset, "clients": cell.clients, "rate": _percent(cell.rate)}
                     for cell in c.cells
                 ],
             }

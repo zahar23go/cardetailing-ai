@@ -6,7 +6,6 @@ All PostgreSQL-specific types (UUID, JSONB) are patched
 to work with SQLite via @compiles decorators.
 """
 
-import asyncio
 import os
 import sys
 from datetime import datetime, timezone, timedelta
@@ -83,14 +82,6 @@ TestSessionLocal = async_sessionmaker(
 # =========================================================================
 # Fixtures
 # =========================================================================
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create a single event loop for the entire test session."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_db():
