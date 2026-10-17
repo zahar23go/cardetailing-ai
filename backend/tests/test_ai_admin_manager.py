@@ -6,12 +6,16 @@ from app.modules.ai import router as ai_router
 def _capture(monkeypatch):
     calls: list[dict] = []
 
-    async def fake(db, tenant_id, user, messages, tz_offset=0, prompt_name="detailer"):
+    async def fake(
+        db, tenant_id, user, messages,
+        tz_offset=0, prompt_name="detailer", session_id=None,
+    ):
         calls.append(
             {
                 "messages": messages,
                 "tz_offset": tz_offset,
                 "prompt_name": prompt_name,
+                "session_id": session_id,
             }
         )
         return {"response": "ok"}
@@ -70,7 +74,7 @@ class TestManagerChat:
 
         res = await client.post(
             "/api/ai/manager",
-            json={"messages": messages, "tz_offset": 180},
+            json={"messages": messages, "tz_offset": 180, "session_id": "s-77"},
             headers=admin_headers,
         )
 
@@ -78,6 +82,7 @@ class TestManagerChat:
         assert res.json() == {"response": "ok"}
         assert calls[0]["prompt_name"] == "manager"
         assert calls[0]["messages"] == messages
+        assert calls[0]["session_id"] == "s-77"
         assert calls[0]["tz_offset"] == 180
 
     async def test_question_only_still_supported(self, client, admin_headers, monkeypatch):

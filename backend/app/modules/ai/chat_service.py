@@ -9,7 +9,8 @@
 from __future__ import annotations
 
 import json
-from uuid import UUID
+from time import perf_counter
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,7 @@ from sqlalchemy.orm import selectinload
 from app.core.deepseek_client import chat_with_tools
 from app.core.prompt_loader import load_prompt
 from app.models import MasterSkill, User
+from app.modules.ai.analytics_service import log_turn
 from app.modules.ai.detailer_service import load_catalog
 from app.modules.ai.detailer_tools import DetailerTools, dispatch as detailer_dispatch
 from app.modules.ai.financier_tools import FinancierTools, dispatch as financier_dispatch
@@ -158,7 +160,7 @@ def _normalize_message(message) -> tuple[list[dict], dict | None, str]:
     return [], None, text
 
 
-async def run_consultant_chat(
+async def _run_chat_pipeline(
     db: AsyncSession,
     tenant_id: UUID,
     client: dict,
@@ -166,12 +168,13 @@ async def run_consultant_chat(
     *,
     tz_offset: int = 0,
     prompt_name: str = "detailer",
-) -> dict:
+    used_tools: list[str] | None = None,
+) -> tuple[str, bool]:
     """Прогнать ход диалога через промпт из файла и вернуть ответ консультанта."""
     try:
         section = load_prompt(prompt_name)
     except (FileNotFoundError, ValueError) as exc:
-        return {"response": f"Промпт «{prompt_name}» недоступен: {exc}"}
+        return f"Промпт «{prompt_name}» недоступен: {exc}", True
 
     catalog = await build_catalog_context(db, tenant_id)
     system_content = f"{section.get('system', '').strip()}\n\n{catalog}"
@@ -195,14 +198,16 @@ async def run_consultant_chat(
         try:
             message = await chat_with_tools(chat_messages, tools)
         except Exception as exc:  # сеть/ключ/лимиты — не роняем чат
-            return {"response": last_text or f"Ошибка при обращении к AI: {exc}"}
+            return last_text or f"Ошибка при обращении к AI: {exc}", True
 
         calls, assistant_message, text = _normalize_message(message)
         if not calls:
-            return {"response": strip_tool_markup(text) or last_text or greeting}
+            return strip_tool_markup(text) or last_text or greeting, False
 
         chat_messages.append(assistant_message)
         for call in calls:
+            if used_tools is not None and call["name"] not in used_tools:
+                used_tools.append(call["name"])
             try:
                 result = await dispatcher(runner, call["name"], call["arguments"])
             except Exception as exc:  # неверные аргументы вызова не должны ронять чат
@@ -218,6 +223,48 @@ async def run_consultant_chat(
 
     try:
         message = await chat_with_tools(chat_messages, None)
-        return {"response": strip_tool_markup(message.content) or last_text}
+        return strip_tool_markup(message.content) or last_text, False
     except Exception as exc:
-        return {"response": last_text or f"Ошибка при обращении к AI: {exc}"}
+        return last_text or f"Ошибка при обращении к AI: {exc}", True
+
+
+async def run_consultant_chat(
+    db: AsyncSession,
+    tenant_id: UUID,
+    client: dict,
+    messages: list[dict],
+    *,
+    tz_offset: int = 0,
+    prompt_name: str = "detailer",
+    session_id: str | None = None,
+) -> dict:
+    """Ответ ассистента + запись хода в аналитику диалогов (best-effort)."""
+    started = perf_counter()
+    used_tools: list[str] = []
+    text, is_error = await _run_chat_pipeline(
+        db,
+        tenant_id,
+        client,
+        messages,
+        tz_offset=tz_offset,
+        prompt_name=prompt_name,
+        used_tools=used_tools,
+    )
+    question = next(
+        (m.get("content", "") for m in reversed(messages) if m.get("role") == "user" and m.get("content")),
+        "",
+    )
+    if question:
+        await log_turn(
+            db,
+            tenant_id=tenant_id,
+            user_id=client.get("id"),
+            session_id=session_id or str(uuid4()),
+            assistant=prompt_name,
+            question=question,
+            answer=text,
+            tool_calls=used_tools,
+            duration_ms=int((perf_counter() - started) * 1000),
+            is_error=is_error,
+        )
+    return {"response": text}

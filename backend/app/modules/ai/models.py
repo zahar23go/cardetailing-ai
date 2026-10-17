@@ -1,10 +1,42 @@
 """SQLAlchemy models — AI-детейлер."""
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.core.database import Base
+
+
+class AiChatLog(Base):
+    """Один ход диалога с ИИ-ассистентом: вопрос, ответ, инструменты, время ответа.
+
+    Пишется из ``run_consultant_chat`` для всех ассистентов (detailer, financier,
+    manager, admin). Текст хранится ограниченное время (AI_CHAT_RETENTION_DAYS).
+    """
+
+    __tablename__ = "ai_chat_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    session_id = Column(String(64), nullable=False, index=True)
+    assistant = Column(String(32), nullable=False, index=True)
+    question = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+    tool_calls = Column(JSONB, nullable=False, server_default="'[]'")
+    duration_ms = Column(Integer, nullable=False, server_default="0")
+    is_error = Column(Boolean, nullable=False, server_default="false")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
 
 class DetailerInspection(Base):

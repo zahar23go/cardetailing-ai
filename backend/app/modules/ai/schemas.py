@@ -26,6 +26,7 @@ class ConsultantChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     question: Optional[str] = Field(None, max_length=2000)
     tz_offset: int = Field(0, ge=-840, le=840, description="Минуты к востоку от UTC")
+    session_id: Optional[str] = Field(None, max_length=64, description="Идентификатор диалога для аналитики")
 
     @model_validator(mode="after")
     def _require_content(self) -> "ConsultantChatRequest":
@@ -35,6 +36,7 @@ class ConsultantChatRequest(BaseModel):
 
 class FinancierRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
+    session_id: Optional[str] = Field(None, max_length=64, description="Идентификатор диалога для аналитики")
 
 class FinancierResponse(BaseModel):
     response: str
@@ -45,6 +47,7 @@ class ManagerRequest(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     question: Optional[str] = Field(None, max_length=2000)
     tz_offset: int = Field(0, ge=-840, le=840, description="Минуты к востоку от UTC")
+    session_id: Optional[str] = Field(None, max_length=64, description="Идентификатор диалога для аналитики")
 
     @model_validator(mode="after")
     def _require_content(self) -> "ManagerRequest":

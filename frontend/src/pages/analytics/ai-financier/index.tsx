@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Spin } from 'antd';
 import { Button, Input } from '../../../components/ui';
+import { newSessionId } from '../../client/api';
 import { BulbOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons';
 
 const API_BASE = '';
@@ -75,6 +76,7 @@ interface FinancierBrief {
 export default function AiFinancierPage() {
   const navigate = useNavigate();
   const [financierMessages, setFinancierMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const [financierSession, setFinancierSession] = useState(newSessionId);
   const [financierInput, setFinancierInput] = useState('');
   const [financierLoading, setFinancierLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -100,6 +102,7 @@ export default function AiFinancierPage() {
   const handleNewDialog = () => {
     setFinancierMessages([]);
     setShowSuggestions(true);
+    setFinancierSession(newSessionId());
   };
 
   const handleFinancierQuestion = async (preset?: string) => {
@@ -112,7 +115,7 @@ export default function AiFinancierPage() {
     try {
       const data = await apiFetch<{ response: string }>('/api/ai/financier', {
         method: 'POST',
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, session_id: financierSession }),
       });
       setFinancierMessages((prev) => [...prev, { role: 'ai', text: data.response }]);
     } catch (e: unknown) {

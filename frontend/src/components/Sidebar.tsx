@@ -31,6 +31,7 @@ const ICONS: Record<string, React.ReactNode> = {
   'ai-admin': <ControlOutlined />,
   analytics: <AreaChartOutlined />,
   financier: <BulbOutlined />,
+  dialogues: <CommentOutlined />,
   finances: <DollarOutlined />,
   metrics: <AreaChartOutlined />,
   reports: <BarChartOutlined />,

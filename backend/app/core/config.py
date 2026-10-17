@@ -128,6 +128,9 @@ class Settings(BaseSettings):
     REMINDERS_ENABLED: bool = True
     REMINDER_INTERVAL_MINUTES: int = 5
 
+    # Аналитика диалогов: сколько дней хранить текст переписки с ИИ
+    AI_CHAT_RETENTION_DAYS: int = 90
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { Card } from 'antd';
 import { PlusOutlined, SendOutlined } from '@ant-design/icons';
 import { Button, Input } from './ui';
-import { apiFetch, tzOffsetMinutes } from '../pages/client/api';
+import { apiFetch, newSessionId, tzOffsetMinutes } from '../pages/client/api';
 
 export type AdminAiChatProps = {
   /** Эндпоинт чата, например /api/ai/manager */
@@ -41,6 +41,7 @@ export default function AdminAiChat({
   placeholder,
   typingText,
 }: AdminAiChatProps) {
+  const [sessionId, setSessionId] = useState(newSessionId);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,6 +51,7 @@ export default function AdminAiChat({
     setMessages([]);
     setInput('');
     setShowSuggestions(true);
+    setSessionId(newSessionId());
   };
 
   const ask = async (preset?: string) => {
@@ -72,6 +74,7 @@ export default function AdminAiChat({
         body: JSON.stringify({
           messages: [...history, { role: 'user', content: question }],
           tz_offset: tzOffsetMinutes(),
+          session_id: sessionId,
         }),
       });
       setMessages((prev) => [...prev, { role: 'ai', text: data.response }]);

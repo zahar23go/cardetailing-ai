@@ -19,6 +19,7 @@ export type AdminTabKey =
   | 'reports'
   | 'notifications'
   | 'service-analytics'
+  | 'dialogues'
   | 'warehouse'
   | 'tech-cards'
   | 'inventory'
@@ -62,6 +63,7 @@ export const PATH_TO_TAB: Record<string, AdminTabKey | 'branding'> = {
   '/analytics/analytics': 'analytics',
   '/analytics/reports': 'reports',
   '/analytics/service-analytics': 'service-analytics',
+  '/analytics/dialogues': 'dialogues',
   '/upload/records': 'appointments',
   '/upload/calendar': 'calendar',
   '/upload/boxes': 'boxes',
@@ -87,6 +89,7 @@ export const TAB_TO_PATH: Record<AdminTabKey | 'branding', string> = {
   analytics: '/analytics/analytics',
   reports: '/analytics/reports',
   'service-analytics': '/analytics/service-analytics',
+  dialogues: '/analytics/dialogues',
   appointments: '/upload/records',
   calendar: '/upload/calendar',
   boxes: '/upload/boxes',
@@ -156,6 +159,7 @@ export const ADMIN_NAV: NavEntry[] = [
     icon: 'analytics',
     children: [
       { type: 'leaf', key: 'financier', path: '/analytics/ai-financier', label: 'ИИ Финансист', icon: 'financier', module: 'ai', feature: 'financier' },
+      { type: 'leaf', key: 'dialogues', path: '/analytics/dialogues', label: 'Диалоги ИИ', icon: 'dialogues', module: 'ai' },
       { type: 'leaf', key: 'finances', path: '/analytics/finances', label: 'Финансы', icon: 'finances', module: 'expenses' },
       { type: 'leaf', key: 'analytics', path: '/analytics/analytics', label: 'Аналитика', icon: 'metrics', module: 'analytics' },
       { type: 'leaf', key: 'reports', path: '/analytics/reports', label: 'Отчёты', icon: 'reports', module: 'analytics' },

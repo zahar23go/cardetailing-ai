@@ -177,6 +177,12 @@ export function tzOffsetMinutes() {
   return -new Date().getTimezoneOffset();
 }
 
+/** Идентификатор диалога для аналитики: один на чат, новый при «Новом диалоге». */
+export function newSessionId(): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  return uuid || `s-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
 export interface DetailerFinding {
   tag: string;
   area: string;

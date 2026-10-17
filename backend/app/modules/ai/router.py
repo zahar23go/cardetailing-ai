@@ -31,10 +31,12 @@ from app.core.image_service import (
 from app.core.deepseek_client import get_ai_response, get_financier_response
 from app.core.prompt_loader import prompt_path
 from app.modules.ai.chat_service import run_consultant_chat
+from app.modules.ai.analytics_router import router as analytics_router
 from app.models import *  # noqa: F401,F403
 from app.schemas import *  # noqa: F401,F403
 
 router = APIRouter()
+router.include_router(analytics_router)
 
 @router.post("/api/ai/chat", response_model=ChatResponse)
 async def ai_chat(request: ChatRequest):
@@ -61,6 +63,7 @@ async def ai_financier(
             current_user,
             [{"role": "user", "content": request.question}],
             prompt_name="financier",
+            session_id=request.session_id,
         )
         return FinancierResponse(response=result["response"])
 
@@ -191,6 +194,7 @@ async def ai_admin(
         messages,
         tz_offset=request.tz_offset,
         prompt_name="admin",
+        session_id=request.session_id,
     )
     return ChatResponse(response=result["response"])
 
@@ -217,6 +221,7 @@ async def ai_manager(
         messages,
         tz_offset=request.tz_offset,
         prompt_name="manager",
+        session_id=request.session_id,
     )
     return ChatResponse(response=result["response"])
 
@@ -243,6 +248,7 @@ async def ai_consultant(
         current_user,
         messages,
         tz_offset=request.tz_offset,
+        session_id=request.session_id,
     )
     return ChatResponse(response=result["response"])
 

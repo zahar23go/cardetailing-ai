@@ -23,6 +23,7 @@ import {
   apiFetch,
   formatCurrency,
   matchServicesFromText,
+  newSessionId,
   tzOffsetMinutes,
 } from '../api';
 
@@ -68,6 +69,7 @@ export default function ClientChatPage() {
 
   const [services, setServices] = useState<Service[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
+  const [sessionId, setSessionId] = useState(newSessionId);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -174,6 +176,7 @@ export default function ClientChatPage() {
         body: JSON.stringify({
           messages: [...history, { role: 'user', content: question }],
           tz_offset: tzOffsetMinutes(),
+          session_id: sessionId,
         }),
       });
       const offers = matchServicesFromText(`${question} ${data.response}`, catalog);
@@ -217,6 +220,7 @@ export default function ClientChatPage() {
     setShowSuggestions(true);
     setInput('');
     setShowInspect(false);
+    setSessionId(newSessionId());
   };
 
   return (

@@ -4656,6 +4656,220 @@
   }
 }
 
+/* ========== АНАЛИТИКА ДИАЛОГОВ ========== */
+.ai-dialog-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.ai-dialog-retention {
+  font-size: 12px;
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.ai-dialog-loading {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
+}
+
+.ai-dialog-card {
+  margin-top: 16px;
+}
+
+.ai-dialog-card-title {
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  color: var(--color-gold, #D4AF37);
+  margin-bottom: 14px;
+}
+
+.ai-dialog-bar-row {
+  margin-bottom: 12px;
+}
+
+.ai-dialog-bar-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--color-white, #F0F2F5);
+  margin-bottom: 6px;
+}
+
+.ai-dialog-bar {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.ai-dialog-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.65), #D4AF37);
+}
+
+.ai-dialog-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-dialog-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.ai-dialog-list code {
+  color: var(--color-gold, #D4AF37);
+  background: rgba(212, 175, 55, 0.1);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.ai-dialog-muted {
+  font-size: 13px;
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.ai-dialog-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-dialog-item {
+  border: 1px solid var(--color-divider, #3B4049);
+  border-radius: var(--radius-card, 14px);
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.ai-dialog-item.is-open {
+  border-color: rgba(212, 175, 55, 0.45);
+}
+
+.ai-dialog-item-head {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font-family: inherit;
+}
+
+.ai-dialog-item-head:hover {
+  background: rgba(212, 175, 55, 0.06);
+}
+
+.ai-dialog-item-chevron {
+  color: var(--color-gold, #D4AF37);
+  font-size: 12px;
+  padding-top: 3px;
+}
+
+.ai-dialog-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-dialog-item-question {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-white, #F0F2F5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-dialog-item-meta {
+  font-size: 12px;
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.ai-dialog-transcript {
+  border-top: 1px solid var(--color-divider, #3B4049);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-dialog-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-dialog-turn-q,
+.ai-dialog-turn-a {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-white, #F0F2F5);
+  white-space: pre-wrap;
+}
+
+.ai-dialog-turn-a {
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.ai-dialog-turn-label {
+  flex: 0 0 62px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-gold, #D4AF37);
+  padding-top: 2px;
+}
+
+.ai-dialog-turn-meta {
+  font-size: 11px;
+  color: rgba(155, 163, 181, 0.75);
+  padding-left: 72px;
+}
+
+.ai-dialog-tooltip {
+  background: var(--color-elevated, #161B22);
+  border: 1px solid var(--color-divider, #3B4049);
+  border-radius: var(--radius-md, 10px);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--color-white, #F0F2F5);
+}
+
+.ai-dialog-tooltip-title {
+  color: var(--color-gold, #D4AF37);
+  margin-bottom: 4px;
+}
+
+@media (max-width: 640px) {
+  .ai-dialog-turn-meta {
+    padding-left: 0;
+  }
+}
+
 /* ========== ОТЧЁТЫ ПО ВЫРУЧКЕ ========== */
 .reports-head {
   display: flex;

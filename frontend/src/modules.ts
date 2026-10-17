@@ -28,6 +28,7 @@ const PATH_PREFIX_MODULE: { prefix: string; module: AppModuleName }[] = [
   { prefix: '/ai/manager', module: 'ai' },
   { prefix: '/ai/admin', module: 'ai' },
   { prefix: '/analytics/ai-financier', module: 'ai' },
+  { prefix: '/analytics/dialogues', module: 'ai' },
   { prefix: '/analytics/finances', module: 'expenses' },
   { prefix: '/analytics/analytics', module: 'analytics' },
   { prefix: '/analytics/reports', module: 'analytics' },
