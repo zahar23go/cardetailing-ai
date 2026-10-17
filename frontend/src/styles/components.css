@@ -4470,6 +4470,192 @@
   }
 }
 
+/* ========== ЧАТЫ ИИ-АССИСТЕНТОВ АДМИНКИ (управляющий, администратор) ========== */
+.ai-chat-thread {
+  min-height: 360px;
+  max-height: 480px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 4px 16px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--color-divider, #3B4049);
+}
+
+.ai-chat-empty {
+  margin: auto;
+  text-align: center;
+  padding: 40px 16px 24px;
+  max-width: 520px;
+}
+
+.ai-chat-empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: var(--color-gold, #D4AF37);
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: 0 8px 24px rgba(212, 175, 55, 0.15);
+}
+
+.ai-chat-empty-title {
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 18px;
+  letter-spacing: 0.03em;
+  color: var(--color-gold, #D4AF37);
+  margin-bottom: 8px;
+}
+
+.ai-chat-empty-hint {
+  font-size: 13px;
+  color: var(--color-titanium, #9BA3B5);
+  margin-bottom: 20px;
+  line-height: 1.45;
+}
+
+.ai-chat-suggests {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.ai-chat-suggest {
+  appearance: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  padding: 12px 18px;
+  border-radius: var(--radius-full);
+  color: var(--color-gold, #D4AF37);
+  background: transparent;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.ai-chat-suggest:hover {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: var(--color-gold, #D4AF37);
+  transform: translateY(-1px);
+}
+
+.ai-chat-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 86%;
+}
+
+.ai-chat-msg.is-user {
+  align-self: flex-end;
+}
+
+.ai-chat-msg.is-ai {
+  align-self: flex-start;
+}
+
+.ai-chat-bubble {
+  padding: 12px 16px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-divider, #3B4049);
+  background: var(--color-elevated, #161B22);
+  box-shadow: var(--shadow-card, 0 6px 24px rgba(0, 0, 0, 0.25));
+}
+
+.ai-chat-msg.is-user .ai-chat-bubble {
+  border-color: rgba(212, 175, 55, 0.4);
+  background: rgba(212, 175, 55, 0.14);
+  border-radius: var(--radius-xl) var(--radius-xl) 4px var(--radius-xl);
+}
+
+.ai-chat-msg.is-ai .ai-chat-bubble {
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-xl) 4px;
+}
+
+.ai-chat-bubble-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-gold, #D4AF37);
+  margin-bottom: 6px;
+}
+
+.ai-chat-bubble-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-white, #F0F2F5);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ai-chat-msg.is-ai .ai-chat-bubble-text {
+  color: var(--color-titanium, #9BA3B5);
+}
+
+.ai-chat-bubble-text.is-typing {
+  color: var(--color-gold, #D4AF37);
+  opacity: 0.85;
+}
+
+.ai-chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ai-chat-new-btn.ant-btn {
+  height: 46px !important;
+  border-radius: var(--radius-full) !important;
+  white-space: nowrap;
+}
+
+.ai-chat-input.ant-input,
+.ai-chat-input.ant-input-textarea textarea {
+  min-height: 46px !important;
+  border-radius: var(--radius-md) !important;
+  flex: 1;
+}
+
+.ai-chat-composer .ai-chat-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.ai-chat-send.ant-btn {
+  width: 52px !important;
+  min-width: 52px !important;
+  height: 46px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+}
+
+@media (max-width: 640px) {
+  .ai-chat-composer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-chat-send.ant-btn {
+    width: 100% !important;
+    border-radius: var(--radius-card) !important;
+  }
+
+  .ai-chat-msg {
+    max-width: 95%;
+  }
+}
+
 /* ========== ОТЧЁТЫ ПО ВЫРУЧКЕ ========== */
 .reports-head {
   display: flex;

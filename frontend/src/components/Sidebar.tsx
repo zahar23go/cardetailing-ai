@@ -12,6 +12,7 @@ import {
   ToolOutlined, BgColorsOutlined, AppstoreOutlined, ExperimentOutlined,
   DatabaseOutlined, ProfileOutlined, FundOutlined, LineChartOutlined,
   InsertRowAboveOutlined, CrownOutlined, CommentOutlined,
+  RobotOutlined, ScheduleOutlined, ControlOutlined,
 } from '@ant-design/icons';
 import {
   ADMIN_NAV,
@@ -25,6 +26,9 @@ import { useEnabledModules, usePlanFeatures } from '../ModulesContext';
 
 const ICONS: Record<string, React.ReactNode> = {
   home: <HomeOutlined />,
+  ai: <RobotOutlined />,
+  'ai-manager': <ScheduleOutlined />,
+  'ai-admin': <ControlOutlined />,
   analytics: <AreaChartOutlined />,
   financier: <BulbOutlined />,
   finances: <DollarOutlined />,

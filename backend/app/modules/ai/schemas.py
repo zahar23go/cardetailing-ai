@@ -41,9 +41,16 @@ class FinancierResponse(BaseModel):
 
 
 class ManagerRequest(BaseModel):
-    """Запрос к ИИ-управляющему студией (админ): операционный вопрос."""
-    question: str = Field(..., min_length=1, max_length=2000)
+    """Запрос к ИИ-управляющему студией (админ): история диалога либо одиночный вопрос."""
+    messages: list[ChatMessage] = Field(default_factory=list)
+    question: Optional[str] = Field(None, max_length=2000)
     tz_offset: int = Field(0, ge=-840, le=840, description="Минуты к востоку от UTC")
+
+    @model_validator(mode="after")
+    def _require_content(self) -> "ManagerRequest":
+        if not self.messages and not (self.question and self.question.strip()):
+            raise ValueError("Передайте messages или непустой question")
+        return self
 
 
 class FinancierWeatherDayOut(BaseModel):

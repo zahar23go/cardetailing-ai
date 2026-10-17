@@ -4,6 +4,8 @@
 
 export type AdminTabKey =
   | 'overview'
+  | 'ai-manager'
+  | 'ai-admin'
   | 'appointments'
   | 'calendar'
   | 'boxes'
@@ -53,6 +55,8 @@ export type NavEntry = NavLeaf | NavGroup;
 /** Канонические пути → ключ вкладки (branding — отдельная страница) */
 export const PATH_TO_TAB: Record<string, AdminTabKey | 'branding'> = {
   '/dashboard': 'overview',
+  '/ai/manager': 'ai-manager',
+  '/ai/admin': 'ai-admin',
   '/analytics/ai-financier': 'financier',
   '/analytics/finances': 'finances',
   '/analytics/analytics': 'analytics',
@@ -76,6 +80,8 @@ export const PATH_TO_TAB: Record<string, AdminTabKey | 'branding'> = {
 
 export const TAB_TO_PATH: Record<AdminTabKey | 'branding', string> = {
   overview: '/dashboard',
+  'ai-manager': '/ai/manager',
+  'ai-admin': '/ai/admin',
   financier: '/analytics/ai-financier',
   finances: '/analytics/finances',
   analytics: '/analytics/analytics',
@@ -132,6 +138,16 @@ export const ADMIN_NAV: NavEntry[] = [
     path: '/dashboard',
     label: 'Главная / Обзор',
     icon: 'home',
+  },
+  {
+    type: 'group',
+    id: 'ai-assistants',
+    label: 'ИИ-ассистенты',
+    icon: 'ai',
+    children: [
+      { type: 'leaf', key: 'ai-manager', path: '/ai/manager', label: 'ИИ-Управляющий', icon: 'ai-manager', module: 'ai' },
+      { type: 'leaf', key: 'ai-admin', path: '/ai/admin', label: 'ИИ-Администратор', icon: 'ai-admin', module: 'ai' },
+    ],
   },
   {
     type: 'group',

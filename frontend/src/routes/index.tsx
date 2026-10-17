@@ -17,6 +17,8 @@ const MasterDashboard = React.lazy(() => import('../MasterDashboard'));
 const OwnerOnboardingPage = React.lazy(() => import('../pages/onboarding'));
 const DashboardPage = React.lazy(() => import('../pages/dashboard'));
 const AiFinancierPage = React.lazy(() => import('../pages/analytics/ai-financier'));
+const AiManagerPage = React.lazy(() => import('../pages/ai/manager'));
+const AiAdminPage = React.lazy(() => import('../pages/ai/admin'));
 const FinancesPage = React.lazy(() => import('../pages/analytics/finances'));
 const AnalyticsPage = React.lazy(() => import('../pages/analytics/analytics'));
 const ReportsPage = React.lazy(() => import('../pages/analytics/reports'));
@@ -154,6 +156,12 @@ export default function AppRoutes({
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="service-analytics" element={<ServiceAnalyticsPage />} />
+        </Route>
+
+        <Route path="ai">
+          <Route index element={<Navigate to="manager" replace />} />
+          <Route path="manager" element={<AiManagerPage />} />
+          <Route path="admin" element={<AiAdminPage />} />
         </Route>
 
         <Route path="upload">

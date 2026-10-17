@@ -204,13 +204,17 @@ async def ai_manager(
     """AI-управляющий студией: расписание, загрузка боксов и мастеров, операционка.
 
     Промпт и функции берутся из prompts/manager.yaml (hot-reload без пересборки).
+    История диалога приходит от клиента; без неё принимается одиночный question.
     """
     tenant_id = UUID(current_user["tenant_id"])
+    messages = [message.model_dump() for message in request.messages]
+    if not messages and request.question:
+        messages = [{"role": "user", "content": request.question}]
     result = await run_consultant_chat(
         db,
         tenant_id,
         current_user,
-        [{"role": "user", "content": request.question}],
+        messages,
         tz_offset=request.tz_offset,
         prompt_name="manager",
     )
