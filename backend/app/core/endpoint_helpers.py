@@ -602,17 +602,10 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
     )
     appointment = result.scalar_one_or_none()
     if not appointment:
-        print(f"[DEBUG][_auto_apply_discount] Appointment #{appointment_id} not found, skipping.")
         return
 
     now = datetime.now(timezone.utc)
     tenant_id = appointment.tenant_id
-
-    print(f"[DEBUG][_auto_apply_discount] Appointment #{appointment_id}: "
-          f"service_id={appointment.service_id}, "
-          f"total_price={appointment.total_price}, "
-          f"client_id={appointment.client_id}, "
-          f"start_time={appointment.start_time}")
 
     # Загружаем активные правила скидок (непросроченные)
     rules_result = await db.execute(
@@ -623,8 +616,6 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
         )
     )
     rules = rules_result.scalars().all()
-
-    print(f"[DEBUG][_auto_apply_discount] Found {len(rules)} active/valid rules for tenant_id={tenant_id}")
 
     best_discount = 0
     best_rule = None
@@ -641,10 +632,6 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
 
     for rule in rules:
         conditions = rule.conditions or {}
-        print(f"[DEBUG][_auto_apply_discount] Checking rule id={rule.id}, name='{rule.name}', "
-              f"type={rule.type}, service_id={rule.service_id}, "
-              f"discount={rule.discount_percent}%, "
-              f"valid_until={rule.valid_until}")
 
         if rule.type == "happy_hours":
             # Скидка на часовой слот (например, 14:00–16:00)
@@ -728,12 +715,9 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
         elif rule.type == "service":
             # Скидка на конкретную услугу
             if rule.service_id and rule.service_id == appointment.service_id:
-                print(f"[DEBUG][_auto_apply_discount]  → service MATCH! rule.service_id={rule.service_id} == appointment.service_id={appointment.service_id}")
                 if rule.discount_percent > best_discount:
                     best_discount = rule.discount_percent
                     best_rule = rule
-            else:
-                print(f"[DEBUG][_auto_apply_discount]  → service MISMATCH: rule.service_id={rule.service_id} vs appointment.service_id={appointment.service_id}")
 
         elif rule.type == "client":
             # Персональная скидка для клиента
@@ -781,12 +765,6 @@ async def _auto_apply_discount(appointment_id: int, db: AsyncSession):
         )
         db.add(cd)
         await db.commit()
-        print(f"[DEBUG][_auto_apply_discount] ✓ Applied discount rule #{best_rule.id} '{best_rule.name}': "
-              f"{best_discount}% → {effective_discount} руб. "
-              f"Price: {original_price} → {appointment.total_price}")
-    else:
-        print(f"[DEBUG][_auto_apply_discount] ✗ No applicable discount found "
-              f"(best_rule={best_rule}, best_discount={best_discount})")
 
 async def _award_loyalty_points(appointment_id: int, db: AsyncSession):
     """Начислить баллы лояльности за завершённую запись."""

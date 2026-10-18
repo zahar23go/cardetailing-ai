@@ -7,6 +7,8 @@
 - Скидка НЕ применяется в выходные
 """
 
+import io
+import sys
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, patch
 
@@ -917,3 +919,35 @@ class TestWinBackAndWeather:
     async def test_smart_requires_admin(self, client: AsyncClient, auth_headers: dict):
         resp = await client.get("/api/discounts/smart", headers=auth_headers)
         assert resp.status_code in (401, 403)
+
+    async def test_booking_survives_cp1251_console(
+        self,
+        monkeypatch,
+        client: AsyncClient,
+        auth_headers: dict,
+        test_service,
+        test_car,
+    ):
+        """Windows-консоль cp1251 не должна ронять создание записи.
+
+        Регресс: отладочный print с символом «✗» в _auto_apply_discount
+        бросал UnicodeEncodeError после коммита записи, и клиент получал 500.
+        """
+        stdout = io.TextIOWrapper(io.BytesIO(), encoding="cp1251", errors="strict")
+        monkeypatch.setattr(sys, "stdout", stdout)
+        try:
+            response = await client.post(
+                "/api/appointments",
+                json={
+                    "service_id": test_service.id,
+                    "car_id": test_car.id,
+                    "start_time": (
+                        datetime.now(timezone.utc) + timedelta(days=2)
+                    ).isoformat(),
+                },
+                headers=auth_headers,
+            )
+        finally:
+            stdout.detach()
+
+        assert response.status_code == 200, response.text
