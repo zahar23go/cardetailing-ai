@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -564,7 +564,7 @@ class DetailerTools:
         return intervals
 
     async def _pick_master(self, service_id: int, start: datetime, end: datetime) -> User | None:
-        """Свободный мастер для услуги: учитывает навыки и занятость."""
+        """Свободный мастер для услуги: навык важнее, из равных — менее загруженный за день."""
         result = await self.db.execute(
             select(User)
             .where(User.tenant_id == self.tenant_id, User.role == "master")
@@ -583,11 +583,18 @@ class DetailerTools:
         for master_id, skill_service_id in skills_result.all():
             skills_by_master.setdefault(master_id, set()).add(skill_service_id)
 
-        eligible = [
-            master
-            for master in masters
-            if not skills_by_master.get(master.id) or service_id in skills_by_master[master.id]
+        skilled = [
+            master for master in masters if service_id in skills_by_master.get(master.id, set())
         ]
+        if skilled:
+            eligible = skilled
+        else:
+            # Навыков нет — как раньше: универсалы и мастера без навыков.
+            eligible = [
+                master
+                for master in masters
+                if not skills_by_master.get(master.id) or service_id in skills_by_master[master.id]
+            ]
         if not eligible:
             return None
 
@@ -601,10 +608,31 @@ class DetailerTools:
             )
         )
         busy_master_ids = {row[0] for row in busy_result.all()}
-        for master in eligible:
-            if master.id not in busy_master_ids:
-                return master
-        return None
+        free = [master for master in eligible if master.id not in busy_master_ids]
+        if not free:
+            return None
+
+        loads = await self._master_day_loads([master.id for master in free], start)
+        return min(free, key=lambda master: (loads.get(master.id, 0), master.id))
+
+    async def _master_day_loads(self, master_ids: list[int], start: datetime) -> dict[int, int]:
+        """Число активных записей мастера на локальный день записи."""
+        tz = client_tz(self.tz_offset)
+        day = start.astimezone(tz).date()
+        day_start = datetime(day.year, day.month, day.day, tzinfo=tz).astimezone(timezone.utc)
+        day_end = day_start + timedelta(days=1)
+        result = await self.db.execute(
+            select(Appointment.master_id, func.count(Appointment.id))
+            .where(
+                Appointment.tenant_id == self.tenant_id,
+                Appointment.master_id.in_(master_ids),
+                Appointment.status.in_(FLOOR_STATUSES),
+                Appointment.start_time >= day_start,
+                Appointment.start_time < day_end,
+            )
+            .group_by(Appointment.master_id)
+        )
+        return {master_id: count for master_id, count in result.all()}
 
     async def _find_appointment(self, employee_name: str | None) -> Appointment | None:
         target = _norm(employee_name)

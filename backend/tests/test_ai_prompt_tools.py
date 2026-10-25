@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.core import prompt_loader
-from app.models import Appointment, DiscountRule, Material, Notification, Photo
+from app.models import Appointment, DiscountRule, MasterSkill, Material, Notification, Photo, User
 from app.modules.ai.chat_service import build_tools
 from app.modules.ai.detailer_tools import DetailerTools, dispatch
 
@@ -194,6 +194,53 @@ class TestDetailerFunctions:
             select(Notification).where(Notification.user_id == test_master.id)
         )).scalars().all()
         assert any(item.title == "Новая запись" for item in notifications)
+
+    async def test_pick_least_loaded_master_with_skill(
+        self, db_session, default_tenant, test_user, test_car, test_master, test_service,
+    ):
+        second = User(
+            phone="+79991112266",
+            password="x",
+            full_name="Второй Мастер",
+            role="master",
+            tenant_id=default_tenant.id,
+        )
+        db_session.add(second)
+        await db_session.flush()
+        for master in (test_master, second):
+            db_session.add(MasterSkill(
+                tenant_id=default_tenant.id,
+                master_id=master.id,
+                service_id=test_service.id,
+            ))
+
+        day = _future()
+        busy_start = datetime.fromisoformat(f"{day}T08:00:00+00:00")
+        db_session.add(Appointment(
+            client_id=test_user.id,
+            tenant_id=default_tenant.id,
+            car_id=test_car.id,
+            service_id=test_service.id,
+            master_id=test_master.id,
+            start_time=busy_start,
+            end_time=busy_start + timedelta(hours=2),
+            total_price=test_service.price,
+            status="pending",
+        ))
+        await db_session.commit()
+
+        tools = DetailerTools(db_session, default_tenant.id, _client(test_user, default_tenant))
+        booking = await tools.create_appointment([{
+            "service_name": test_service.name,
+            "date": day,
+            "time": "12:00",
+        }])
+        assert booking["ok"] is True
+
+        appointment = await db_session.get(
+            Appointment, booking["bookings"][0]["appointment_id"]
+        )
+        assert appointment.master_id == second.id
 
     async def test_create_appointment_applies_discount(
         self, db_session, default_tenant, test_user, test_car, test_master, test_service,
