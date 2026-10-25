@@ -650,13 +650,14 @@ async def update_master_appointment_status(
         raise HTTPException(status_code=403, detail="Это не ваша запись")
 
     new_status = request.status
+    old_status = appointment.status
     # Разрешённые переходы для мастера
     valid_transitions = {
-        "pending": ["in_progress"],
+        "pending": ["in_progress", "cancelled"],
         "confirmed": ["in_progress"],
         "in_progress": ["completed"],
     }
-    allowed = valid_transitions.get(appointment.status, [])
+    allowed = valid_transitions.get(old_status, [])
     if new_status not in allowed:
         raise HTTPException(
             status_code=400,
@@ -684,7 +685,7 @@ async def update_master_appointment_status(
 
     # History: log status change
     from app.services.history_service import log_status_change as _log_sc
-    await _log_sc(db, appointment.id, appointment.status, new_status, current_user["id"])
+    await _log_sc(db, appointment.id, old_status, new_status, current_user["id"])
 
     # Начисляем баллы, если мастер завершил запись
     if new_status == "completed":

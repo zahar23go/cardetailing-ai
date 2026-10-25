@@ -54,6 +54,55 @@ class TestMasterKpi:
         assert resp.status_code == 200, resp.text
         assert resp.json()["status"] == "in_progress"
 
+    async def test_master_cancels_pending(
+        self, client, auth_headers, master_headers, test_master, test_service, test_car,
+    ):
+        appt_id = await _create_appointment(
+            client, auth_headers, test_service.id, test_car.id, master_id=test_master.id,
+        )
+        resp = await client.put(
+            f"/api/masters/me/appointments/{appt_id}/status",
+            json={"status": "cancelled"},
+            headers=master_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == "cancelled"
+
+        hist = await client.get(
+            f"/api/appointments/{appt_id}/history?change_type=status_change",
+            headers=master_headers,
+        )
+        assert hist.status_code == 200, hist.text
+        items = hist.json()["items"]
+        assert len(items) == 1
+        assert items[0]["old_value"] == "pending"
+        assert items[0]["new_value"] == "cancelled"
+
+    async def test_master_completes_and_revenue_counted(
+        self, client, auth_headers, master_headers, test_master, test_service, test_car,
+    ):
+        appt_id = await _create_appointment(
+            client, auth_headers, test_service.id, test_car.id, master_id=test_master.id,
+        )
+        started = await client.put(
+            f"/api/masters/me/appointments/{appt_id}/status",
+            json={"status": "in_progress"},
+            headers=master_headers,
+        )
+        assert started.status_code == 200, started.text
+
+        done = await client.put(
+            f"/api/masters/me/appointments/{appt_id}/status",
+            json={"status": "completed"},
+            headers=master_headers,
+        )
+        assert done.status_code == 200, done.text
+        assert done.json()["status"] == "completed"
+
+        kpi = await client.get("/api/masters/me/kpi", headers=master_headers)
+        assert kpi.status_code == 200, kpi.text
+        assert kpi.json()["revenue"] == 5000.0
+
     async def test_score_formula(self):
         assert compute_shift_score(
             completed=0, compliance_pct=100, overspend_ratio=0, repeat_rate=0, no_show_rate=0,
