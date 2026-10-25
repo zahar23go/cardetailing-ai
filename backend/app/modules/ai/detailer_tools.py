@@ -14,6 +14,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.endpoint_helpers import _auto_apply_discount
 from app.core.image_service import resolve_portfolio_url
 from app.core.notification_service import create_notification
 from app.models import (
@@ -21,6 +22,7 @@ from app.models import (
     Box,
     BoxService,
     Car,
+    MasterSkill,
     Material,
     Photo,
     Service,
@@ -379,6 +381,8 @@ class DetailerTools:
                 continue
 
             end = start + timedelta(minutes=int(service.duration or DEFAULT_DURATION))
+            if master is None:
+                master = await self._pick_master(service.id, start, end)
             box_id = await self._pick_box(service.id, start, end)
             appointment = Appointment(
                 client_id=self._client_id,
@@ -395,6 +399,25 @@ class DetailerTools:
             self.db.add(appointment)
             await self.db.commit()
             await self.db.refresh(appointment)
+
+            await _auto_apply_discount(appointment.id, self.db)
+            await self.db.refresh(appointment)
+
+            if master is not None:
+                local_start = start.astimezone(client_tz(self.tz_offset))
+                await create_notification(
+                    self.db,
+                    master.id,
+                    self.tenant_id,
+                    title="Новая запись",
+                    message=(
+                        f"{self.client.get('full_name') or 'Клиент'}: {service.name} — "
+                        f"{local_start:%d.%m.%Y %H:%M}"
+                    ),
+                    type="info",
+                    related_entity_type="appointment",
+                    related_entity_id=appointment.id,
+                )
 
             record = {
                 "ok": True,
@@ -540,6 +563,49 @@ class DetailerTools:
                 intervals.append((start, end))
         return intervals
 
+    async def _pick_master(self, service_id: int, start: datetime, end: datetime) -> User | None:
+        """Свободный мастер для услуги: учитывает навыки и занятость."""
+        result = await self.db.execute(
+            select(User)
+            .where(User.tenant_id == self.tenant_id, User.role == "master")
+            .order_by(User.id)
+        )
+        masters = list(result.scalars().all())
+        if not masters:
+            return None
+
+        skills_result = await self.db.execute(
+            select(MasterSkill.master_id, MasterSkill.service_id).where(
+                MasterSkill.tenant_id == self.tenant_id
+            )
+        )
+        skills_by_master: dict[int, set[int]] = {}
+        for master_id, skill_service_id in skills_result.all():
+            skills_by_master.setdefault(master_id, set()).add(skill_service_id)
+
+        eligible = [
+            master
+            for master in masters
+            if not skills_by_master.get(master.id) or service_id in skills_by_master[master.id]
+        ]
+        if not eligible:
+            return None
+
+        busy_result = await self.db.execute(
+            select(Appointment.master_id).where(
+                Appointment.tenant_id == self.tenant_id,
+                Appointment.master_id.is_not(None),
+                Appointment.status.in_(FLOOR_STATUSES),
+                Appointment.start_time < end,
+                Appointment.end_time > start,
+            )
+        )
+        busy_master_ids = {row[0] for row in busy_result.all()}
+        for master in eligible:
+            if master.id not in busy_master_ids:
+                return master
+        return None
+
     async def _find_appointment(self, employee_name: str | None) -> Appointment | None:
         target = _norm(employee_name)
         for record in reversed(self._created):
@@ -547,6 +613,12 @@ class DetailerTools:
                 found = await self.db.get(Appointment, record["appointment_id"])
                 if found is not None:
                     return found
+
+        # Мастера мог подобрать сервер — модель имени не знает. Берём последнюю запись хода.
+        if self._created:
+            found = await self.db.get(Appointment, self._created[-1]["appointment_id"])
+            if found is not None:
+                return found
 
         stmt = (
             select(Appointment)

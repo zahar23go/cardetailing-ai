@@ -174,6 +174,8 @@ detailer:
         Создать записи. ОДНА УСЛУГА = ОДНА ЗАПИСЬ = ОДИН МАСТЕР.
         Передавай массив bookings: для каждой услуги — свой элемент.
         Время бери ТОЛЬКО из свободных слотов.
+        Если клиент назвал мастера — передай employee_name. Если нет — не передавай:
+        свободный мастер подберётся автоматически.
         После успеха вызови send_master_brief для КАЖДОГО мастера.
       parameters:
         type: object
@@ -184,22 +186,22 @@ detailer:
               type: object
               properties:
                 service_name: {type: string}
-                employee_name: {type: string}
+                employee_name: {type: string, description: "Имя мастера (только если клиент его назвал)"}
                 date: {type: string}
                 time: {type: string}
-              required: [service_name, employee_name, date, time]
+              required: [service_name, date, time]
         required: [bookings]
 
     - name: send_master_brief
-      description: Отправить мастеру развёрнутую сводку о договорённостях. Вызывать только после успешной create_appointment.
+      description: Отправить мастеру развёрнутую сводку о договорённостях. Вызывать только после успешной create_appointment. Если мастера подобрала система, employee_name можно не передавать — сводка уйдёт по последней созданной записи.
       parameters:
         type: object
         properties:
-          employee_name: {type: string, description: "Имя мастера"}
+          employee_name: {type: string, description: "Имя мастера (если клиент его называл)"}
           summary: {type: string, description: "Подробное описание услуги, пожеланий, контекста"}
           features: {type: string, description: "Особенности авто: тип покрытия (керамика/лак/плёнка), сколы/трещины на лобовом, особые требования (бескислотный шампунь, мягкая мойка, только ручная сушка), важные нюансы"}
           images: {type: array, items: {type: string}, description: "Ссылки на фото из портфолио"}
-        required: [employee_name, summary]
+        required: [summary]
 
     - name: escalate_to_human
       description: Передать диалог живому администратору. Вызывать, если клиент задаёт вопрос вне компетенции, выражает недовольство или просит соединить с человеком.

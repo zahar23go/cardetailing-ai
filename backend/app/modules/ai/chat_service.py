@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from time import perf_counter
 from uuid import UUID, uuid4
 
@@ -20,7 +21,7 @@ from app.core.deepseek_client import chat_with_tools
 from app.core.prompt_loader import load_prompt
 from app.models import MasterSkill, User
 from app.modules.ai.analytics_service import log_turn
-from app.modules.ai.detailer_service import load_catalog
+from app.modules.ai.detailer_service import client_tz, load_catalog
 from app.modules.ai.detailer_tools import DetailerTools, dispatch as detailer_dispatch
 from app.modules.ai.financier_tools import FinancierTools, dispatch as financier_dispatch
 from app.modules.ai.manager_tools import ManagerTools, dispatch as manager_dispatch
@@ -36,6 +37,30 @@ TOOL_RUNNERS = {
     "manager": (ManagerTools, manager_dispatch),
     "admin": (AdminTools, admin_dispatch),
 }
+
+_WEEKDAYS_RU = (
+    "понедельник",
+    "вторник",
+    "среда",
+    "четверг",
+    "пятница",
+    "суббота",
+    "воскресенье",
+)
+
+
+def _datetime_note(tz_offset: int) -> str:
+    """Текущие дата и время в часовом поясе клиента — чтобы модель понимала «завтра»."""
+    tz = client_tz(tz_offset)
+    now = datetime.now(timezone.utc).astimezone(tz)
+    total_minutes = int(tz_offset or 0)
+    sign = "+" if total_minutes >= 0 else "-"
+    hours, minutes = divmod(abs(total_minutes), 60)
+    return (
+        f"Текущие дата и время: {now:%Y-%m-%d %H:%M}, {_WEEKDAYS_RU[now.weekday()]}, "
+        f"часовой пояс UTC{sign}{hours:02d}:{minutes:02d}. "
+        "Опирайся на эти данные для «сегодня», «завтра», «послезавтра» и дат без года."
+    )
 
 
 def build_tools(functions: list[dict] | None) -> list[dict]:
@@ -177,7 +202,9 @@ async def _run_chat_pipeline(
         return f"Промпт «{prompt_name}» недоступен: {exc}", True
 
     catalog = await build_catalog_context(db, tenant_id)
-    system_content = f"{section.get('system', '').strip()}\n\n{catalog}"
+    system_content = (
+        f"{section.get('system', '').strip()}\n\n{catalog}\n\n{_datetime_note(tz_offset)}"
+    )
 
     greeting = (section.get("greeting") or "").strip()
     chat_messages: list[dict] = [{"role": "system", "content": system_content}]

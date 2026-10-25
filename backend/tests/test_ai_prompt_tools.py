@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.core import prompt_loader
-from app.models import Appointment, Material, Notification, Photo
+from app.models import Appointment, DiscountRule, Material, Notification, Photo
 from app.modules.ai.chat_service import build_tools
 from app.modules.ai.detailer_tools import DetailerTools, dispatch
 
@@ -172,6 +172,58 @@ class TestDetailerFunctions:
         assert "Полируем кузов" in appointment.master_brief
         assert "Лак, скол на капоте" in appointment.master_brief
 
+    async def test_create_appointment_auto_assigns_master(
+        self, db_session, default_tenant, test_user, test_car, test_master, test_service,
+    ):
+        from sqlalchemy import select
+
+        tools = DetailerTools(db_session, default_tenant.id, _client(test_user, default_tenant))
+        booking = await tools.create_appointment([{
+            "service_name": test_service.name,
+            "date": _future(),
+            "time": "10:00",
+        }])
+        assert booking["ok"] is True
+
+        appointment = await db_session.get(
+            Appointment, booking["bookings"][0]["appointment_id"]
+        )
+        assert appointment.master_id == test_master.id
+
+        notifications = (await db_session.execute(
+            select(Notification).where(Notification.user_id == test_master.id)
+        )).scalars().all()
+        assert any(item.title == "Новая запись" for item in notifications)
+
+    async def test_create_appointment_applies_discount(
+        self, db_session, default_tenant, test_user, test_car, test_master, test_service,
+    ):
+        db_session.add(DiscountRule(
+            tenant_id=default_tenant.id,
+            name="Скидка 10% на полировку",
+            type="service",
+            service_id=test_service.id,
+            discount_percent=10,
+            conditions={},
+            is_active=True,
+        ))
+        await db_session.commit()
+
+        tools = DetailerTools(db_session, default_tenant.id, _client(test_user, default_tenant))
+        booking = await tools.create_appointment([{
+            "service_name": test_service.name,
+            "employee_name": test_master.full_name,
+            "date": _future(),
+            "time": "10:00",
+        }])
+        assert booking["ok"] is True
+
+        appointment = await db_session.get(
+            Appointment, booking["bookings"][0]["appointment_id"]
+        )
+        assert float(appointment.total_price) == 4500.0
+        assert float(appointment.discount_applied) == 500.0
+
     async def test_escalate_notifies_admin(
         self, db_session, default_tenant, test_user, test_admin,
     ):
@@ -230,3 +282,38 @@ class TestChatService:
         assert result["response"] == "Профиль загружен, чем помочь?"
         # Второй вызов модели получил результат функции (роль tool)
         assert any(message["role"] == "tool" for message in seen[1])
+
+    async def test_system_prompt_has_current_datetime(
+        self, db_session, default_tenant, test_user, monkeypatch,
+    ):
+        """Модель получает сегодняшнюю дату в часовом поясе клиента."""
+        from app.modules.ai import chat_service
+
+        class _Message:
+            content = "Здравствуйте!"
+            tool_calls = None
+
+        seen: list[list[dict]] = []
+
+        async def fake_chat(messages, tools=None, **kwargs):
+            seen.append(messages)
+            return _Message()
+
+        def _today(offset_minutes: int) -> str:
+            tz = timezone(timedelta(minutes=offset_minutes))
+            return datetime.now(timezone.utc).astimezone(tz).strftime("%Y-%m-%d")
+
+        before = _today(180)
+        monkeypatch.setattr(chat_service, "chat_with_tools", fake_chat)
+        await chat_service.run_consultant_chat(
+            db_session,
+            default_tenant.id,
+            _client(test_user, default_tenant),
+            [{"role": "user", "content": "Запиши меня завтра"}],
+            tz_offset=180,
+        )
+        after = _today(180)
+
+        system_content = seen[0][0]["content"]
+        assert before in system_content or after in system_content
+        assert "UTC+03:00" in system_content
