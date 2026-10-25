@@ -75,3 +75,4 @@ backend/__pycache__/
 # Пользовательские загрузки и локальные бэкапы
 backend/uploads/
 backend/app/_legacy_backup/
+backup_*.sql

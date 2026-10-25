@@ -10,6 +10,8 @@ import MainPage from '../components/MainPage';
 import ConceptPage from '../components/ConceptPage';
 import AdminLayout from '../components/AdminLayout';
 import ClientLayout from '../pages/client/layout';
+import type { ServerBranding } from '../design/BrandProvider';
+import PrivacyPage from '../components/PrivacyPage';
 
 // Экраны грузим лениво: каждый уезжает в отдельный чанк вместо одного бандла ~2.4 МБ.
 const MasterDashboard = React.lazy(() => import('../MasterDashboard'));
@@ -69,6 +71,7 @@ export interface AppUser {
     background_color: string;
     white_label: boolean;
   };
+  branding?: ServerBranding;
 }
 
 export type AppRoutesProps = {
@@ -102,6 +105,7 @@ export default function AppRoutes({
   return (
     <Routes>
       <Route path="/register" element={<RegisterPage onRegistered={onRegistered} />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
       <Route
         path="/concept"
         element={

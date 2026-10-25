@@ -12,6 +12,31 @@ import {
   surfacePalettes,
 } from './surface';
 
+/** White Label салона, как его отдаёт GET /api/branding. */
+export interface ServerBranding {
+  accent_solid?: string | null;
+  radius_md?: string | null;
+  font_ui?: string | null;
+  base_theme?: BrandThemeId | null;
+  surface_mode?: SurfaceMode | null;
+  logo_url?: string | null;
+  name?: string | null;
+}
+
+/** Кэш последнего брендинга с сервера: только чтобы не мигать до ответа /api/me. */
+export const BRANDING_CACHE_KEY = 'serverBranding';
+
+function readCachedBranding(): ServerBranding | null {
+  try {
+    const raw = localStorage.getItem(BRANDING_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as ServerBranding) : null;
+  } catch {
+    return null;
+  }
+}
+
 interface BrandContextValue {
   brand: BrandTheme;
   brandId: BrandThemeId;
@@ -20,13 +45,20 @@ interface BrandContextValue {
   surfaceMode: SurfaceMode;
   setSurfaceMode: (mode: SurfaceMode) => void;
   surfaces: typeof surfacePalettes;
+  serverBranding: ServerBranding | null;
+  applyRemoteBranding: (branding?: ServerBranding | null) => void;
 }
 
 const BrandContext = createContext<BrandContextValue | null>(null);
 
 export function BrandProvider({ children }: { children: React.ReactNode }) {
-  const [brandId, setBrandIdState] = useState<BrandThemeId>(() => getBrandTheme().id);
-  const [surfaceMode, setSurfaceModeState] = useState<SurfaceMode>(() => getSurfaceMode());
+  const [serverBranding, setServerBranding] = useState<ServerBranding | null>(() => readCachedBranding());
+  const [brandId, setBrandIdState] = useState<BrandThemeId>(
+    () => serverBranding?.base_theme || getBrandTheme().id,
+  );
+  const [surfaceMode, setSurfaceModeState] = useState<SurfaceMode>(
+    () => serverBranding?.surface_mode || getSurfaceMode(),
+  );
   const brand = useMemo(() => getBrandTheme(brandId), [brandId]);
   const surface = surfacePalettes[surfaceMode];
   const styledTheme: AppTheme = useMemo(
@@ -36,25 +68,19 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     applyBrandCssVars(brand, surfaceMode);
-    try {
-      const raw = localStorage.getItem('brandOverrides');
-      if (!raw) return;
-      const o = JSON.parse(raw) as {
-        accentSolid?: string;
-        radiusMd?: string;
-        fontUi?: string;
-        surfaceMode?: SurfaceMode;
-      };
-      if (o.accentSolid) {
-        document.documentElement.style.setProperty('--color-gold', o.accentSolid);
-        document.documentElement.style.setProperty('--nd-primary', o.accentSolid);
-      }
-      if (o.radiusMd) document.documentElement.style.setProperty('--radius-md', o.radiusMd);
-      if (o.fontUi) document.documentElement.style.setProperty('--font-family', o.fontUi);
-    } catch {
-      /* ignore */
+    if (serverBranding?.accent_solid) {
+      document.documentElement.style.setProperty('--color-gold', serverBranding.accent_solid);
+      document.documentElement.style.setProperty('--nd-primary', serverBranding.accent_solid);
     }
-  }, [brand, surfaceMode]);
+    if (serverBranding?.radius_md) {
+      document.documentElement.style.setProperty('--radius-md', serverBranding.radius_md);
+      document.documentElement.style.setProperty('--radius-lg', serverBranding.radius_md);
+    }
+    if (serverBranding?.font_ui) {
+      document.documentElement.style.setProperty('--font-family', serverBranding.font_ui);
+      document.documentElement.style.setProperty('--font-body', serverBranding.font_ui);
+    }
+  }, [brand, surfaceMode, serverBranding]);
 
   const setBrandId = useCallback((id: BrandThemeId) => {
     storeBrandId(id);
@@ -64,12 +90,24 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const setSurfaceMode = useCallback((mode: SurfaceMode) => {
     storeSurfaceMode(mode);
     setSurfaceModeState(mode);
+  }, []);
+
+  /** Применить брендинг салона с сервера (после /api/me, логина или сохранения). */
+  const applyRemoteBranding = useCallback((remote?: ServerBranding | null) => {
+    if (!remote) return;
+    setServerBranding(remote);
     try {
-      const raw = localStorage.getItem('brandOverrides');
-      const prev = raw ? JSON.parse(raw) : {};
-      localStorage.setItem('brandOverrides', JSON.stringify({ ...prev, surfaceMode: mode }));
+      localStorage.setItem(BRANDING_CACHE_KEY, JSON.stringify(remote));
     } catch {
       /* ignore */
+    }
+    if (remote.base_theme) {
+      storeBrandId(remote.base_theme);
+      setBrandIdState(remote.base_theme);
+    }
+    if (remote.surface_mode) {
+      storeSurfaceMode(remote.surface_mode);
+      setSurfaceModeState(remote.surface_mode);
     }
   }, []);
 
@@ -82,8 +120,10 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       surfaceMode,
       setSurfaceMode,
       surfaces: surfacePalettes,
+      serverBranding,
+      applyRemoteBranding,
     }),
-    [brand, brandId, setBrandId, surfaceMode, setSurfaceMode],
+    [brand, brandId, setBrandId, surfaceMode, setSurfaceMode, serverBranding, applyRemoteBranding],
   );
 
   const algorithm = antdTheme.darkAlgorithm;

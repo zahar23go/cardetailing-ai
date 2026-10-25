@@ -99,6 +99,21 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    consent_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="152-ФЗ: когда пользователь дал согласие на обработку ПДн",
+    )
+    consent_version = Column(
+        String(20),
+        nullable=True,
+        comment="Версия политики конфиденциальности на момент согласия",
+    )
+    anonymized_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="152-ФЗ: когда данные клиента обезличены (право на забвение)",
+    )
 
     # relationships
     tenant = relationship("Tenant", back_populates="users")

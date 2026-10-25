@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
+import { message } from 'antd';
 import { useBrand } from '../../../design/BrandProvider';
 import { GoldButton, GhostGoldButton, GoldField } from '../../../design/components/BrandControls';
 import type { BrandThemeId } from '../../../design/tokens';
@@ -180,16 +181,46 @@ const Note = styled.p`
 `;
 
 export default function BrandingPage() {
-  const { brand, brandId, setBrandId, themes, surfaceMode, setSurfaceMode, surfaces } = useBrand();
+  const {
+    brand, brandId, setBrandId, themes, surfaceMode, setSurfaceMode, surfaces,
+    applyRemoteBranding,
+  } = useBrand();
   const [draftAccent, setDraftAccent] = useState(brand.colors.accent.solid);
   const [draftRadius, setDraftRadius] = useState(brand.radii.md);
   const [draftFont, setDraftFont] = useState(brand.fonts.ui);
+  const [logoUrl, setLogoUrl] = useState<string | null | undefined>(undefined);
+  const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     setDraftAccent(brand.colors.accent.solid);
     setDraftRadius(brand.radii.md);
     setDraftFont(brand.fonts.ui);
   }, [brand]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/branding', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.accent_solid) setDraftAccent(data.accent_solid);
+        if (data.radius_md) setDraftRadius(data.radius_md);
+        if (data.font_ui) setDraftFont(data.font_ui);
+        if (data.base_theme) setBrandId(data.base_theme);
+        if (data.surface_mode) setSurfaceMode(data.surface_mode);
+        setLogoUrl(data.logo_url || null);
+      } catch {
+        /* остаёмся на локальных значениях */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [setBrandId, setSurfaceMode]);
 
   const liveBrand = useMemo(() => ({
     ...brand,
@@ -217,20 +248,67 @@ export default function BrandingPage() {
     },
   }), [brand, draftAccent, draftRadius, draftFont]);
 
-  const saveManual = () => {
-    const overrides = {
-      accentSolid: draftAccent,
-      radiusMd: draftRadius,
-      fontUi: draftFont,
-      baseTheme: brandId,
-      surfaceMode,
-    };
-    localStorage.setItem('brandOverrides', JSON.stringify(overrides));
-    document.documentElement.style.setProperty('--color-gold', draftAccent);
-    document.documentElement.style.setProperty('--nd-primary', draftAccent);
-    document.documentElement.style.setProperty('--radius-md', draftRadius);
-    document.documentElement.style.setProperty('--font-family', draftFont);
-    alert('Черновик бренда сохранён локально (brandOverrides). На проде это уйдёт в API тенанта.');
+  const saveBranding = async () => {
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/branding', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          accent_solid: draftAccent,
+          radius_md: draftRadius,
+          font_ui: draftFont,
+          base_theme: brandId,
+          surface_mode: surfaceMode,
+          ...(logoUrl !== undefined ? { logo_url: logoUrl } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        message.error(
+          typeof data.detail === 'string' ? data.detail : 'Не удалось сохранить брендинг',
+        );
+        return;
+      }
+      applyRemoteBranding(data);
+      message.success('Брендинг сохранён в салоне');
+    } catch {
+      message.error('Нет связи с сервером');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const uploadLogo = async (file: File) => {
+    setUploadingLogo(true);
+    try {
+      const token = localStorage.getItem('token');
+      const body = new FormData();
+      body.append('file', file);
+      const res = await fetch('/api/branding/logo', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        message.error(
+          typeof data.detail === 'string' ? data.detail : 'Не удалось загрузить логотип',
+        );
+        return;
+      }
+      setLogoUrl(data.logo_url || null);
+      applyRemoteBranding(data);
+      message.success('Логотип обновлён');
+    } catch {
+      message.error('Нет связи с сервером');
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   return (
@@ -296,7 +374,55 @@ export default function BrandingPage() {
       </Panel>
 
       <Panel>
-        <h2>Ручная настройка (релиз / клиент)</h2>
+        <h2>Логотип салона</h2>
+        <Note>
+          Используется в PWA и уведомлениях салона. PNG, JPG или WEBP до 10 МБ.
+          Сохраняется на сервере в тенанте.
+        </Note>
+        <Row>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Логотип салона"
+                style={{ height: 56, maxWidth: 180, objectFit: 'contain' }}
+              />
+            ) : (
+              <span style={{ fontSize: 13, opacity: 0.7 }}>Логотип не задан</span>
+            )}
+            <label
+              style={{
+                display: 'inline-block',
+                padding: '10px 16px',
+                borderRadius: 10,
+                border: `1px solid ${brand.colors.accent.border}`,
+                color: brand.colors.accent.solid,
+                fontSize: 12,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                cursor: uploadingLogo ? 'wait' : 'pointer',
+                opacity: uploadingLogo ? 0.6 : 1,
+              }}
+            >
+              {uploadingLogo ? 'Загрузка…' : 'Загрузить логотип'}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: 'none' }}
+                disabled={uploadingLogo}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) uploadLogo(file);
+                }}
+              />
+            </label>
+          </div>
+        </Row>
+      </Panel>
+
+      <Panel>
+        <h2>Ручная настройка</h2>
         <Row>
           <FieldEdit>
             Accent / Gold
@@ -319,9 +445,10 @@ export default function BrandingPage() {
           $theme={liveBrand}
           type="button"
           whileTap={{ scale: 0.98 }}
-          onClick={saveManual}
+          onClick={saveBranding}
+          disabled={saving}
         >
-          Сохранить настройки
+          {saving ? 'Сохранение…' : 'Сохранить в салоне'}
         </GoldButton>
       </Panel>
 

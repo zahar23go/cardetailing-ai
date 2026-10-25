@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse, Response, JSONResponse
 from sqlalchemy import func, or_, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.database import get_db
 from app.core.auth import (
@@ -31,7 +32,18 @@ from app.core.image_service import (
 from app.core.deepseek_client import get_ai_response, get_financier_response, get_consultant_response
 from app.models import *  # noqa: F401,F403
 from app.schemas import *  # noqa: F401,F403
-from app.modules.plans import catalog as plan_catalog, modules_payload, normalize_plan, PLAN_IDS, load_tenant, pwa_for_tenant, web_manifest
+from app.modules.plans import (
+    catalog as plan_catalog,
+    modules_payload,
+    normalize_plan,
+    PLAN_IDS,
+    load_tenant,
+    pwa_for_tenant,
+    web_manifest,
+    branding_for_tenant,
+    features_for_plan,
+)
+from app.modules.core.privacy import CONSENT_VERSION, anonymize_client
 
 router = APIRouter()
 
@@ -154,6 +166,8 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         full_name=request.full_name,
         role="client",
         tenant_id=tenant_id,
+        consent_at=datetime.now(timezone.utc),
+        consent_version=CONSENT_VERSION,
     )
     db.add(user)
     await db.commit()
@@ -174,6 +188,7 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         tenant_name=extras.get("tenant_name"),
         logo_url=extras.get("logo_url"),
         pwa=extras.get("pwa") or {},
+        branding=extras.get("branding") or {},
     )
 
 @router.post("/api/login", response_model=AuthResponse)
@@ -199,6 +214,7 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
         tenant_name=extras.get("tenant_name"),
         logo_url=extras.get("logo_url"),
         pwa=extras.get("pwa") or {},
+        branding=extras.get("branding") or {},
     )
 
 @router.get("/api/me")
@@ -208,6 +224,82 @@ async def get_me(
 ):
     extras = await modules_payload(db, current_user.get("tenant_id"))
     return {**current_user, **extras, "enabled_modules": extras["modules"]}
+
+
+def _require_branding_feature(tenant: Tenant) -> None:
+    if not features_for_plan(getattr(tenant, "plan", None)).get("branding"):
+        raise HTTPException(
+            status_code=403,
+            detail="White Label доступен на тарифе Бизнес.",
+        )
+
+
+@router.get("/api/branding")
+async def get_branding(
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """White Label текущего салона: цвета, шрифт, тема и логотип."""
+    tenant = await load_tenant(db, current_user.get("tenant_id"))
+    return branding_for_tenant(tenant)
+
+
+@router.put("/api/branding")
+async def update_branding(
+    request: BrandingUpdate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Сохранить брендинг в tenant.config.branding."""
+    tenant = await load_tenant(db, current_user.get("tenant_id"))
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Тенант не найден")
+    _require_branding_feature(tenant)
+
+    data = request.model_dump(exclude_unset=True)
+    has_logo = "logo_url" in data
+    logo_url = data.pop("logo_url", None)
+
+    cfg = dict(tenant.config or {})
+    saved = cfg.get("branding")
+    saved = dict(saved) if isinstance(saved, dict) else {}
+    saved.update({key: value for key, value in data.items() if value is not None})
+    cfg["branding"] = saved
+    tenant.config = cfg
+    flag_modified(tenant, "config")
+    if has_logo:
+        tenant.logo_url = logo_url or None
+
+    await db.commit()
+    await db.refresh(tenant)
+    return branding_for_tenant(tenant)
+
+
+@router.post("/api/branding/logo")
+async def upload_branding_logo(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Загрузить логотип салона и применить его в PWA-манифесте."""
+    tenant = await load_tenant(db, current_user.get("tenant_id"))
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Тенант не найден")
+    _require_branding_feature(tenant)
+
+    raw = await file.read()
+    try:
+        validate_image(raw, file.filename or "logo.png")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    url, _thumb = save_file_local(
+        raw, "branding", generate_filename(file.filename or "logo.png")
+    )
+    tenant.logo_url = url
+    await db.commit()
+    await db.refresh(tenant)
+    return branding_for_tenant(tenant)
 
 
 @router.get("/api/modules")
@@ -282,6 +374,21 @@ async def update_me(
     await db.commit()
     await db.refresh(user)
     return UserOut.model_validate(user)
+
+
+@router.delete("/api/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_data(
+    current_user: dict = Depends(_get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Право на забвение: обезличить ПДн клиента, сохранив финансовую историю."""
+    if current_user.get("role") != "client":
+        raise HTTPException(
+            status_code=400,
+            detail="Удаление данных доступно только клиентскому аккаунту",
+        )
+    await anonymize_client(db, current_user["id"])
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get("/api/onboarding", response_model=OnboardingStatus)
 async def get_onboarding(

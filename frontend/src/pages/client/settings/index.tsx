@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Empty,
   InputNumber,
+  Modal,
   Space,
   Spin,
   Table,
@@ -169,6 +170,29 @@ export default function ClientSettingsPage() {
     setSavingCar(false);
   };
 
+  const deleteMyData = () => {
+    Modal.confirm({
+      title: 'Удалить мои данные?',
+      content:
+        'Аккаунт обезличивается: имя, телефон, госномер, VIN и фото удаляются. '
+        + 'История визитов останется в отчётности салона без ваших персональных данных. '
+        + 'Восстановить доступ будет нельзя.',
+      okText: 'Удалить',
+      okButtonProps: { danger: true },
+      cancelText: 'Отмена',
+      onOk: async () => {
+        try {
+          await apiFetch<void>('/api/me', { method: 'DELETE' });
+          localStorage.removeItem('token');
+          message.success('Данные удалены');
+          window.location.assign('/');
+        } catch (e: unknown) {
+          message.error(e instanceof Error ? e.message : 'Не удалось удалить данные');
+        }
+      },
+    });
+  };
+
   if (loading) return <Spin />;
 
   return (
@@ -320,6 +344,28 @@ export default function ClientSettingsPage() {
             }}
           />
         )}
+      </Card>
+
+      <div className="client-section-title">Персональные данные</div>
+      <Card variant="admin" className="client-block">
+        <Space direction="vertical" size="middle" className="client-stack">
+          <Text className="text-titanium">
+            Право на забвение (152-ФЗ): профиль и автомобили обезличиваются,
+            история визитов остаётся в финансовой отчётности салона без ваших
+            персональных данных.
+          </Text>
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gold"
+          >
+            Политика конфиденциальности
+          </a>
+          <Button look="ghost" onClick={deleteMyData}>
+            Удалить мои данные
+          </Button>
+        </Space>
       </Card>
     </>
   );

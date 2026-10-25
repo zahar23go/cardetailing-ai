@@ -24,6 +24,7 @@ export {
   SilverButton,
 } from './components/BrandControls';
 export { GoldCarLogo } from './components/GoldCarLogo';
-export { BrandProvider, useBrand } from './BrandProvider';
+export { BrandProvider, useBrand, BRANDING_CACHE_KEY } from './BrandProvider';
+export type { ServerBranding } from './BrandProvider';
 export { applyBrandCssVars, buildStyledTheme } from './applyBrand';
 export type { AppTheme } from './applyBrand';

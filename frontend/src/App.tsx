@@ -7,6 +7,7 @@ import { PLAN_UPDATED_EVENT } from './pages/settings/tariffs';
 import { AUTH_EXPIRED_EVENT } from './pages/client/api';
 import PwaInstallBanner from './PwaInstallBanner';
 import { applyPwaBrand, hidePwaSplash, type PwaBrand } from './pwa';
+import { useBrand, BRANDING_CACHE_KEY, type ServerBranding } from './design/BrandProvider';
 
 const API_BASE = '';
 
@@ -26,6 +27,7 @@ function userFromMe(data: Record<string, unknown>): AppUser {
     tenant_name: data.tenant_name as string | undefined,
     logo_url: data.logo_url as string | undefined,
     pwa: data.pwa as PwaBrand | undefined,
+    branding: data.branding as ServerBranding | undefined,
   };
 }
 
@@ -40,6 +42,7 @@ function userFromLogin(data: {
   tenant_name?: string;
   logo_url?: string | null;
   pwa?: PwaBrand;
+  branding?: ServerBranding;
 }): AppUser {
   return {
     ...data.user,
@@ -53,6 +56,7 @@ function userFromLogin(data: {
     tenant_name: data.tenant_name,
     logo_url: data.logo_url,
     pwa: data.pwa,
+    branding: data.branding,
   };
 }
 
@@ -61,6 +65,7 @@ function App() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const navigate = useNavigate();
+  const { applyRemoteBranding } = useBrand();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -101,6 +106,10 @@ function App() {
   useEffect(() => {
     applyPwaBrand(user?.pwa, user?.tenant_id);
   }, [user?.pwa, user?.tenant_id]);
+
+  useEffect(() => {
+    if (user?.branding) applyRemoteBranding(user.branding);
+  }, [user?.branding, applyRemoteBranding]);
 
   const fetchUser = async (token: string) => {
     try {
@@ -182,6 +191,7 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem(BRANDING_CACHE_KEY);
     setIsAuthenticated(false);
     setUser(null);
     message.info('👋 Вы вышли из системы');

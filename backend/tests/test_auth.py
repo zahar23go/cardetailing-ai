@@ -22,6 +22,7 @@ class TestAuth:
             "phone": "+79991111111",
             "password": "mypassword",
             "full_name": "Новый Клиент",
+            "consent": True,
         }
         response = await client.post("/api/register", json=payload)
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
@@ -33,6 +34,20 @@ class TestAuth:
         assert data["user"]["phone"] == payload["phone"]
         assert data["user"]["full_name"] == payload["full_name"]
         assert data["user"]["role"] == "client"
+        assert data["branding"]["accent_solid"] == "#D4AF37"
+
+    async def test_register_requires_consent(self, client: AsyncClient, default_tenant):
+        """❌ Без согласия на обработку ПДн регистрация отклоняется (152-ФЗ)."""
+        base = {
+            "phone": "+79992223344",
+            "password": "mypassword",
+            "full_name": "Без согласия",
+        }
+        missing = await client.post("/api/register", json=base)
+        assert missing.status_code == 422, missing.text
+
+        refused = await client.post("/api/register", json={**base, "consent": False})
+        assert refused.status_code == 422, refused.text
 
     # ------------------------------------------------------------------
     # 2. Регистрация с существующим телефоном → 409
@@ -43,6 +58,7 @@ class TestAuth:
             "phone": test_user.phone,  # телефон уже занят
             "password": "anotherpass",
             "full_name": "Дубликат",
+            "consent": True,
         }
         response = await client.post("/api/register", json=payload)
         assert response.status_code == 409, f"Expected 409, got {response.status_code}: {response.text}"

@@ -1,7 +1,8 @@
 """Pydantic schemas — модуль core."""
+import re
 from datetime import datetime
 from decimal import Decimal
-from typing import Generic, Optional, TypeVar
+from typing import Generic, Literal, Optional, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -47,6 +48,72 @@ class RegisterRequest(BaseModel):
     password: str = Field(..., min_length=4, max_length=255)
     full_name: str = Field(..., min_length=1, max_length=150)
     tenant_id: Optional[UUID] = Field(None, description="Tenant UUID (required for client registration)")
+    consent: bool = Field(..., description="Согласие на обработку персональных данных (152-ФЗ)")
+    consent_version: Optional[str] = Field(None, max_length=20)
+
+    @field_validator("consent")
+    @classmethod
+    def _consent_required(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("Требуется согласие на обработку персональных данных")
+        return value
+
+
+_ACCENT_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+_RADIUS_RE = re.compile(r"^(?:[0-9]|[12][0-9]|3[0-2])px$")
+_FONT_RE = re.compile(r"^[A-Za-z0-9 ,'\"\-]{1,120}$")
+_LOGO_PREFIXES = ("/uploads/", "/icons/", "http://", "https://")
+
+
+class BrandingUpdate(BaseModel):
+    """White Label салона: сохраняется в tenant.config.branding."""
+
+    accent_solid: Optional[str] = Field(None, description="Hex-цвет акцента, #RRGGBB")
+    radius_md: Optional[str] = Field(None, description="Скругление, например 14px")
+    font_ui: Optional[str] = Field(None, max_length=120, description="CSS font-family")
+    base_theme: Optional[Literal["goldMetal", "goldGlow", "silver"]] = None
+    surface_mode: Optional[Literal["light", "dark"]] = None
+    logo_url: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("accent_solid")
+    @classmethod
+    def _accent(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        value = value.strip()
+        if not _ACCENT_RE.fullmatch(value):
+            raise ValueError("accent_solid должен быть в формате #RRGGBB")
+        return value.upper()
+
+    @field_validator("radius_md")
+    @classmethod
+    def _radius(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        value = value.strip()
+        if not _RADIUS_RE.fullmatch(value):
+            raise ValueError("radius_md должен быть в формате 0px…32px")
+        return value
+
+    @field_validator("font_ui")
+    @classmethod
+    def _font(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        value = value.strip()
+        if not _FONT_RE.fullmatch(value):
+            raise ValueError("font_ui содержит недопустимые символы")
+        return value
+
+    @field_validator("logo_url")
+    @classmethod
+    def _logo(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not value.strip():
+            return None
+        value = value.strip()
+        if not value.startswith(_LOGO_PREFIXES):
+            raise ValueError("logo_url должен начинаться с /uploads/, /icons/ или http(s)://")
+        return value
 
 class LoginRequest(BaseModel):
     phone: str = Field(..., min_length=1)
@@ -73,6 +140,7 @@ class AuthResponse(BaseModel):
     tenant_name: Optional[str] = None
     logo_url: Optional[str] = None
     pwa: dict = Field(default_factory=dict)
+    branding: dict = Field(default_factory=dict)
 
 
 class PlanCatalogItem(BaseModel):

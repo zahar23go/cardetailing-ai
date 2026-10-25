@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getBrandTheme, GoldButton, GhostGoldButton, GoldField } from '../design';
 
 const orbPulse = keyframes`
@@ -166,6 +166,31 @@ const ErrorText = styled.div`
   color: #e74c3c;
 `;
 
+const ConsentRow = styled.label`
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 2px 0 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: ${brand.colors.text.secondary};
+  cursor: pointer;
+
+  input {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+    margin-top: 2px;
+    accent-color: ${brand.colors.accent.solid};
+    cursor: pointer;
+  }
+
+  a {
+    color: ${brand.colors.accent.solid};
+    text-decoration: underline;
+  }
+`;
+
 const HomeBar = styled.div`
   width: 128px;
   height: 5px;
@@ -207,6 +232,7 @@ export default function RegisterPage({ onRegistered }: RegisterPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [consent, setConsent] = useState(false);
 
   const submit = async () => {
     setError('');
@@ -226,6 +252,10 @@ export default function RegisterPage({ onRegistered }: RegisterPageProps) {
       setError('Пароли не совпадают');
       return;
     }
+    if (!consent) {
+      setError('Без согласия на обработку персональных данных регистрация невозможна');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -236,6 +266,8 @@ export default function RegisterPage({ onRegistered }: RegisterPageProps) {
           phone: phone.trim(),
           password,
           full_name: fullName.trim(),
+          consent: true,
+          consent_version: '2026-10-25',
         }),
       });
       const data = await res.json();
@@ -343,6 +375,21 @@ export default function RegisterPage({ onRegistered }: RegisterPageProps) {
                   autoComplete="new-password"
                 />
               </GoldField>
+
+              <ConsentRow>
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                />
+                <span>
+                  Я согласен с{' '}
+                  <Link to="/privacy" target="_blank" rel="noopener noreferrer">
+                    политикой конфиденциальности
+                  </Link>{' '}
+                  и обработкой персональных данных
+                </span>
+              </ConsentRow>
 
               {error ? <ErrorText>{error}</ErrorText> : null}
 

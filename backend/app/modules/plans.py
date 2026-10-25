@@ -26,6 +26,15 @@ PWA_DEFAULT_ICON = "/icons/icon-192x192.png"
 PWA_THEME = "#C8A977"
 PWA_BG = "#0B0D10"
 
+# White Label: дефолты совпадают с темой goldMetal во фронтенде.
+DEFAULT_BRANDING: dict[str, str] = {
+    "accent_solid": "#D4AF37",
+    "radius_md": "14px",
+    "font_ui": '"Manrope", "Montserrat", -apple-system, BlinkMacSystemFont, sans-serif',
+    "base_theme": "goldMetal",
+    "surface_mode": "light",
+}
+
 BASIC_MODULES = [
     "core",
     "services",
@@ -167,10 +176,27 @@ def catalog() -> list[dict]:
     ]
 
 
+def branding_for_tenant(tenant) -> dict:
+    """Сохранённый White Label салона из tenant.config + логотип и имя тенанта."""
+    cfg = getattr(tenant, "config", None) if tenant is not None else None
+    saved = cfg.get("branding") if isinstance(cfg, dict) else None
+    if not isinstance(saved, dict):
+        saved = {}
+    branding = dict(DEFAULT_BRANDING)
+    for key in DEFAULT_BRANDING:
+        value = saved.get(key)
+        if isinstance(value, str) and value.strip():
+            branding[key] = value.strip()
+    branding["logo_url"] = getattr(tenant, "logo_url", None) if tenant is not None else None
+    branding["name"] = getattr(tenant, "name", None) if tenant is not None else None
+    return branding
+
+
 def pwa_for_tenant(tenant) -> dict:
     """White Label на тарифе Бизнес: имя и иконка салона. Иначе бренд платформы."""
     plan = normalize_plan(getattr(tenant, "plan", None) if tenant is not None else None)
     branding = bool(features_for_plan(plan).get("branding"))
+    accent = branding_for_tenant(tenant)["accent_solid"]
     if tenant is not None and branding:
         name = (getattr(tenant, "name", None) or PWA_DEFAULT_NAME).strip() or PWA_DEFAULT_NAME
         icon = (getattr(tenant, "logo_url", None) or "").strip() or PWA_DEFAULT_ICON
@@ -179,7 +205,7 @@ def pwa_for_tenant(tenant) -> dict:
             "name": name,
             "short_name": short,
             "icon": icon,
-            "theme_color": PWA_THEME,
+            "theme_color": accent,
             "background_color": PWA_BG,
             "white_label": True,
         }
@@ -187,7 +213,7 @@ def pwa_for_tenant(tenant) -> dict:
         "name": PWA_DEFAULT_NAME,
         "short_name": PWA_DEFAULT_SHORT,
         "icon": PWA_DEFAULT_ICON,
-        "theme_color": PWA_THEME,
+        "theme_color": accent,
         "background_color": PWA_BG,
         "white_label": False,
     }
@@ -268,6 +294,7 @@ async def modules_payload(db: AsyncSession, tenant_id: str | UUID | None) -> dic
     payload = plan_payload(plan)
     pwa = pwa_for_tenant(tenant)
     payload["pwa"] = pwa
+    payload["branding"] = branding_for_tenant(tenant)
     payload["tenant_name"] = getattr(tenant, "name", None) if tenant is not None else None
     payload["logo_url"] = getattr(tenant, "logo_url", None) if tenant is not None else None
     from app.models import Appointment
