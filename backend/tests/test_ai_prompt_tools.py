@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.core import prompt_loader
-from app.models import Appointment, DiscountRule, MasterSkill, Material, Notification, Photo, User
+from app.models import Appointment, DiscountRule, MasterSkill, Material, Notification, Photo, Service, User
 from app.modules.ai.chat_service import build_tools
 from app.modules.ai.detailer_tools import DetailerTools, dispatch
 
@@ -241,6 +241,42 @@ class TestDetailerFunctions:
             Appointment, booking["bookings"][0]["appointment_id"]
         )
         assert appointment.master_id == second.id
+
+    async def test_pick_master_falls_back_without_skill(
+        self, db_session, default_tenant, test_user, test_car, test_master, test_service,
+    ):
+        """Навык есть только на другую услугу — всё равно назначается свободный мастер."""
+        other_service = Service(
+            name="Химчистка салона",
+            description="Салон и кожа",
+            category="Салон",
+            price=3500,
+            duration=90,
+            material_cost=200,
+            is_active=True,
+            tenant_id=default_tenant.id,
+        )
+        db_session.add(other_service)
+        await db_session.flush()
+        db_session.add(MasterSkill(
+            tenant_id=default_tenant.id,
+            master_id=test_master.id,
+            service_id=other_service.id,
+        ))
+        await db_session.commit()
+
+        tools = DetailerTools(db_session, default_tenant.id, _client(test_user, default_tenant))
+        booking = await tools.create_appointment([{
+            "service_name": test_service.name,
+            "date": _future(),
+            "time": "12:00",
+        }])
+        assert booking["ok"] is True
+
+        appointment = await db_session.get(
+            Appointment, booking["bookings"][0]["appointment_id"]
+        )
+        assert appointment.master_id == test_master.id
 
     async def test_create_appointment_applies_discount(
         self, db_session, default_tenant, test_user, test_car, test_master, test_service,

@@ -564,7 +564,10 @@ class DetailerTools:
         return intervals
 
     async def _pick_master(self, service_id: int, start: datetime, end: datetime) -> User | None:
-        """Свободный мастер для услуги: навык важнее, из равных — менее загруженный за день."""
+        """Свободный мастер: навык важнее, из равных — менее загруженный за день.
+
+        Если мастера с нужным навыком нет, подходит любой свободный.
+        """
         result = await self.db.execute(
             select(User)
             .where(User.tenant_id == self.tenant_id, User.role == "master")
@@ -586,17 +589,8 @@ class DetailerTools:
         skilled = [
             master for master in masters if service_id in skills_by_master.get(master.id, set())
         ]
-        if skilled:
-            eligible = skilled
-        else:
-            # Навыков нет — как раньше: универсалы и мастера без навыков.
-            eligible = [
-                master
-                for master in masters
-                if not skills_by_master.get(master.id) or service_id in skills_by_master[master.id]
-            ]
-        if not eligible:
-            return None
+        # Нет мастера с нужным навыком — берём любого свободного, как универсала.
+        eligible = skilled or masters
 
         busy_result = await self.db.execute(
             select(Appointment.master_id).where(
