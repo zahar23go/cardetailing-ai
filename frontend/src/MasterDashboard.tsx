@@ -749,7 +749,7 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
                               {formatCurrency(item.total_price)}
                             </Text>
                             <Space className="w-full" style={{ justifyContent: 'flex-end' }} wrap>
-                              {item.status === 'confirmed' && (
+                              {(item.status === 'pending' || item.status === 'confirmed') && (
                                 <Button
                                   size="small"
                                   icon={<PlayCircleOutlined />}

@@ -635,7 +635,7 @@ async def update_master_appointment_status(
     current_user: dict = Depends(_require_master),
     db: AsyncSession = Depends(get_db),
 ):
-    """Сменить статус записи (master: in_progress → completed или confirmed → in_progress)."""
+    """Сменить статус записи (master: pending/confirmed → in_progress, in_progress → completed)."""
     result = await db.execute(
         select(Appointment).options(*_APPT_LOAD).where(
             Appointment.id == appointment_id,
@@ -652,6 +652,7 @@ async def update_master_appointment_status(
     new_status = request.status
     # Разрешённые переходы для мастера
     valid_transitions = {
+        "pending": ["in_progress"],
         "confirmed": ["in_progress"],
         "in_progress": ["completed"],
     }

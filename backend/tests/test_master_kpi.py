@@ -39,6 +39,21 @@ class TestMasterKpi:
         assert len(data["sparkline_revenue"]) == 14
         assert data["score_hint"] == "техкарта · расход · повтор"
 
+    async def test_master_takes_pending_into_work(
+        self, client, auth_headers, master_headers, test_master, test_service, test_car,
+    ):
+        """AI создаёт записи в pending — мастер должен иметь возможность взять их в работу."""
+        appt_id = await _create_appointment(
+            client, auth_headers, test_service.id, test_car.id, master_id=test_master.id,
+        )
+        resp = await client.put(
+            f"/api/masters/me/appointments/{appt_id}/status",
+            json={"status": "in_progress"},
+            headers=master_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == "in_progress"
+
     async def test_score_formula(self):
         assert compute_shift_score(
             completed=0, compliance_pct=100, overspend_ratio=0, repeat_rate=0, no_show_rate=0,
