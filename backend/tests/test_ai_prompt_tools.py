@@ -143,6 +143,48 @@ class TestDetailerFunctions:
         assert result["slots"]
         assert result["slots"][0]["time"]
 
+    async def test_get_free_slots_includes_afternoon(
+        self, db_session, default_tenant, test_user, test_service,
+    ):
+        """Отдаём весь день, иначе модель считает 14:00 занятым."""
+        tools = DetailerTools(db_session, default_tenant.id, _client(test_user, default_tenant))
+        result = await tools.get_free_slots([test_service.name], date=_future())
+        times = [slot["time"] for slot in result["slots"]]
+        assert len(times) > 6
+        assert "14:00" in times
+
+    async def test_get_free_slots_accepts_dotted_date(
+        self, db_session, default_tenant, test_user, test_service,
+    ):
+        day = datetime.fromisoformat(_future()).strftime("%d.%m.%Y")
+        tools = DetailerTools(db_session, default_tenant.id, _client(test_user, default_tenant))
+        result = await tools.get_free_slots([test_service.name], date=day)
+        assert result["date"] == _future()
+        assert result["slots"]
+
+    async def test_get_free_slots_rejects_past_date(
+        self, db_session, default_tenant, test_user, test_service,
+    ):
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).date().isoformat()
+        tools = DetailerTools(db_session, default_tenant.id, _client(test_user, default_tenant))
+        result = await tools.get_free_slots([test_service.name], date=yesterday)
+        assert result["ok"] is False
+        assert "прошла" in result["error"]
+
+    async def test_create_appointment_rejects_past_date(
+        self, db_session, default_tenant, test_user, test_car, test_master, test_service,
+    ):
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).date().isoformat()
+        tools = DetailerTools(db_session, default_tenant.id, _client(test_user, default_tenant))
+        result = await tools.create_appointment([{
+            "service_name": test_service.name,
+            "employee_name": test_master.full_name,
+            "date": yesterday,
+            "time": "10:00",
+        }])
+        assert result["ok"] is False
+        assert "прошла" in result["bookings"][0]["error"]
+
     async def test_create_appointment_and_master_brief(
         self, db_session, default_tenant, test_user, test_car, test_master, test_service,
     ):

@@ -73,6 +73,22 @@ def _overlaps(start: datetime, end: datetime, other_start: datetime, other_end: 
     return start < other_end and end > other_start
 
 
+_DATE_FORMATS = ("%Y-%m-%d", "%d.%m.%Y", "%d.%m.%y")
+
+
+def _parse_date_arg(value: str | None) -> tuple[str | None, str | None]:
+    """Дата из аргумента модели → ISO (YYYY-MM-DD). Второй элемент — текст ошибки."""
+    if not value or not str(value).strip():
+        return None, "Нужна дата в формате YYYY-MM-DD."
+    text = str(value).strip()
+    for fmt in _DATE_FORMATS:
+        try:
+            return datetime.strptime(text, fmt).date().isoformat(), None
+        except ValueError:
+            continue
+    return None, f"Не понял дату «{value}». Нужен формат YYYY-MM-DD."
+
+
 class DetailerTools:
     """Диспетчер функций промпта, привязанный к клиенту и его сессии БД."""
 
@@ -141,13 +157,19 @@ class DetailerTools:
                 return master
         return None
 
+    def _today_iso(self) -> str:
+        return datetime.now(timezone.utc).astimezone(client_tz(self.tz_offset)).date().isoformat()
+
     def _parse_slot_datetime(self, date_str: str | None, time_str: str | None) -> datetime | None:
         if not date_str or not time_str:
             return None
         tz = client_tz(self.tz_offset)
         text = time_str.strip()
         fmt = "%H:%M" if len(text) <= 5 else "%H:%M:%S"
-        local = datetime.strptime(f"{date_str.strip()} {text}", f"%Y-%m-%d {fmt}")
+        try:
+            local = datetime.strptime(f"{date_str} {text}", f"%Y-%m-%d {fmt}")
+        except ValueError:
+            return None
         return local.replace(tzinfo=tz).astimezone(timezone.utc)
 
     # --------------------------------------------------------------- handlers
@@ -304,11 +326,26 @@ class DetailerTools:
         duration = max((int(s.duration or DEFAULT_DURATION) for s in services), default=DEFAULT_DURATION)
         service_id = services[0].id if services else None
 
+        date_iso = None
         if date:
+            date_iso, date_error = _parse_date_arg(date)
+            if date_error:
+                return {"ok": False, "error": date_error, "today": self._today_iso()}
+            if date_iso < self._today_iso():
+                return {
+                    "ok": False,
+                    "error": (
+                        f"Дата {date_iso} уже прошла, сегодня {self._today_iso()}. "
+                        "Уточни дату у клиента."
+                    ),
+                    "today": self._today_iso(),
+                }
+
+        if date_iso:
             items = await day_slot_grid(
                 self.db,
                 self.tenant_id,
-                date_str=date,
+                date_str=date_iso,
                 duration_min=duration,
                 service_id=service_id,
                 tz_offset_minutes=self.tz_offset,
@@ -325,7 +362,7 @@ class DetailerTools:
 
         master = await self._match_master(employee_name) if employee_name else None
         if master is not None:
-            busy = await self._busy_intervals(master.id, date)
+            busy = await self._busy_intervals(master.id, date_iso)
             available = [
                 slot
                 for slot in available
@@ -350,10 +387,12 @@ class DetailerTools:
                 "employee_name": master.full_name if master else None,
                 "box_name": slot.get("box_name"),
             }
-            for slot in available[:6]
+            for slot in available
         ]
         return {
             "slots": slots,
+            "date": date_iso,
+            "today": self._today_iso(),
             "duration_min": duration,
             "services": [s.name for s in services],
             "employee_name": master.full_name if master else employee_name,
@@ -375,9 +414,23 @@ class DetailerTools:
             if employee_name and master is None:
                 results.append({"ok": False, "error": f"Мастер не найден: {employee_name}"})
                 continue
-            start = self._parse_slot_datetime(booking.get("date"), booking.get("time"))
+            booking_date, date_error = _parse_date_arg(booking.get("date"))
+            if date_error:
+                results.append({"ok": False, "error": date_error, "today": self._today_iso()})
+                continue
+            start = self._parse_slot_datetime(booking_date, booking.get("time"))
             if start is None:
                 results.append({"ok": False, "error": "Нужны дата и время записи."})
+                continue
+            if start < datetime.now(timezone.utc):
+                results.append({
+                    "ok": False,
+                    "error": (
+                        f"Дата {booking_date} уже прошла, сегодня {self._today_iso()}. "
+                        "Уточни дату у клиента."
+                    ),
+                    "today": self._today_iso(),
+                })
                 continue
 
             end = start + timedelta(minutes=int(service.duration or DEFAULT_DURATION))
