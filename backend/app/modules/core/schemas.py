@@ -32,6 +32,19 @@ class TenantUpdate(BaseModel):
     logo_url: Optional[str] = None
     config: Optional[dict] = None
 
+class TenantSelfUpdate(BaseModel):
+    """Поля, которые администратор салона может менять у своего тенанта."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Название салона не может быть пустым")
+        return value
+
 class TenantOut(BaseModel):
     id: UUID
     name: str

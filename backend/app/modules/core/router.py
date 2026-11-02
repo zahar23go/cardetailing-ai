@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone, time
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status, Body, Request
 from fastapi.responses import StreamingResponse, Response, JSONResponse
@@ -17,6 +17,7 @@ from app.core.auth import (
     get_current_user as _get_current_user,
     require_admin as _require_admin,
     require_master as _require_master,
+    require_super_admin as _require_super_admin,
     hash_password as _hash_password,
     verify_password as _verify_password,
     create_token as _create_token,
@@ -49,12 +50,12 @@ router = APIRouter()
 
 @router.get("/api/tenants")
 async def get_tenants(
-    current_user: dict = Depends(_require_admin),
+    current_user: dict = Depends(_require_super_admin),
     db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ):
-    """Получить список всех тенантов (только admin/super_admin)."""
+    """Получить список всех тенантов (только super_admin)."""
     stmt = select(Tenant).order_by(Tenant.name)
     items, total = await _paginate(db, stmt, skip=skip, limit=limit)
     return PaginatedResponse[TenantOut](
@@ -65,16 +66,17 @@ async def get_tenants(
 @router.post("/api/tenants", response_model=TenantOut)
 async def create_tenant(
     request: TenantCreate,
-    current_user: dict = Depends(_require_admin),
+    current_user: dict = Depends(_require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Создать новый тенант (только admin/super_admin)."""
+    """Создать новый тенант (только super_admin)."""
     # Проверка уникальности subdomain
     existing = await db.execute(select(Tenant).where(Tenant.subdomain == request.subdomain))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Tenant with this subdomain already exists")
 
     tenant = Tenant(
+        id=uuid4(),
         name=request.name,
         subdomain=request.subdomain,
         logo_url=request.logo_url,
@@ -88,10 +90,10 @@ async def create_tenant(
 @router.get("/api/tenants/{tenant_id}", response_model=TenantOut)
 async def get_tenant(
     tenant_id: UUID,
-    current_user: dict = Depends(_require_admin),
+    current_user: dict = Depends(_require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Получить тенант по ID."""
+    """Получить тенант по ID (только super_admin)."""
     result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
     tenant = result.scalar_one_or_none()
     if not tenant:
@@ -102,10 +104,10 @@ async def get_tenant(
 async def update_tenant(
     tenant_id: UUID,
     request: TenantUpdate,
-    current_user: dict = Depends(_require_admin),
+    current_user: dict = Depends(_require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Обновить тенант."""
+    """Обновить тенант (только super_admin)."""
     result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
     tenant = result.scalar_one_or_none()
     if not tenant:
@@ -122,13 +124,10 @@ async def update_tenant(
 @router.delete("/api/tenants/{tenant_id}")
 async def delete_tenant(
     tenant_id: UUID,
-    current_user: dict = Depends(_require_admin),
+    current_user: dict = Depends(_require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Удалить тенант (только super_admin)."""
-    if current_user["role"] != "super_admin":
-        raise HTTPException(status_code=403, detail="Только super_admin может удалять тенанты")
-
     result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
     tenant = result.scalar_one_or_none()
     if not tenant:
@@ -334,11 +333,9 @@ async def list_plans(current_user: dict = Depends(_get_current_user)):
 async def set_tenant_plan(
     tenant_id: UUID,
     request: TenantPlanUpdate,
-    current_user: dict = Depends(_require_admin),
+    current_user: dict = Depends(_require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    if current_user["role"] != "super_admin":
-        raise HTTPException(status_code=403, detail="Тариф назначает супер-админ")
     plan = normalize_plan(request.plan)
     if request.plan.strip().lower() not in PLAN_IDS:
         raise HTTPException(status_code=422, detail="Тариф: basic, pro или business")
@@ -350,6 +347,27 @@ async def set_tenant_plan(
     await db.commit()
     await db.refresh(tenant)
     return TenantOut.model_validate(tenant)
+
+
+@router.put("/api/tenant/me", response_model=TenantOut)
+async def update_my_tenant(
+    request: TenantSelfUpdate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Обновить название своего салона (admin/super_admin).
+
+    Отдельный self-service endpoint: обычный admin не получает доступ
+    к платформенному CRUD тенантов, но может переименовать свой салон.
+    """
+    tenant = await load_tenant(db, current_user.get("tenant_id"))
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    tenant.name = request.name
+    await db.commit()
+    await db.refresh(tenant)
+    return TenantOut.model_validate(tenant)
+
 
 @router.put("/api/me", response_model=UserOut)
 async def update_me(

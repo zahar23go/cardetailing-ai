@@ -79,6 +79,17 @@ def require_master(current_user: dict = Depends(get_current_user)):
     return current_user
 
 
+def require_super_admin(current_user: dict = Depends(get_current_user)):
+    """Управление тенантами доступно только супер-администратору платформы."""
+    if current_user["role"] != "super_admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Доступ запрещён. Только для супер-администратора.",
+        )
+    return current_user
+
+
 _get_current_user = get_current_user
 _require_admin = require_admin
 _require_master = require_master
+_require_super_admin = require_super_admin

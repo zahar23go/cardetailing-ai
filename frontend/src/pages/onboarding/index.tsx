@@ -193,11 +193,6 @@ export default function OwnerOnboardingPage() {
         if (s.salon_name) setSalon(s.salon_name);
       })
       .catch(() => undefined);
-    apiFetch<{ id?: string; tenant_id?: string }>('/api/me')
-      .then((me) => {
-        if (me.tenant_id) localStorage.setItem('onboarding-tenant', me.tenant_id);
-      })
-      .catch(() => undefined);
   }, []);
 
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -207,9 +202,8 @@ export default function OwnerOnboardingPage() {
     setBusy(true);
     try {
       storeBrandId(brandId);
-      const tenantId = localStorage.getItem('onboarding-tenant');
-      if (tenantId && salon.trim()) {
-        await apiFetch(`/api/tenants/${tenantId}`, {
+      if (salon.trim()) {
+        await apiFetch('/api/tenant/me', {
           method: 'PUT',
           body: JSON.stringify({ name: salon.trim() }),
         });
