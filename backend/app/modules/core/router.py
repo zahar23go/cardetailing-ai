@@ -33,6 +33,7 @@ from app.core.image_service import (
 from app.core.deepseek_client import get_ai_response, get_financier_response, get_consultant_response
 from app.models import *  # noqa: F401,F403
 from app.schemas import *  # noqa: F401,F403
+from app.modules.core.schemas import UserAdminUpdate
 from app.modules.plans import (
     catalog as plan_catalog,
     modules_payload,
@@ -394,6 +395,8 @@ async def update_me(
         user.email = (data.get("email") or "").strip() or None
     if "birth_date" in data:
         user.birth_date = data.get("birth_date")
+    if "avatar" in data:
+        user.avatar = (data.get("avatar") or "").strip() or None
     await db.commit()
     await db.refresh(user)
     return UserOut.model_validate(user)
@@ -509,6 +512,8 @@ async def create_user(
         full_name=request.full_name,
         email=(request.email or "").strip() or None,
         birth_date=request.birth_date,
+        source=(request.source or "").strip() or None,
+        avatar=(request.avatar or "").strip() or None,
         role=role,
         tenant_id=UUID(current_user["tenant_id"]),
     )
@@ -563,6 +568,41 @@ async def update_user_role(
     await db.commit()
     await db.refresh(user)
     return UserOut.model_validate(user)
+
+
+@router.put("/api/users/{user_id}", response_model=UserOut)
+async def update_user_profile(
+    user_id: int,
+    request: UserAdminUpdate,
+    current_user: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Обновить профиль клиента или сотрудника (только админ)."""
+    result = await db.execute(
+        select(User).where(
+            User.id == user_id,
+            User.tenant_id == UUID(current_user["tenant_id"]),
+        )
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    data = request.model_dump(exclude_unset=True)
+    if data.get("full_name"):
+        user.full_name = str(data["full_name"]).strip()
+    if "email" in data:
+        user.email = (data.get("email") or "").strip() or None
+    if "birth_date" in data:
+        user.birth_date = data.get("birth_date")
+    if "source" in data:
+        user.source = (data.get("source") or "").strip() or None
+    if "avatar" in data:
+        user.avatar = (data.get("avatar") or "").strip() or None
+    await db.commit()
+    await db.refresh(user)
+    return UserOut.model_validate(user)
+
 
 @router.delete("/api/users/{user_id}")
 async def delete_user(
@@ -736,6 +776,8 @@ async def get_user_detail(
         full_name=user.full_name,
         email=user.email,
         birth_date=user.birth_date,
+        source=user.source,
+        avatar=user.avatar,
         role=user.role,
         created_at=user.created_at,
         appointments_count=len(appointments),

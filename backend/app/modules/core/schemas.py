@@ -138,6 +138,8 @@ class UserOut(BaseModel):
     full_name: str
     email: Optional[str] = None
     birth_date: Optional[date] = None
+    source: Optional[str] = None
+    avatar: Optional[str] = None
     role: str
 
     model_config = {"from_attributes": True}
@@ -176,6 +178,7 @@ class UserProfileUpdate(BaseModel):
     phone: Optional[str] = Field(None, min_length=1, max_length=20)
     email: Optional[str] = Field(None, max_length=255)
     birth_date: Optional[date] = None
+    avatar: Optional[str] = Field(None, max_length=500)
 
 class UserListOut(BaseModel):
     id: int
@@ -183,6 +186,8 @@ class UserListOut(BaseModel):
     full_name: str
     email: Optional[str] = None
     birth_date: Optional[date] = None
+    source: Optional[str] = None
+    avatar: Optional[str] = None
     role: str
     commission_percent: int = 0
     created_at: Optional[datetime] = None
@@ -206,7 +211,17 @@ class UserCreate(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=150)
     email: Optional[str] = Field(None, max_length=255)
     birth_date: Optional[date] = None
+    source: Optional[str] = Field(None, max_length=100)
+    avatar: Optional[str] = Field(None, max_length=500)
     role: str = Field(default="master")
+
+
+class UserAdminUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=1, max_length=150)
+    email: Optional[str] = Field(None, max_length=255)
+    birth_date: Optional[date] = None
+    source: Optional[str] = Field(None, max_length=100)
+    avatar: Optional[str] = Field(None, max_length=500)
 
 
 class OnboardingStatus(BaseModel):
@@ -224,6 +239,8 @@ class UserDetailOut(BaseModel):
     full_name: str
     email: Optional[str] = None
     birth_date: Optional[date] = None
+    source: Optional[str] = None
+    avatar: Optional[str] = None
     role: str
     created_at: Optional[datetime] = None
     appointments_count: int = 0

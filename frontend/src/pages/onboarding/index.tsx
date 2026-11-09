@@ -126,6 +126,7 @@ const STEPS = [
 const PRESETS: { id: BrandThemeId; label: string }[] = [
   { id: 'goldMetal', label: 'Gold Metal — металл, как на входе' },
   { id: 'goldGlow', label: 'Gold Glow — свечение' },
+  { id: 'silver', label: 'Silver — холодный металл' },
 ];
 
 type Status = {

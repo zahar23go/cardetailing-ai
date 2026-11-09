@@ -2,7 +2,7 @@
  * Пользователи — /crm/users
  * Клиенты (RFM) / мастера / админы + карточка клиента. Без state OwnerDashboard.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Typography,
@@ -21,9 +21,15 @@ import {
   Tooltip,
   Select,
   InputNumber,
+  Input,
 } from 'antd';
 import { Button, Modal } from '../../../components/ui';
-import { PhoneOutlined, DeleteOutlined, ToolOutlined } from '@ant-design/icons';
+import {
+  PhoneOutlined,
+  DeleteOutlined,
+  ToolOutlined,
+  SearchOutlined,
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -147,6 +153,7 @@ export default function UsersPage() {
   const [clients, setClients] = useState<RfmClient[]>([]);
   const [segments, setSegments] = useState<SegmentCount[]>([]);
   const [segmentFilter, setSegmentFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [clientsLoading, setClientsLoading] = useState(false);
 
   const [allUsers, setAllUsers] = useState<UserRow[]>([]);
@@ -160,6 +167,8 @@ export default function UsersPage() {
     total_earned: number;
     total_spent: number;
   } | null>(null);
+  const [clientEdit, setClientEdit] = useState({ source: '', avatar: '' });
+  const [clientSaving, setClientSaving] = useState(false);
 
   const [skillModal, setSkillModal] = useState(false);
   const [skillMaster, setSkillMaster] = useState<UserRow | null>(null);
@@ -282,6 +291,7 @@ export default function UsersPage() {
         ),
       ]);
       setClientDetail(data);
+      setClientEdit({ source: data.source || '', avatar: data.avatar || '' });
       if (pointsData.items && pointsData.items.length > 0) {
         setClientPoints(pointsData.items[0]);
       }
@@ -291,6 +301,43 @@ export default function UsersPage() {
     }
     setClientLoading(false);
   };
+
+  const saveClientProfile = async () => {
+    if (!clientDetail) return;
+    setClientSaving(true);
+    try {
+      const updated = await apiFetch<any>(`/api/users/${clientDetail.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          source: clientEdit.source.trim() || null,
+          avatar: clientEdit.avatar.trim() || null,
+        }),
+      });
+      setClientDetail((prev: any) => ({
+        ...prev,
+        source: updated.source,
+        avatar: updated.avatar,
+      }));
+      message.success('Данные клиента сохранены');
+    } catch (e: any) {
+      message.error(e.message || 'Не удалось сохранить данные клиента');
+    }
+    setClientSaving(false);
+  };
+
+  const filteredClients = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return clients;
+    const digits = query.replace(/\D/g, '');
+    return clients.filter((client) => {
+      const nameMatch = client.full_name.toLowerCase().includes(query);
+      const phoneDigits = client.phone.replace(/\D/g, '');
+      const phoneMatch = digits
+        ? phoneDigits.includes(digits)
+        : client.phone.toLowerCase().includes(query);
+      return nameMatch || phoneMatch;
+    });
+  }, [clients, searchQuery]);
 
   const masters = allUsers.filter((u) => u.role === 'master');
   const admins = allUsers.filter((u) => u.role === 'admin' || u.role === 'super_admin');
@@ -351,11 +398,26 @@ export default function UsersPage() {
               </Row>
             )}
 
-            {clients.length === 0 && !clientsLoading ? (
-              <Empty description={<Text className="text-titanium">Нет клиентов</Text>} />
+            <Input
+              allowClear
+              prefix={<SearchOutlined />}
+              placeholder="Поиск по имени или телефону"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ maxWidth: 340, marginBottom: 12 }}
+            />
+
+            {filteredClients.length === 0 && !clientsLoading ? (
+              <Empty
+                description={
+                  <Text className="text-titanium">
+                    {searchQuery.trim() ? 'Ничего не найдено' : 'Нет клиентов'}
+                  </Text>
+                }
+              />
             ) : (
               <Table
-                dataSource={clients}
+                dataSource={filteredClients}
                 rowKey="id"
                 pagination={{ pageSize: 20, size: 'small' }}
                 columns={[
@@ -599,7 +661,12 @@ export default function UsersPage() {
       <Modal
         title={<Text className="text-gold-bold">📋 Карточка клиента</Text>}
         open={clientModal}
-        onCancel={() => { setClientModal(false); setClientDetail(null); setClientPoints(null); }}
+        onCancel={() => {
+          setClientModal(false);
+          setClientDetail(null);
+          setClientPoints(null);
+          setClientEdit({ source: '', avatar: '' });
+        }}
         footer={null}
         width={520}
         className="modal-command"
@@ -608,18 +675,75 @@ export default function UsersPage() {
           {clientDetail && (
             <Space direction="vertical" size="middle">
               <Card size="small" className="card-detail">
-                <Space direction="vertical" size={4}>
-                  <Text className="text-white text-18-bold">{clientDetail.full_name}</Text>
-                  <Text className="text-titanium">📱 {clientDetail.phone}</Text>
-                  <Text className="text-titanium">Email: {clientDetail.email || '—'}</Text>
-                  <Text className="text-titanium">
-                    Дата рождения: {clientDetail.birth_date
-                      ? dayjs(clientDetail.birth_date).format('DD.MM.YYYY')
-                      : '—'}
-                  </Text>
-                  <Text className="text-titanium">
-                    📅 Регистрация: {dayjs(clientDetail.created_at).format('DD.MM.YYYY')}
-                  </Text>
+                <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                  {clientDetail.avatar ? (
+                    <img
+                      src={clientDetail.avatar}
+                      alt="avatar"
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '1px solid rgba(200,169,119,0.45)',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'rgba(200,169,119,0.15)',
+                        color: '#C8A977',
+                        fontSize: 22,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {(clientDetail.full_name || '?').slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <Space direction="vertical" size={4}>
+                    <Text className="text-white text-18-bold">{clientDetail.full_name}</Text>
+                    <Text className="text-titanium">📱 {clientDetail.phone}</Text>
+                    <Text className="text-titanium">Email: {clientDetail.email || '—'}</Text>
+                    <Text className="text-titanium">
+                      Дата рождения: {clientDetail.birth_date
+                        ? dayjs(clientDetail.birth_date).format('DD.MM.YYYY')
+                        : '—'}
+                    </Text>
+                    <Text className="text-titanium">Источник: {clientDetail.source || '—'}</Text>
+                    <Text className="text-titanium">
+                      📅 Регистрация: {dayjs(clientDetail.created_at).format('DD.MM.YYYY')}
+                    </Text>
+                  </Space>
+                </div>
+              </Card>
+
+              <Card size="small" className="card-detail">
+                <Text className="title-gold text-14 d-block mb-8">Источник и аватар</Text>
+                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  <Input
+                    placeholder="Ссылка на аватар (https://...)"
+                    value={clientEdit.avatar}
+                    onChange={(e) => setClientEdit((prev) => ({ ...prev, avatar: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Источник привлечения (Instagram, Telegram, сарафан...)"
+                    value={clientEdit.source}
+                    onChange={(e) => setClientEdit((prev) => ({ ...prev, source: e.target.value }))}
+                  />
+                  <Button
+                    size="small"
+                    look="gold"
+                    loading={clientSaving}
+                    onClick={saveClientProfile}
+                  >
+                    Сохранить
+                  </Button>
                 </Space>
               </Card>
 

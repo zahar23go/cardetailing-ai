@@ -160,6 +160,40 @@ class TestAuth:
         assert data["email"] == "client@example.com"
         assert data["birth_date"] == "1990-05-15"
 
+    async def test_admin_updates_client_source_and_avatar(
+        self,
+        client: AsyncClient,
+        admin_headers: dict,
+        test_user,
+    ):
+        """✅ Админ сохраняет источник привлечения и аватар клиента."""
+        response = await client.put(
+            f"/api/users/{test_user.id}",
+            json={
+                "source": "Instagram",
+                "avatar": "https://example.com/avatar.png",
+            },
+            headers=admin_headers,
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["source"] == "Instagram"
+        assert data["avatar"] == "https://example.com/avatar.png"
+
+        detail = await client.get(f"/api/users/{test_user.id}", headers=admin_headers)
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["source"] == "Instagram"
+        assert detail.json()["avatar"] == "https://example.com/avatar.png"
+
+        cleared = await client.put(
+            f"/api/users/{test_user.id}",
+            json={"source": None, "avatar": None},
+            headers=admin_headers,
+        )
+        assert cleared.status_code == 200, cleared.text
+        assert cleared.json()["source"] is None
+        assert cleared.json()["avatar"] is None
+
     async def test_modules_endpoint(self, client: AsyncClient, auth_headers: dict):
         """✅ GET /api/modules отдаёт включённые домены тарифа."""
         response = await client.get("/api/modules", headers=auth_headers)

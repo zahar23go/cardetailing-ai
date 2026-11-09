@@ -78,6 +78,8 @@ class TestRightToBeForgotten:
         old_phone = test_user.phone
         test_user.email = "alex@example.com"
         test_user.birth_date = datetime.now(timezone.utc).date()
+        test_user.source = "Instagram"
+        test_user.avatar = "https://example.com/avatar.png"
         await db_session.commit()
         await _seed_client_data(
             db_session, default_tenant.id, test_user.id, test_car.id, test_service.id
@@ -96,6 +98,8 @@ class TestRightToBeForgotten:
         assert user.full_name == "Удалённый клиент"
         assert user.email is None
         assert user.birth_date is None
+        assert user.source is None
+        assert user.avatar is None
 
         await db_session.refresh(test_car)
         assert test_car.license_plate is None

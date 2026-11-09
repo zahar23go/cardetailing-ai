@@ -79,6 +79,8 @@ class User(Base):
     full_name = Column(String(150), nullable=False)
     email = Column(String(255), nullable=True, index=True)
     birth_date = Column(Date, nullable=True, comment="Дата рождения клиента")
+    source = Column(String(100), nullable=True, comment="Источник привлечения клиента")
+    avatar = Column(String(500), nullable=True, comment="Ссылка на аватар клиента")
     role = Column(
         String(20),
         nullable=False,
