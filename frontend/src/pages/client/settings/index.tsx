@@ -30,7 +30,14 @@ import {
 dayjs.locale('ru');
 const { Text } = Typography;
 
-type Profile = { id: number; phone: string; full_name: string; role: string };
+type Profile = {
+  id: number;
+  phone: string;
+  full_name: string;
+  email?: string | null;
+  birth_date?: string | null;
+  role: string;
+};
 type CarDraft = {
   make: string;
   model: string;
@@ -64,6 +71,8 @@ export default function ClientSettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [cars, setCars] = useState<Car[]>([]);
   const [history, setHistory] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +92,8 @@ export default function ClientSettingsPage() {
     setProfile(me);
     setFullName(me.full_name || '');
     setPhone(me.phone || '');
+    setEmail(me.email || '');
+    setBirthDate(me.birth_date || '');
     setCars(carData.items || []);
     setHistory(appts.items || []);
   };
@@ -108,10 +119,17 @@ export default function ClientSettingsPage() {
     try {
       const updated = await apiFetch<Profile>('/api/me', {
         method: 'PUT',
-        body: JSON.stringify({ full_name: fullName.trim(), phone: phone.trim() }),
+        body: JSON.stringify({
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          email: email.trim() || null,
+          birth_date: birthDate || null,
+        }),
       });
       setProfile(updated);
       setPhone(updated.phone);
+      setEmail(updated.email || '');
+      setBirthDate(updated.birth_date || '');
       message.success('Профиль сохранён');
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : 'Ошибка сохранения');
@@ -200,7 +218,7 @@ export default function ClientSettingsPage() {
       <div className="client-section-head">
         <div>
           <h3>Профиль</h3>
-          <Badge variant="gold">Имя, телефон, автомобиль и история</Badge>
+          <Badge variant="gold">Личные данные, автомобиль и история</Badge>
         </div>
       </div>
 
@@ -222,6 +240,27 @@ export default function ClientSettingsPage() {
               className="input-luxury client-field"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+          <div>
+            <span className="label-field">Email</span>
+            <Input
+              type="email"
+              size="large"
+              className="input-luxury client-field"
+              placeholder="name@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <span className="label-field">Дата рождения</span>
+            <Input
+              type="date"
+              size="large"
+              className="input-luxury client-field"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
             />
           </div>
           <Button type="primary" look="gold" loading={saving} onClick={saveProfile}>

@@ -1,6 +1,6 @@
 """Pydantic schemas — модуль core."""
 import re
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Generic, Literal, Optional, TypeVar
 from uuid import UUID
@@ -136,6 +136,8 @@ class UserOut(BaseModel):
     id: int
     phone: str
     full_name: str
+    email: Optional[str] = None
+    birth_date: Optional[date] = None
     role: str
 
     model_config = {"from_attributes": True}
@@ -172,11 +174,15 @@ class TenantPlanUpdate(BaseModel):
 class UserProfileUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=1, max_length=150)
     phone: Optional[str] = Field(None, min_length=1, max_length=20)
+    email: Optional[str] = Field(None, max_length=255)
+    birth_date: Optional[date] = None
 
 class UserListOut(BaseModel):
     id: int
     phone: str
     full_name: str
+    email: Optional[str] = None
+    birth_date: Optional[date] = None
     role: str
     commission_percent: int = 0
     created_at: Optional[datetime] = None
@@ -198,6 +204,8 @@ class UserCreate(BaseModel):
     phone: str = Field(..., min_length=1, max_length=20)
     password: str = Field(..., min_length=4, max_length=255)
     full_name: str = Field(..., min_length=1, max_length=150)
+    email: Optional[str] = Field(None, max_length=255)
+    birth_date: Optional[date] = None
     role: str = Field(default="master")
 
 
@@ -214,6 +222,8 @@ class UserDetailOut(BaseModel):
     id: int
     phone: str
     full_name: str
+    email: Optional[str] = None
+    birth_date: Optional[date] = None
     role: str
     created_at: Optional[datetime] = None
     appointments_count: int = 0

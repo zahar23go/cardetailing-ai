@@ -611,6 +611,12 @@ export default function UsersPage() {
                 <Space direction="vertical" size={4}>
                   <Text className="text-white text-18-bold">{clientDetail.full_name}</Text>
                   <Text className="text-titanium">📱 {clientDetail.phone}</Text>
+                  <Text className="text-titanium">Email: {clientDetail.email || '—'}</Text>
+                  <Text className="text-titanium">
+                    Дата рождения: {clientDetail.birth_date
+                      ? dayjs(clientDetail.birth_date).format('DD.MM.YYYY')
+                      : '—'}
+                  </Text>
                   <Text className="text-titanium">
                     📅 Регистрация: {dayjs(clientDetail.created_at).format('DD.MM.YYYY')}
                   </Text>

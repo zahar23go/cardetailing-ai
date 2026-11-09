@@ -1,10 +1,11 @@
 """SQLAlchemy models — модуль core."""
 import enum
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     Enum,
     Float,
@@ -76,6 +77,8 @@ class User(Base):
     phone = Column(String(20), unique=True, nullable=False, index=True)
     password = Column(String(255), nullable=False)
     full_name = Column(String(150), nullable=False)
+    email = Column(String(255), nullable=True, index=True)
+    birth_date = Column(Date, nullable=True, comment="Дата рождения клиента")
     role = Column(
         String(20),
         nullable=False,

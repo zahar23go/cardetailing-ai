@@ -4,6 +4,8 @@
 Проверяют регистрацию, логин и доступ к защищённым маршрутам.
 """
 
+from datetime import date
+
 import pytest
 from httpx import AsyncClient
 
@@ -108,6 +110,55 @@ class TestAuth:
         assert data["role"] == "client"
         assert "enabled_modules" in data
         assert "core" in data["enabled_modules"]
+
+    async def test_update_me_email_and_birth_date(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        test_user,
+        db_session,
+    ):
+        """✅ /api/me сохраняет email и дату рождения и умеет их очищать."""
+        response = await client.put(
+            "/api/me",
+            json={"email": "alex@example.com", "birth_date": "1990-05-15"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["email"] == "alex@example.com"
+        assert data["birth_date"] == "1990-05-15"
+
+        await db_session.refresh(test_user)
+        assert test_user.email == "alex@example.com"
+        assert test_user.birth_date.isoformat() == "1990-05-15"
+
+        cleared = await client.put(
+            "/api/me",
+            json={"email": None, "birth_date": None},
+            headers=auth_headers,
+        )
+        assert cleared.status_code == 200, cleared.text
+        assert cleared.json()["email"] is None
+        assert cleared.json()["birth_date"] is None
+
+    async def test_admin_user_detail_has_email_and_birth_date(
+        self,
+        client: AsyncClient,
+        admin_headers: dict,
+        test_user,
+        db_session,
+    ):
+        """✅ Карточка клиента в CRM отдаёт email и дату рождения."""
+        test_user.email = "client@example.com"
+        test_user.birth_date = date(1990, 5, 15)
+        await db_session.commit()
+
+        response = await client.get(f"/api/users/{test_user.id}", headers=admin_headers)
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["email"] == "client@example.com"
+        assert data["birth_date"] == "1990-05-15"
 
     async def test_modules_endpoint(self, client: AsyncClient, auth_headers: dict):
         """✅ GET /api/modules отдаёт включённые домены тарифа."""

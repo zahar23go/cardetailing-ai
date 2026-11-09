@@ -87,6 +87,8 @@ async def anonymize_client(db: AsyncSession, user_id: int) -> bool:
 
     user.phone = f"del{secrets.token_hex(8)}"
     user.full_name = ANONYMIZED_NAME
+    user.email = None
+    user.birth_date = None
     user.password = hash_password(secrets.token_urlsafe(32))
     user.anonymized_at = datetime.now(timezone.utc)
 

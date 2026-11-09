@@ -379,6 +379,7 @@ async def update_me(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+    data = request.model_dump(exclude_unset=True)
     if request.full_name:
         user.full_name = request.full_name.strip()
     if request.phone:
@@ -389,6 +390,10 @@ async def update_me(
         if taken.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Этот телефон уже занят")
         user.phone = phone
+    if "email" in data:
+        user.email = (data.get("email") or "").strip() or None
+    if "birth_date" in data:
+        user.birth_date = data.get("birth_date")
     await db.commit()
     await db.refresh(user)
     return UserOut.model_validate(user)
@@ -502,6 +507,8 @@ async def create_user(
         phone=request.phone,
         password=_hash_password(request.password),
         full_name=request.full_name,
+        email=(request.email or "").strip() or None,
+        birth_date=request.birth_date,
         role=role,
         tenant_id=UUID(current_user["tenant_id"]),
     )
@@ -727,6 +734,8 @@ async def get_user_detail(
         id=user.id,
         phone=user.phone,
         full_name=user.full_name,
+        email=user.email,
+        birth_date=user.birth_date,
         role=user.role,
         created_at=user.created_at,
         appointments_count=len(appointments),
