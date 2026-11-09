@@ -13,6 +13,7 @@ import { CLIENT_NAV, clientTabFromPath } from './navConfig';
 import { isModuleEnabled, type AppModuleName } from '../../modules';
 import { useEnabledModules } from '../../ModulesContext';
 import ModuleGate from '../../ModuleGate';
+import MobileUserMenu from '../../components/MobileUserMenu';
 
 const { Header, Content, Sider } = Layout;
 const { Text } = Typography;
@@ -52,15 +53,17 @@ export default function ClientLayout({ user, onLogout }: Props) {
   return (
     <Layout className="client-layout client-app">
       <Header className="header-mobile client-header">
-        <Space size="small" align="center">
+        <div className="mobile-header-brand">
           <img
             src={brandIcon}
             alt=""
             className="client-header-logo"
           />
-          <Text className="client-header-title">{brandName}</Text>
-        </Space>
-        <span className="client-header-badge">Кабинет</span>
+          <Text className="client-header-title mobile-header-title">{brandName}</Text>
+        </div>
+        <div className="mobile-header-actions">
+          <MobileUserMenu user={user} onLogout={onLogout} />
+        </div>
       </Header>
 
       <Header className="header-desktop client-header">

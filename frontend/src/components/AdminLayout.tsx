@@ -17,6 +17,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import NotificationBell from './NotificationBell';
+import MobileUserMenu from './MobileUserMenu';
 import Sidebar from './Sidebar';
 import ModuleGate from '../ModuleGate';
 import { pathFromTab, tabFromPath } from '../admin/navConfig';
@@ -71,37 +72,26 @@ export default function AdminLayout({ user, onLogout }: AdminLayoutProps) {
   return (
     <Layout className="admin-layout client-layout">
       <Header className="header-mobile admin-header-mobile">
-        <div className="admin-mobile-brand">
+        <div className="mobile-header-brand">
           <img src={brandIcon} alt="" className="client-header-logo" />
-          <Text className="admin-header-title">{brandName}</Text>
+          <Text className="admin-header-title mobile-header-title">{brandName}</Text>
         </div>
-        <div className="admin-mobile-actions">
-          {showBranding && (
-            <button
-              type="button"
-              className="admin-mobile-action"
-              title="Брендинг"
-              aria-label="Брендинг"
-              onClick={() => navigate('/settings/branding')}
-            >
-              <BgColorsOutlined />
-            </button>
-          )}
-          <span className="admin-mobile-action admin-mobile-notify" title="Уведомления">
+        <div className="mobile-header-actions">
+          <span className="mobile-header-action mobile-header-notify" title="Уведомления">
             <NotificationBell />
           </span>
-          <span className="admin-mobile-action admin-mobile-user" title={user.full_name}>
-            <UserOutlined />
-          </span>
-          <button
-            type="button"
-            className="admin-mobile-action admin-mobile-logout"
-            title="Выйти"
-            aria-label="Выйти"
-            onClick={onLogout}
-          >
-            <LogoutOutlined />
-          </button>
+          <MobileUserMenu
+            user={user}
+            onLogout={onLogout}
+            extraItems={
+              showBranding
+                ? [{ key: 'branding', icon: <BgColorsOutlined />, label: 'Брендинг' }]
+                : []
+            }
+            onExtraClick={(key) => {
+              if (key === 'branding') navigate('/settings/branding');
+            }}
+          />
         </div>
       </Header>
 

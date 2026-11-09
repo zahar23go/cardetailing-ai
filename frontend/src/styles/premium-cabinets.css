@@ -1395,9 +1395,11 @@
 }
 
 /* ------------------------------------------------------------
-   13. Админский мобильный хедер: одна строка без переносов
+   13. Единые мобильные шапки и меню аватара
+   Админ / Мастер / Клиент
    ------------------------------------------------------------ */
-.admin-layout .header-mobile.admin-header-mobile {
+.admin-layout .header-mobile.admin-header-mobile,
+.master-layout .header-mobile.admin-header-mobile {
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
@@ -1407,20 +1409,25 @@
   padding: 0 12px !important;
 }
 
-.admin-layout .admin-mobile-brand {
+.mobile-header-brand {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
   flex: 1 1 auto;
 }
 
-.admin-layout .admin-mobile-brand .client-header-logo {
+.mobile-header-brand .client-header-logo {
   height: 24px;
   flex: 0 0 auto;
 }
 
-.admin-layout .admin-mobile-brand .admin-header-title {
+.admin-layout .mobile-header-brand .mobile-header-title,
+.master-layout .mobile-header-brand .mobile-header-title,
+.client-app .mobile-header-brand .mobile-header-title {
+  display: block;
+  min-width: 0;
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1428,14 +1435,15 @@
   font-size: 13px !important;
 }
 
-.admin-layout .admin-mobile-actions {
+.mobile-header-actions {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
 }
 
-.admin-layout .admin-mobile-action {
+.mobile-header-action,
+.mobile-user-trigger {
   width: 34px;
   height: 34px;
   padding: 0;
@@ -1455,34 +1463,93 @@
     color 180ms ease;
 }
 
-.admin-layout .admin-mobile-action:hover {
+.mobile-header-action:hover,
+.mobile-user-trigger:hover {
   background: var(--color-gold-shadow, rgba(200, 169, 119, 0.18));
   border-color: var(--color-gold, #d4af37);
   color: var(--color-gold-hover, #e5c04a);
 }
 
-.admin-layout .admin-mobile-action .anticon {
+.mobile-header-action .anticon,
+.mobile-user-trigger .anticon {
   color: currentColor;
   font-size: 16px;
 }
 
-.admin-layout .admin-mobile-notify,
-.admin-layout .admin-mobile-user {
+.mobile-header-notify {
   cursor: default;
 }
 
-.admin-layout .admin-mobile-notify .anticon {
+.mobile-user-trigger:focus-visible,
+.mobile-header-notify:focus-within {
+  outline: 2px solid var(--color-gold, #d4af37);
+  outline-offset: 2px;
+}
+
+.mobile-header-notify .anticon {
   color: var(--color-gold, #d4af37) !important;
 }
 
-.admin-layout .admin-mobile-logout {
-  background: var(--color-gold, #d4af37) !important;
-  border-color: var(--color-gold, #d4af37) !important;
-  color: #17120a !important;
+/* Выпадающее меню аватара (портал в body — общее для трёх ролей) */
+.mobile-user-menu .ant-dropdown-menu {
+  min-width: 232px;
+  padding: 6px;
+  border: 1px solid var(--color-gold-shadow, rgba(200, 169, 119, 0.22));
+  border-radius: 16px;
+  background: var(--color-elevated, #161b22);
+  box-shadow:
+    0 24px 56px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-.admin-layout .admin-mobile-logout .anticon {
-  color: #17120a !important;
+.mobile-user-menu .ant-dropdown-menu-item {
+  padding: 9px 12px !important;
+  border-radius: 10px;
+  color: var(--color-white, #f0f2f5);
+  font-size: 14px;
+}
+
+.mobile-user-menu .ant-dropdown-menu-item:not(.ant-dropdown-menu-item-disabled):hover {
+  background: var(--color-gold-shadow, rgba(212, 175, 55, 0.18)) !important;
+  color: var(--color-gold-hover, #e5c04a) !important;
+}
+
+.mobile-user-menu .ant-dropdown-menu-item-divider {
+  margin: 6px 4px;
+  background: var(--color-gold-shadow, rgba(212, 175, 55, 0.16)) !important;
+}
+
+.mobile-user-menu .ant-dropdown-menu-item-disabled {
+  padding-bottom: 11px !important;
+  opacity: 1 !important;
+  cursor: default;
+}
+
+.mobile-user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.35;
+}
+
+.mobile-user-meta-name {
+  color: var(--color-white, #f0f2f5);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mobile-user-meta-phone {
+  color: var(--color-titanium, #9ba3b5);
+  font-size: 12px;
+}
+
+.mobile-user-menu .ant-dropdown-menu-item-danger {
+  color: var(--color-danger-text, #ff6b6b) !important;
+}
+
+.mobile-user-menu .ant-dropdown-menu-item-danger:hover {
+  background: var(--color-danger-bg, rgba(199, 59, 59, 0.15)) !important;
+  color: var(--color-danger-text, #ff6b6b) !important;
 }
 
 /* Планшетный desktop-хедер: не даём кнопкам уйти на вторую строку */
@@ -1547,24 +1614,29 @@
 }
 
 @media (max-width: 360px) {
-  .admin-layout .header-mobile.admin-header-mobile {
+  .admin-layout .header-mobile.admin-header-mobile,
+  .master-layout .header-mobile.admin-header-mobile,
+  .client-app .header-mobile.client-header {
     padding: 0 8px !important;
   }
 
-  .admin-layout .admin-mobile-brand {
+  .mobile-header-brand {
     gap: 5px;
   }
 
-  .admin-layout .admin-mobile-brand .admin-header-title {
-    max-width: 100px;
+  .admin-layout .mobile-header-brand .mobile-header-title,
+  .master-layout .mobile-header-brand .mobile-header-title,
+  .client-app .mobile-header-brand .mobile-header-title {
+    max-width: 110px;
     font-size: 12px !important;
   }
 
-  .admin-layout .admin-mobile-actions {
+  .mobile-header-actions {
     gap: 4px;
   }
 
-  .admin-layout .admin-mobile-action {
+  .mobile-header-action,
+  .mobile-user-trigger {
     width: 30px;
     height: 30px;
     font-size: 13px;
@@ -1579,5 +1651,53 @@
   .master-layout * {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------
+   15. Админские таблицы на мобильных: горизонтальный скролл
+   Не даём колонкам сжиматься до одной буквы и растягивать страницу.
+   ------------------------------------------------------------ */
+@media (max-width: 767px) {
+  .admin-layout .ant-table-wrapper {
+    max-width: 100%;
+  }
+
+  .admin-layout .ant-table-content,
+  .admin-layout .ant-table-body {
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-gold, #d4af37) rgba(255, 255, 255, 0.06);
+  }
+
+  .admin-layout .ant-table-content > table,
+  .admin-layout .ant-table-body > table {
+    width: max-content !important;
+    min-width: 100% !important;
+    table-layout: auto !important;
+  }
+
+  .admin-layout .ant-table-thead > tr > th,
+  .admin-layout .ant-table-tbody > tr > td {
+    padding: 10px 12px !important;
+  }
+
+  .admin-layout .ant-table-thead > tr > th {
+    white-space: nowrap;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+  }
+
+  .admin-layout .ant-table-tbody > tr > td {
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+  }
+
+  .admin-layout .ant-table-wrapper .ant-spin-container {
+    overflow: hidden;
+    border-radius: var(--radius-card, 20px);
   }
 }

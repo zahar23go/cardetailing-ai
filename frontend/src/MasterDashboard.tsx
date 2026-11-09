@@ -35,6 +35,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import PortfolioSection from './components/PortfolioSection';
 import NotificationBell from './components/NotificationBell';
+import MobileUserMenu from './components/MobileUserMenu';
 import NotificationList from './components/NotificationList';
 import NotificationSettings from './components/NotificationSettings';
 import CloseVisitModal from './components/CloseVisitModal';
@@ -956,9 +957,16 @@ export default function MasterDashboard({ user, onLogout, initialSection = 'over
   return (
     <Layout className="client-layout master-layout">
       <Header className="header-mobile admin-header-mobile">
-        <img src="/images/logo-formula-sport.png" alt="" className="client-header-logo" />
-        <Text className="admin-header-title">CAR DETAILING AI</Text>
-        <span className="admin-header-badge">Мастер</span>
+        <div className="mobile-header-brand">
+          <img src="/images/logo-formula-sport.png" alt="" className="client-header-logo" />
+          <Text className="admin-header-title mobile-header-title">CAR DETAILING AI</Text>
+        </div>
+        <div className="mobile-header-actions">
+          <span className="mobile-header-action mobile-header-notify" title="Уведомления">
+            <NotificationBell />
+          </span>
+          <MobileUserMenu user={user} onLogout={onLogout} />
+        </div>
       </Header>
 
       <Header className="header-desktop admin-header">
