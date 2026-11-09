@@ -13,6 +13,7 @@ from app.modules.ai.detailer_tools import DetailerTools, dispatch
 
 EXPECTED_FUNCTIONS = {
     "get_client_profile",
+    "get_weather",
     "update_client_profile",
     "search_portfolio",
     "search_products",

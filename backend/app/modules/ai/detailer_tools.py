@@ -193,6 +193,50 @@ class DetailerTools:
             ],
         }
 
+    async def get_weather(self, date: str | None = None) -> dict:
+        """Прогноз погоды на дату визита (Open-Meteo) для полировки и покрытий."""
+        from app.modules.discounts.smart import (
+            WEATHER_KIND_LABELS,
+            pick_weather_day,
+            weather_forecast_for_tenant,
+            weather_kind_of_day,
+        )
+
+        iso = self._today_iso()
+        if date:
+            parsed, error = _parse_date_arg(date)
+            if error:
+                return {"ok": False, "error": error}
+            iso = parsed or iso
+
+        target = datetime.strptime(iso, "%Y-%m-%d").date()
+        days, geo = await weather_forecast_for_tenant(self.db, self.tenant_id)
+        day = pick_weather_day(days, target)
+        if day is None:
+            return {
+                "ok": False,
+                "date": iso,
+                "city": geo.get("city"),
+                "error": "Прогноз доступен только на ближайшие 7 дней.",
+            }
+
+        kind = weather_kind_of_day(day)
+        return {
+            "ok": True,
+            "date": iso,
+            "city": geo.get("city"),
+            "temperature_min": round(day.t_min, 1),
+            "temperature_max": round(day.t_max, 1),
+            "precipitation_mm": round(day.precip_mm, 1),
+            "condition": kind,
+            "condition_label": WEATHER_KIND_LABELS.get(kind, kind),
+            "advice": (
+                "Для полировки и нанесения покрытий лучше выбрать сухой день."
+                if kind in ("rain", "freeze")
+                else "Погода подходит для работ на улице."
+            ),
+        }
+
     async def update_client_profile(
         self,
         car_model: str | None = None,
@@ -716,6 +760,7 @@ class DetailerTools:
 # Имя функции в промпте → метод DetailerTools
 HANDLERS = {
     "get_client_profile": "get_client_profile",
+    "get_weather": "get_weather",
     "update_client_profile": "update_client_profile",
     "search_portfolio": "search_portfolio",
     "search_products": "search_products",

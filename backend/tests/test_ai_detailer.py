@@ -9,9 +9,39 @@ from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
 
 from app.models import Appointment, Box, BoxService, Service
+from app.modules.ai.detailer_tools import DetailerTools, dispatch
+from app.modules.ai.financier_service import WeatherDay
 
 
 class TestAIDetailer:
+    async def test_get_weather_tool(
+        self,
+        db_session,
+        default_tenant,
+        test_user,
+    ):
+        """✅ get_weather отдаёт прогноз и не ходит в сеть при неверной дате."""
+        tools = DetailerTools(
+            db_session,
+            default_tenant.id,
+            {"id": test_user.id, "full_name": test_user.full_name},
+        )
+        day = WeatherDay(date="2026-11-10", t_max=21.0, t_min=12.0, precip_mm=0.0)
+        with patch(
+            "app.modules.discounts.smart.weather_forecast_for_tenant",
+            new_callable=AsyncMock,
+            return_value=([day], {"city": "Москва", "tz": "Europe/Moscow"}),
+        ):
+            result = await dispatch(tools, "get_weather", {"date": "2026-11-10"})
+        assert result["ok"] is True
+        assert result["city"] == "Москва"
+        assert result["condition"] == "dry"
+        assert result["temperature_max"] == 21.0
+
+        bad = await dispatch(tools, "get_weather", {"date": "не-дата"})
+        assert bad["ok"] is False
+        assert "формат" in bad["error"]
+
     async def test_consultant_still_works(
         self,
         client: AsyncClient,
