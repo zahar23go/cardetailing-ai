@@ -3,7 +3,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Empty, Spin, Typography } from 'antd';
+import { Empty, Spin, Typography, Modal, message } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -107,6 +107,28 @@ export default function ClientHomePage() {
     [appointments, services],
   );
 
+  const cancelAppointment = (appointment: Appointment) => {
+    Modal.confirm({
+      title: 'Отменить запись?',
+      content: `${appointment.service_name || appointment.service?.name || 'Услуга'} · ${dayjs(appointment.start_time).format('D MMMM, HH:mm')}. Слот освободится.`,
+      okText: 'Да, отменить',
+      cancelText: 'Оставить',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await apiFetch(`/api/appointments/${appointment.id}/cancel`, { method: 'PUT' });
+          setAppointments((prev) => prev.map((item) => (
+            item.id === appointment.id ? { ...item, status: 'cancelled' } : item
+          )));
+          message.success('Запись отменена');
+        } catch (e: unknown) {
+          message.error(e instanceof Error ? e.message : 'Не удалось отменить запись');
+          throw e;
+        }
+      },
+    });
+  };
+
   if (loading) return <Spin />;
 
   return (
@@ -188,6 +210,16 @@ export default function ClientHomePage() {
                 <div className="client-appt-meta">
                   <Badge variant={st.variant} size="sm">{st.label}</Badge>
                   <Text className="text-gold-bold">{formatCurrency(a.total_price)}</Text>
+                  {(a.status === 'pending' || a.status === 'confirmed') && (
+                    <Button
+                      size="small"
+                      look="danger"
+                      disabled={offline}
+                      onClick={() => cancelAppointment(a)}
+                    >
+                      Отменить
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
