@@ -13,6 +13,8 @@ import {
   HomeOutlined,
   FileTextOutlined,
   SettingOutlined,
+  BgColorsOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import NotificationBell from './NotificationBell';
 import Sidebar from './Sidebar';
@@ -69,9 +71,38 @@ export default function AdminLayout({ user, onLogout }: AdminLayoutProps) {
   return (
     <Layout className="admin-layout client-layout">
       <Header className="header-mobile admin-header-mobile">
-        <img src={brandIcon} alt="" className="client-header-logo" />
-        <Text className="admin-header-title">{brandName}</Text>
-        <span className="admin-header-badge">Command Center</span>
+        <div className="admin-mobile-brand">
+          <img src={brandIcon} alt="" className="client-header-logo" />
+          <Text className="admin-header-title">{brandName}</Text>
+        </div>
+        <div className="admin-mobile-actions">
+          {showBranding && (
+            <button
+              type="button"
+              className="admin-mobile-action"
+              title="Брендинг"
+              aria-label="Брендинг"
+              onClick={() => navigate('/settings/branding')}
+            >
+              <BgColorsOutlined />
+            </button>
+          )}
+          <span className="admin-mobile-action admin-mobile-notify" title="Уведомления">
+            <NotificationBell />
+          </span>
+          <span className="admin-mobile-action admin-mobile-user" title={user.full_name}>
+            <UserOutlined />
+          </span>
+          <button
+            type="button"
+            className="admin-mobile-action admin-mobile-logout"
+            title="Выйти"
+            aria-label="Выйти"
+            onClick={onLogout}
+          >
+            <LogoutOutlined />
+          </button>
+        </div>
       </Header>
 
       <Header className="header-desktop admin-header">
@@ -80,18 +111,20 @@ export default function AdminLayout({ user, onLogout }: AdminLayoutProps) {
           <Text className="admin-header-title">{brandName}</Text>
           <span className="admin-header-badge">Command Center</span>
         </Space>
-        <Space size="middle" className="admin-header-actions" wrap>
+        <Space size="middle" className="admin-header-actions" wrap={false}>
           {showBranding && (
             <Button
               type="text"
-              className="admin-header-btn"
+              icon={<BgColorsOutlined />}
+              className="admin-header-btn admin-header-btn-branding"
               onClick={() => navigate('/settings/branding')}
             >
-              Брендинг
+              <span className="admin-header-btn-label">Брендинг</span>
             </Button>
           )}
           <span className="admin-header-user">
-            <span>{user.full_name}</span>
+            <UserOutlined />
+            <span className="admin-header-user-name">{user.full_name}</span>
           </span>
           <NotificationBell />
           <Button
@@ -100,7 +133,7 @@ export default function AdminLayout({ user, onLogout }: AdminLayoutProps) {
             onClick={onLogout}
             className="admin-header-btn admin-header-btn-logout"
           >
-            Выйти
+            <span className="admin-header-btn-label">Выйти</span>
           </Button>
         </Space>
       </Header>

@@ -10,6 +10,7 @@ import './styles/global.css';
 import './styles/theme.css';
 import './styles/components.css';
 import './components/ui/ui.css';
+import './styles/premium-cabinets.css';
 
 registerServiceWorker();
 

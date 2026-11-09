@@ -6,16 +6,23 @@ const Bar = styled.div`
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: 72px;
+  bottom: 78px;
   z-index: 40;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  max-width: 620px;
+  margin: 0 auto;
   padding: 12px 14px;
   border-radius: ${({ theme }) => theme.radii.lg};
   background: ${({ theme }) => theme.brand.colors.bg.elevated};
   border: 1px solid ${({ theme }) => theme.brand.colors.accent.border};
+  box-shadow:
+    0 22px 54px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 `;
 
 const Copy = styled.div`
@@ -65,7 +72,7 @@ export default function PwaInstallBanner() {
   };
 
   return (
-    <Bar>
+    <Bar className="pwa-install-banner">
       <Copy>
         {deferred
           ? 'Установить на экран Домой — как приложение салона.'
